@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Focusable="False" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Grid>
-        <Border Background="{DynamicResource SidebarBackground}">
+        <Border x:Name="MainBorder" Background="{DynamicResource SidebarBackground}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />

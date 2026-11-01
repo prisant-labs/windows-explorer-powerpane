@@ -83,6 +83,7 @@ namespace QuickPane.UI
             if (_wired || _detached) return;
             _wired = true;
             if (App.Theme != null) App.Theme.ThemeChanged += OnDataChanged;
+            if (App.Theme != null) App.Theme.PaneColorChanged += OnPaneColorChanged;
             if (App.Settings != null) App.Settings.Changed += OnSettingsChanged;
             SshfsService.MountStatusChanged += OnSshMountChanged;
             PaneFilter.Changed += OnFilterChanged;
@@ -93,6 +94,7 @@ namespace QuickPane.UI
             if (!_wired) return;
             _wired = false;
             if (App.Theme != null) App.Theme.ThemeChanged -= OnDataChanged;
+            if (App.Theme != null) App.Theme.PaneColorChanged -= OnPaneColorChanged;
             if (App.Settings != null) App.Settings.Changed -= OnSettingsChanged;
             SshfsService.MountStatusChanged -= OnSshMountChanged;
             PaneFilter.Changed -= OnFilterChanged;
@@ -188,6 +190,19 @@ namespace QuickPane.UI
         private void OnDataChanged()
         {
             QueueBuild();
+        }
+
+        /// <summary>A PaneColor change (#134) alone, as opposed to a real theme switch: no rebuild,
+        /// just the one Border repainted. MainBorder's Background is already bound to SidebarBackground
+        /// with DynamicResource, but that binding did not pick up ThemeService's resource dictionary
+        /// swap on its own for an already-rendered, HwndSource-hosted pane (confirmed empirically in
+        /// the sandbox), so this re-establishes the same binding, which forces it to re-read the
+        /// resource's current value right away instead of waiting on a notification that never
+        /// arrives.</summary>
+        private void OnPaneColorChanged()
+        {
+            if (_detached || MainBorder == null) return;
+            MainBorder.SetResourceReference(Border.BackgroundProperty, "SidebarBackground");
         }
 
         // What BuildSections built the pane from last time, so OnSettingsChanged can tell a change

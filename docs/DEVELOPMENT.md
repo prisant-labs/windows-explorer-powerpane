@@ -79,6 +79,7 @@ Windows Sandbox makes a safe test bed for UI checks. It is a disposable desktop 
 - **Comments explain why.** The codebase documents the reason behind each non-obvious choice, often a past bug. Keep that style.
 - **One change per commit.** Each fix should be one commit that can be cherry-picked onto a branch cut from upstream.
 - **No personal data.** Use invented paths such as `C:\Demo\Projects` in tests, comments, issues, and commit messages.
+- **The pane matches Explorer's own color by default.** A Settings pane color other than Default (the swatches on the Pane page) is the person's own opt-in; never default a theme, profile, or release to a color choice they didn't make.
 
 ## Traps in the code
 
