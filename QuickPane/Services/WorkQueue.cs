@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading;
 
 namespace QuickPane.Services
@@ -48,24 +49,46 @@ namespace QuickPane.Services
     /// </summary>
     internal sealed class WorkLane
     {
+        // A task that runs long enough to matter gets its own log line, so a stalled lane shows up
+        // without waiting for someone to notice the symptom (prisant-labs/windows-explorer-quickpane#77).
+        private const long SlowTaskMs = 5000;
+
         private readonly BlockingCollection<Action> _queue = new BlockingCollection<Action>();
         private readonly object _gate = new object();
         private readonly string _name;
         private readonly Action<string, Exception> _onError;
+        private readonly Action<string> _onInfo;
         private Thread _thread;
+        private int _nextDepthThreshold = 25;
 
-        public WorkLane(string name, Action<string, Exception> onError = null)
+        public WorkLane(string name, Action<string, Exception> onError = null, Action<string> onInfo = null)
         {
             _name = name;
             _onError = onError ?? Log.Error;
+            _onInfo = onInfo ?? Log.Info;
         }
 
         public void Post(Action work)
         {
             if (work == null) return;
             EnsureThread();
-            try { _queue.Add(work); }
-            catch (InvalidOperationException) { /* shutting down */ }
+            int depth;
+            try { _queue.Add(work); depth = _queue.Count; }
+            catch (InvalidOperationException) { /* shutting down */ return; }
+            bool report;
+            lock (_gate) { report = ShouldReportDepth(depth, ref _nextDepthThreshold); }
+            if (report) _onInfo(_name + " queue depth " + depth);
+        }
+
+        /// <summary>Whether the backlog just crossed a reporting line: 25, 50, 100, and doubling from
+        /// there, so a stalled lane's queue shows up in the log without a line for every single post.
+        /// Depth 0 resets the next line back to 25, so the next burst reports from the start again.</summary>
+        internal static bool ShouldReportDepth(int depth, ref int nextThreshold)
+        {
+            if (depth == 0) { nextThreshold = 25; return false; }
+            if (depth < nextThreshold) return false;
+            while (nextThreshold <= depth) nextThreshold *= 2;
+            return true;
         }
 
         private void EnsureThread()
@@ -85,11 +108,51 @@ namespace QuickPane.Services
 
         private void Loop()
         {
+            var sw = new Stopwatch();
             foreach (var work in _queue.GetConsumingEnumerable())
             {
+                sw.Restart();
                 try { work(); }
                 catch (Exception ex) { _onError("background work failed on " + _name, ex); }
+                var ms = sw.ElapsedMilliseconds;
+                var waiting = _queue.Count;
+                if (ms > SlowTaskMs)
+                    _onInfo("task on " + _name + " ran " + ms + " ms; " + waiting + " waiting");
+                if (waiting == 0) lock (_gate) { ShouldReportDepth(0, ref _nextDepthThreshold); }
             }
+        }
+    }
+
+    /// <summary>
+    /// Merges every Request() that arrives while a run is queued or in flight into the one about to
+    /// run, instead of posting a new run for each. The groups watcher used to re-arm a 250 ms timer on
+    /// every change and post a fresh full scan each time it fired, so separate bursts during a stalled
+    /// lane stacked up scans that each walked every pin again
+    /// (prisant-labs/windows-explorer-quickpane#77). Clearing the pending flag before running work means
+    /// a Request() that arrives mid-run is not lost: it schedules exactly one more run after this one.
+    /// </summary>
+    internal sealed class CoalescedPost
+    {
+        private readonly Action _work;
+        private readonly Action<Action> _post;
+        private int _pending;
+
+        public CoalescedPost(Action work, Action<Action> post)
+        {
+            _work = work;
+            _post = post;
+        }
+
+        public void Request()
+        {
+            if (Interlocked.CompareExchange(ref _pending, 1, 0) != 0) return;
+            _post(Run);
+        }
+
+        private void Run()
+        {
+            Interlocked.Exchange(ref _pending, 0);
+            _work();
         }
     }
 }

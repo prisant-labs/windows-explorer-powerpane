@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+On `main` after 3.11.0.0; these ship in the next release.
+
+### Changed
+- When the groups folder changes in several bursts while background work is busy, QuickPane now rescans it once instead of once per burst. The log also notes when background work backs up or one task runs longer than 5 seconds ([#77](https://github.com/prisant-labs/windows-explorer-quickpane/issues/77)).
+
 ## [3.11.0.0] - Unreleased
 
 Settings is now a Windows 11 Settings-style window, with its own navigation pane, search box, and cards, in place of the old tabbed panel.

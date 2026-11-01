@@ -31,6 +31,7 @@ namespace QuickPane.Services
         private FileSystemWatcher _watcher;
         private Timer _debounce;
         private readonly object _gate = new object();
+        private readonly CoalescedPost _rescan;
 
         private readonly Action<string> _info;
 
@@ -42,6 +43,9 @@ namespace QuickPane.Services
         {
             _settings = settings;
             _info = info ?? Log.Info;
+            // A field initializer cannot call an instance method (CS0236), so this is built here
+            // instead of alongside _debounce and _gate above.
+            _rescan = new CoalescedPost(() => { ScanOnce(); RaiseChanged(); }, WorkQueue.Post);
         }
 
         public string Root { get { return _settings.ExpandedGroupsPath; } }
@@ -1038,9 +1042,15 @@ namespace QuickPane.Services
         {
             if (!TriggersRescan(e.ChangeType, e.FullPath)) return;
             // Scan on the worker, not on the watcher's threadpool callback, so the timer thread is
-            // never tied up by a slow disk and the scan is serialized with everything else.
-            if (_debounce == null)
-                _debounce = new Timer(_ => WorkQueue.Post(() => { ScanOnce(); RaiseChanged(); }), null, Timeout.Infinite, Timeout.Infinite);
+            // never tied up by a slow disk and the scan is serialized with everything else. _debounce
+            // used to be created lazily with no lock, a small race between threadpool callbacks; the
+            // lock here closes that. _rescan merges every timer fire that lands while a scan is already
+            // queued or running into the one about to run (#77).
+            lock (_gate)
+            {
+                if (_debounce == null)
+                    _debounce = new Timer(_ => _rescan.Request(), null, Timeout.Infinite, Timeout.Infinite);
+            }
             _debounce.Change(250, Timeout.Infinite);
         }
 
