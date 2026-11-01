@@ -187,6 +187,9 @@ namespace QuickPane
             _dialogPanes.Start();     // adds a pane beside file Open/Save dialogs, in every pane mode
 
             Drives = new DriveService();
+            // The quick pass above only reads DriveType now, so every row starts with a default label
+            // and Ready=true (#76); this warms the real details before This PC is ever opened.
+            Drives.RefreshAsync();
             RecentApps = new RecentAppsService();
             AppDefaults = new AppDefaultsService();
 

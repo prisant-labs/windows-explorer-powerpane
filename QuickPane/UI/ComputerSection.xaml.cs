@@ -127,8 +127,9 @@ namespace QuickPane.UI
         private FrameworkElement BuildDriveNode(DriveItem d, int level)
         {
             var label = d.Label + "  (" + d.Letter + ")";
-            var icon = IconHelper.GetFolderIcon(d.RootPath, d.Ready);
-            var node = new FolderTreeNode(label, d.RootPath, d.Ready, _navigate, level, false, icon);
+            // No overrideIcon: the node binds its own real icon in the background (#76), since a
+            // drive's icon extraction is no more guaranteed to be fast than any other fixed-drive path.
+            var node = new FolderTreeNode(label, d.RootPath, d.Ready, _navigate, level, false, null);
             node.Row.ContextMenu = BuildDriveMenu(d);
             if (d.Ready && d.TotalBytes > 0)
             {

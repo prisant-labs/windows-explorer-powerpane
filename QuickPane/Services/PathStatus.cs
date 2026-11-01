@@ -92,10 +92,6 @@ namespace QuickPane.Services
         /// <summary>Ask for a (re-)probe without reading anything.</summary>
         public static void Touch(string path) { Lookup(path); }
 
-        /// <summary>Fire the coalesced Changed event (used by slow icon extraction as well, so all
-        /// visual refreshes funnel through one throttle).</summary>
-        public static void NotifyVisualRefresh() { QueueRaise(); }
-
         // Returns the entry (never probes on the calling thread) and queues a probe when the entry
         // is new or stale. Null for empty paths.
         private static Entry Lookup(string path)

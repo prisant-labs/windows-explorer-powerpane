@@ -37,11 +37,16 @@ namespace QuickPane.UI
         private readonly PinDropContext _pinContext;
         private readonly Func<int, List<FrameworkElement>> _childProvider;
         private readonly Action _onClick;
+        private readonly Image _icon;
         private bool _loaded;
         private bool _expanded;
         private readonly bool _hasChildren;
 
         public Border Row { get { return _row; } }
+
+        /// <summary>The row's icon image, so a caller that supplies no <c>overrideIcon</c> (an app
+        /// icon fetched separately, for instance) can bind its own real icon onto this row.</summary>
+        internal Image IconImage { get { return _icon; } }
 
         /// <summary>The row's visible text, for the pane's filter.</summary>
         public string LabelText { get; private set; }
@@ -94,9 +99,11 @@ namespace QuickPane.UI
                 Width = 16,
                 Height = 16,
                 Margin = new Thickness(2, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Source = overrideIcon ?? IconHelper.GetIcon(path, exists, isFile)
+                VerticalAlignment = VerticalAlignment.Center
             };
+            if (overrideIcon != null) icon.Source = overrideIcon;
+            else IconHelper.Bind(icon, path, exists, isFile);
+            _icon = icon;
             var label = new TextBlock
             {
                 Text = display,
@@ -297,8 +304,11 @@ namespace QuickPane.UI
                 return;
             }
             var path = _path;
-            var nav = _navigate;
             var level = _level;
+            // A WeakReference, not this node's own closure, holds the way back to it: a slow or huge
+            // folder (thousands of children, see #76) must never keep a detached pane's tree alive
+            // just because its expand is still in flight.
+            var weakSelf = new WeakReference<FolderTreeNode>(this);
             WorkQueue.Post(() =>
             {
                 string[] dirs;
@@ -307,8 +317,10 @@ namespace QuickPane.UI
                 var ordered = dirs.OrderBy(d => Path.GetFileName(d), StringComparer.CurrentCultureIgnoreCase).ToList();
                 WorkQueue.PostUI(() =>
                 {
+                    FolderTreeNode self;
+                    if (!weakSelf.TryGetTarget(out self)) return; // the row's pane closed before this ran
                     foreach (var d in ordered)
-                        _children.Children.Add(new FolderTreeNode(Path.GetFileName(d), d, true, nav, level + 1));
+                        self._children.Children.Add(new FolderTreeNode(Path.GetFileName(d), d, true, self._navigate, level + 1));
                 });
             });
         }

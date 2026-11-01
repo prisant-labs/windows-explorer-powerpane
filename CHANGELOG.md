@@ -6,6 +6,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 
 ### Changed
 - When the groups folder changes in several bursts while background work is busy, QuickPane now rescans it once instead of once per burst. The log also notes when background work backs up or one task runs longer than 5 seconds ([#77](https://github.com/prisant-labs/windows-explorer-quickpane/issues/77)).
+- Icons and drive details now load in the background. A pane appears at once with generic icons, and the real ones fill in a moment later, so a slow disk, a custom icon handler, or an expanded folder with thousands of subfolders no longer holds up Explorer. A finished icon now updates only the rows that show it, instead of rebuilding every pane section ([#76](https://github.com/prisant-labs/windows-explorer-quickpane/issues/76), [#78](https://github.com/prisant-labs/windows-explorer-quickpane/issues/78)).
 
 ## [3.11.0.0] - Unreleased
 
