@@ -95,6 +95,7 @@ namespace QuickPane.Explorer
             try
             {
                 _sidebar = new SidebarControl();
+                _sidebar.HostWindow = _cabinet;   // set before Attach, which is what builds the sections
                 _sidebar.Attach(NavigateInThisWindow);
                 _sidebar.TitleToggle = ToggleCollapsed;
 

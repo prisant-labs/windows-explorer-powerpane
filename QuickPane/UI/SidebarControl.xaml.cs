@@ -28,6 +28,15 @@ namespace QuickPane.UI
         /// Explorer window has no answer to, so they are built only when this is set.</summary>
         public string HostApp { get; set; }
 
+        /// <summary>Top-level window this pane is attached to: an Explorer window's own hwnd, or a
+        /// file dialog's hwnd. Quick actions (quick actions, first version) uses it to read "the folder
+        /// the host Explorer window shows" fresh at the moment an action runs, through
+        /// ExplorerNavigator.GetCurrentPath, which only ever resolves a real Explorer window. A file
+        /// dialog's hwnd never resolves there, which is exactly why BuildSection skips the Quick
+        /// actions section entirely whenever HostApp is set (i.e. whenever this is a dialog), rather
+        /// than building it and finding out at click time.</summary>
+        public IntPtr HostWindow { get; set; }
+
         /// <summary>The pane a row belongs to, found by walking up from the row. A row is built before it
         /// is in the tree, so anything that depends on the host app has to ask at the moment it is
         /// needed rather than at construction.</summary>
@@ -131,6 +140,7 @@ namespace QuickPane.UI
                 var c = child as ComputerSection; if (c != null) { c.Detach(); continue; }
                 var ra = child as RecentAppsSection; if (ra != null) { ra.Detach(); continue; }
                 var ad = child as AppDefaultsSection; if (ad != null) { ad.Detach(); continue; }
+                var qa = child as QuickActionsSection; if (qa != null) { qa.Detach(); continue; }
             }
         }
 
@@ -249,6 +259,19 @@ namespace QuickPane.UI
                     sb.Append(sec.Type).Append('\u0001').Append(sec.Order).Append('\u0001').Append(sec.Title).Append('\u0002');
             }
             sb.Append('\u0003').Append(s.RecentAppsSource).Append('\u0003');
+
+            // The Quick actions master switch is the "quickactions" entry in Sections above, already
+            // covered there; this is only which built-in actions show and in what order, and only
+            // matters while the section itself is visible -- toggling an action while the switch is
+            // off would otherwise rebuild every open pane for a list nothing on screen reads from
+            // (quick actions, first version).
+            bool quickActionsVisible = s.Sections != null && s.Sections.Any(x => x.Type == "quickactions" && x.Visible);
+            if (quickActionsVisible && s.QuickActions != null)
+            {
+                foreach (var a in s.QuickActions)
+                    sb.Append(a.Id).Append('\u0001').Append(a.Enabled).Append('\u0002');
+            }
+            sb.Append('\u0003');
 
             if (s.SshProfiles != null)
             {
@@ -481,6 +504,15 @@ namespace QuickPane.UI
                     var ad = new AppDefaultsSection(); ad.Build(_navigate, HostApp); return ad;
                 case "recentapps":
                     var ra = new RecentAppsSection(); ra.Build(_navigate); return ra;
+                case "quickactions":
+                    // Hidden inside a file dialog (HostApp set): there is no reliable way to read a
+                    // dialog's current folder the way ExplorerNavigator.GetCurrentPath reads a real
+                    // Explorer window's. Also hidden on the desktop dock and any other host that never
+                    // set HostWindow: that pane follows whichever Explorer window last had focus
+                    // rather than owning one of its own, so "the folder the host window shows" has no
+                    // answer there either.
+                    if (!string.IsNullOrEmpty(HostApp) || HostWindow == IntPtr.Zero) return null;
+                    var qa = new QuickActionsSection(); qa.Build(HostWindow); return qa;
                 case "computer":
                     var c = new ComputerSection(); c.Build(_navigate); return c;
                 case "network":

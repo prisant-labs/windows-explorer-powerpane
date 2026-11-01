@@ -134,6 +134,7 @@ namespace QuickPane.Explorer
                 };
                 _sidebar = new SidebarControl();
                 _sidebar.HostApp = _hostApp;   // set before Attach, which is what builds the sections
+                _sidebar.HostWindow = _dlg;
                 _sidebar.Attach(_navigate);
                 _host = new HwndSource(p);
                 // HwndSource swallows a failed CreateWindowEx and disposes itself, so the object can come
