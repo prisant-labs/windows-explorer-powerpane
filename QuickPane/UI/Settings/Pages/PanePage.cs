@@ -141,12 +141,17 @@ namespace QuickPane.UI.Settings.Pages
             };
             description.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
 
+            // The light tints are close to one another by design, so the chosen one is named in text
+            // as well; the tooltip alone needs a hover to tell Sage from Teal.
+            var selectedName = new TextBlock { Text = current, FontSize = 12, Margin = new Thickness(0, 0, 0, 4) };
+            selectedName.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
             var wrap = new WrapPanel { Orientation = Orientation.Horizontal, IsEnabled = !highContrast };
             RadioButton firstSwatch = null;
             foreach (var name in ThemeService.PaneColorNames)
             {
                 var swatch = BuildSwatch(name, dark, string.Equals(name, current, StringComparison.OrdinalIgnoreCase),
-                    chosen => { settings.PaneColor = chosen; ctx.Settings.Save(); });
+                    chosen => { settings.PaneColor = chosen; selectedName.Text = chosen; ctx.Settings.Save(); });
                 if (firstSwatch == null) firstSwatch = swatch;
                 wrap.Children.Add(swatch);
             }
@@ -155,6 +160,7 @@ namespace QuickPane.UI.Settings.Pages
             body.Children.Add(title);
             body.Children.Add(description);
             body.Children.Add(wrap);
+            body.Children.Add(selectedName);
 
             var border = cards.CardShell(body, hoverable: false);
             if (firstSwatch != null) cards.Register("paneColor", firstSwatch);
@@ -167,14 +173,19 @@ namespace QuickPane.UI.Settings.Pages
         /// a different swatch becomes checked, same as a combo box's SelectionChanged.</summary>
         private static RadioButton BuildSwatch(string name, bool dark, bool isChecked, Action<string> onSelected)
         {
+            // Opaque in the preview: at the pane's own E6 alpha the card's translucent background
+            // shows through and the light tints wash out into one another.
             var color = ThemeService.PreviewColor(name, dark);
+            color.A = 0xFF;
             var fill = new SolidColorBrush(color); fill.Freeze();
             var checkForeground = ThemeService.IsDarkColor(color) ? Brushes.White : Brushes.Black;
 
             var radio = new RadioButton
             {
                 GroupName = "PaneColorSwatch",
+                // The Fluent RadioButton style sets MinWidth 120, which spread the swatches far apart.
                 Width = 32,
+                MinWidth = 0,
                 Height = 32,
                 Margin = new Thickness(0, 0, 8, 8),
                 Cursor = Cursors.Hand,

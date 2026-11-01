@@ -40,6 +40,7 @@ namespace QuickPane.Services
         private const string ExplorerAccentKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Accent";
         private ResourceDictionary _current;
         private SettingsStore _settings;
+        private string _appliedPaneColor;   // the PaneColor the installed dictionary was built with
 
         public void Start()
         {
@@ -79,6 +80,10 @@ namespace QuickPane.Services
         public void ApplyPaneColor()
         {
             if (IsHighContrast) return;
+            // App calls this on every settings save, such as the end of a width drag, so skip the
+            // XAML reload unless the color itself changed.
+            var name = NormalizePaneColorName(_settings != null ? _settings.Current?.PaneColor : null);
+            if (string.Equals(name, _appliedPaneColor, StringComparison.OrdinalIgnoreCase)) return;
             var dict = BuildThemeDictionary();
             if (dict == null) return;
             SwapDictionary(dict);
@@ -136,7 +141,8 @@ namespace QuickPane.Services
                 // A named pane color (#134) overrides the theme's own SidebarBackground. Default and
                 // an unrecognized name both come back null from PaneBackground, so the dictionary
                 // simply keeps the value Theme.*.xaml just loaded.
-                var paneColor = PaneBackground(_settings != null ? _settings.Current?.PaneColor : null, IsDark);
+                _appliedPaneColor = NormalizePaneColorName(_settings != null ? _settings.Current?.PaneColor : null);
+                var paneColor = PaneBackground(_appliedPaneColor, IsDark);
                 if (paneColor.HasValue)
                 {
                     var sidebarBrush = new SolidColorBrush(paneColor.Value); sidebarBrush.Freeze();
