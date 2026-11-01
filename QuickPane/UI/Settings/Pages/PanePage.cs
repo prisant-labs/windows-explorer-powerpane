@@ -1,25 +1,32 @@
+using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Input;
+using System.Windows.Media;
 using QuickPane.Models;
+using QuickPane.Services;
 
 namespace QuickPane.UI.Settings.Pages
 {
     // Carries over every control from SettingsPanel.xaml.cs's "Pane" tab (left column), at commit
     // 068301b.
 
-    /// <summary>Pane mode and File dialogs cards (combo boxes), a Desktop dock expander (toggle in
-    /// the header, auto-hide and all-desktops as child rows), and a Profile tabs expander (toggle in
-    /// the header, auto-hide as a child row). Every setting here reads and writes the same
-    /// <see cref="AppSettings"/> field, with the same values and the same immediate
-    /// <c>SettingsStore.Save()</c>, as the matching handler in <c>SettingsPanel.xaml.cs</c> at
-    /// commit 068301b (<c>PaneModeBlock</c>, <c>DialogModeBlock</c>, <c>DockBlock</c>,
+    /// <summary>Pane mode and File dialogs cards (combo boxes), a Pane color card (swatches, #134),
+    /// a Desktop dock expander (toggle in the header, auto-hide and all-desktops as child rows), and
+    /// a Profile tabs expander (toggle in the header, auto-hide as a child row). Every setting here
+    /// reads and writes the same <see cref="AppSettings"/> field, with the same values and the same
+    /// immediate <c>SettingsStore.Save()</c>, as the matching handler in <c>SettingsPanel.xaml.cs</c>
+    /// at commit 068301b (<c>PaneModeBlock</c>, <c>DialogModeBlock</c>, <c>DockBlock</c>,
     /// <c>ProfileTabsBlock</c>).</summary>
     internal sealed class PanePage : SettingsPage
     {
         public override string Id => "pane";
         public override string Title => "Pane";
-        public override string Glyph => "";   // Segoe Fluent Icons Dock panel
+        public override string Glyph => "";   // Segoe Fluent Icons Dock panel
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
@@ -27,6 +34,7 @@ namespace QuickPane.UI.Settings.Pages
             {
                 yield return new SettingsSearchEntry(Id, "paneMode", "Pane mode", "Where the pane attaches to Explorer windows.", "inside", "beside");
                 yield return new SettingsSearchEntry(Id, "fileDialogs", "File dialogs", "Where the pane attaches to Open and Save dialogs.", "dialog", "open", "save");
+                yield return new SettingsSearchEntry(Id, "paneColor", "Pane color", "A background tint for the pane.", "color", "colour", "swatch", "theme");
                 yield return new SettingsSearchEntry(Id, "desktopDock", "Desktop dock", "A screen-edge dock independent of the window pane.", "dock", "auto-hide", "virtual desktop");
                 yield return new SettingsSearchEntry(Id, "profileTabs", "Profile tabs", "The row of profile tabs under the title.", "profile tabs", "tab row");
             }
@@ -49,7 +57,7 @@ namespace QuickPane.UI.Settings.Pages
                 },
                 mode,
                 v => { s.Mode = v; ctx.Settings.Save(); });
-            panel.Children.Add(cards.Card("paneMode", "", "Pane mode",
+            panel.Children.Add(cards.Card("paneMode", "", "Pane mode",
                 "Where the pane attaches to an Explorer window", modeCombo, "Pane mode"));
 
             // ---- File dialogs (old: DialogModeBlock, lines 393-412) ----
@@ -63,13 +71,16 @@ namespace QuickPane.UI.Settings.Pages
                 },
                 dialogMode,
                 v => { s.DialogMode = v; ctx.Settings.Save(); });
-            panel.Children.Add(cards.Card("fileDialogs", "", "File dialogs",
+            panel.Children.Add(cards.Card("fileDialogs", "", "File dialogs",
                 "Off also hides App Folders and \"Always start here\", which only appear in dialog panes.",
                 dialogCombo, "File dialogs"));
 
+            // ---- Pane color (#134) ----
+            panel.Children.Add(BuildPaneColorCard(ctx, s));
+
             // ---- Desktop dock (old: DockBlock, lines 414-424) ----
             var dockToggle = cards.Toggle(s.DesktopDock, on => { s.DesktopDock = on; ctx.Settings.Save(); });
-            var dockExpander = cards.Expander("desktopDock", "", "Desktop dock",
+            var dockExpander = cards.Expander("desktopDock", "", "Desktop dock",
                 "Pin a small dock to a screen edge", dockToggle, accessibleName: "Show desktop dock");
             dockExpander.AddChild(cards.ChildRow("Auto-hide (slide out on hover)",
                 cards.Toggle(s.DesktopDockAutoHide, on => { s.DesktopDockAutoHide = on; ctx.Settings.Save(); }),
@@ -81,7 +92,7 @@ namespace QuickPane.UI.Settings.Pages
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----
             var tabsToggle = cards.Toggle(s.ShowProfileTabs, on => { s.ShowProfileTabs = on; ctx.Settings.Save(); });
-            var tabsExpander = cards.Expander("profileTabs", "", "Profile tabs",
+            var tabsExpander = cards.Expander("profileTabs", "", "Profile tabs",
                 "The row appears once there are two or more profiles.", tabsToggle,
                 accessibleName: "Show profiles tab row");
             tabsExpander.AddChild(cards.ChildRow("Auto-hide (slide out on hover)",
@@ -90,6 +101,147 @@ namespace QuickPane.UI.Settings.Pages
             panel.Children.Add(tabsExpander.Root);
 
             return panel;
+        }
+
+        // ---- Pane color card (#134) -----------------------------------------
+
+        // Shared by every swatch: a rounded square filled from the swatch's own Background, with a
+        // checkmark that shows only while IsChecked, and a thicker, accent-colored border while the
+        // swatch itself holds keyboard focus. Built once and reused, since nothing in it varies per
+        // swatch except properties already set on the control (Background, Foreground, BorderBrush).
+        private static ControlTemplate _swatchTemplate;
+
+        private static readonly FontFamily FluentIconFont = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");
+
+        /// <summary>A wrapping row of swatches, modelled on Windows 11 Personalization > Colors: a
+        /// rounded square per color, a check mark on the one <paramref name="settings"/>.PaneColor
+        /// names, a tooltip and an AutomationProperties.Name carrying the color's name, and keyboard
+        /// focus with Space/Enter selection. Previews each color for the pane's current light/dark
+        /// mode. Disabled, with a note, under Windows high contrast, which ThemeService.Apply already
+        /// ignores PaneColor under, the same as the accent color.</summary>
+        private static Border BuildPaneColorCard(SettingsPageContext ctx, AppSettings settings)
+        {
+            var cards = ctx.Cards;
+            bool highContrast = App.Theme != null && App.Theme.IsHighContrast;
+            bool dark = App.Theme != null && App.Theme.IsDark;
+            string current = ThemeService.NormalizePaneColorName(settings.PaneColor);
+
+            var title = new TextBlock { Text = "Pane color", FontSize = 14, TextWrapping = TextWrapping.Wrap };
+            title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+
+            string descriptionText = highContrast
+                ? "Tints the pane's background. Ignored while Windows runs a high contrast theme, like the accent color."
+                : "Tints the pane's background. Default matches Explorer's own color.";
+            var description = new TextBlock
+            {
+                Text = descriptionText,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 12),
+            };
+            description.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+            var wrap = new WrapPanel { Orientation = Orientation.Horizontal, IsEnabled = !highContrast };
+            RadioButton firstSwatch = null;
+            foreach (var name in ThemeService.PaneColorNames)
+            {
+                var swatch = BuildSwatch(name, dark, string.Equals(name, current, StringComparison.OrdinalIgnoreCase),
+                    chosen => { settings.PaneColor = chosen; ctx.Settings.Save(); });
+                if (firstSwatch == null) firstSwatch = swatch;
+                wrap.Children.Add(swatch);
+            }
+
+            var body = new StackPanel();
+            body.Children.Add(title);
+            body.Children.Add(description);
+            body.Children.Add(wrap);
+
+            var border = cards.CardShell(body, hoverable: false);
+            if (firstSwatch != null) cards.Register("paneColor", firstSwatch);
+            return border;
+        }
+
+        /// <summary>One 32x32 swatch: a RadioButton so the group (all swatches share one GroupName)
+        /// stays single-select with native arrow-key and Tab navigation, templated to look like a
+        /// plain color square rather than a radio dot. <paramref name="onSelected"/> fires only when
+        /// a different swatch becomes checked, same as a combo box's SelectionChanged.</summary>
+        private static RadioButton BuildSwatch(string name, bool dark, bool isChecked, Action<string> onSelected)
+        {
+            var color = ThemeService.PreviewColor(name, dark);
+            var fill = new SolidColorBrush(color); fill.Freeze();
+            var checkForeground = ThemeService.IsDarkColor(color) ? Brushes.White : Brushes.Black;
+
+            var radio = new RadioButton
+            {
+                GroupName = "PaneColorSwatch",
+                Width = 32,
+                Height = 32,
+                Margin = new Thickness(0, 0, 8, 8),
+                Cursor = Cursors.Hand,
+                Focusable = true,
+                Template = SwatchTemplate(),
+                Background = fill,
+                Foreground = checkForeground,
+                BorderThickness = new Thickness(1),
+                IsChecked = isChecked,
+                Tag = name,
+            };
+            radio.SetResourceReference(Control.BorderBrushProperty, "CardStrokeColorDefaultBrush");
+            AutomationProperties.SetName(radio, name);
+            ToolTipService.SetToolTip(radio, name);
+
+            radio.Checked += (s, e) => onSelected?.Invoke(name);
+            // RadioButton answers Space out of the box (ButtonBase), but not Enter; the spec asks
+            // for both, same as a Windows 11 color swatch.
+            radio.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter) { radio.IsChecked = true; e.Handled = true; }
+            };
+            return radio;
+        }
+
+        private static ControlTemplate SwatchTemplate()
+        {
+            if (_swatchTemplate != null) return _swatchTemplate;
+
+            var swatch = new FrameworkElementFactory(typeof(Border), "Swatch");
+            swatch.SetValue(FrameworkElement.WidthProperty, 32.0);
+            swatch.SetValue(FrameworkElement.HeightProperty, 32.0);
+            swatch.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            swatch.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            swatch.SetBinding(Border.BackgroundProperty,
+                new Binding("Background") { RelativeSource = RelativeSource.TemplatedParent });
+            swatch.SetBinding(Border.BorderBrushProperty,
+                new Binding("BorderBrush") { RelativeSource = RelativeSource.TemplatedParent });
+
+            var check = new FrameworkElementFactory(typeof(TextBlock), "Check");
+            check.SetValue(TextBlock.TextProperty, "");   // Segoe Fluent Icons CheckMark, same glyph as CheckBoxCheckedGlyph
+            check.SetValue(TextBlock.FontFamilyProperty, FluentIconFont);
+            check.SetValue(TextBlock.FontSizeProperty, 14.0);
+            check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            check.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            check.SetValue(UIElement.VisibilityProperty, Visibility.Collapsed);
+            check.SetBinding(TextBlock.ForegroundProperty,
+                new Binding("Foreground") { RelativeSource = RelativeSource.TemplatedParent });
+
+            var grid = new FrameworkElementFactory(typeof(Grid));
+            grid.AppendChild(swatch);
+            grid.AppendChild(check);
+
+            var template = new ControlTemplate(typeof(RadioButton)) { VisualTree = grid };
+
+            var checkedTrigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
+            checkedTrigger.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Visible, "Check"));
+            template.Triggers.Add(checkedTrigger);
+
+            var focusTrigger = new Trigger { Property = UIElement.IsKeyboardFocusedProperty, Value = true };
+            focusTrigger.Setters.Add(new Setter(Border.BorderThicknessProperty, new Thickness(2), "Swatch"));
+            focusTrigger.Setters.Add(new Setter(Border.BorderBrushProperty, new DynamicResourceExtension("AccentFillColorDefaultBrush"), "Swatch"));
+            template.Triggers.Add(focusTrigger);
+
+            template.Seal();
+            _swatchTemplate = template;
+            return _swatchTemplate;
         }
     }
 }

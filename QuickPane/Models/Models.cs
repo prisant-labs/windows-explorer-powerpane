@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
+using QuickPane.Services;
 
 namespace QuickPane.Models
 {
@@ -173,6 +174,12 @@ namespace QuickPane.Models
         [DataMember(Name = "dialogMode", Order = 13, EmitDefaultValue = false)]
         public string DialogMode { get; set; } = "same";
 
+        // A background tint for the pane, applied over every open pane live, with no rebuild
+        // (#134). "Default" keeps the theme's own SidebarBackground. The lookup from this name to an
+        // actual color lives in ThemeService, next to the theme it overrides.
+        [DataMember(Name = "paneColor", Order = 14, EmitDefaultValue = false)]
+        public string PaneColor { get; set; } = "Default";
+
         // Optional extra: a screen-edge dock (AppBar) independent of the window pane.
         [DataMember(Name = "desktopDock", Order = 5, EmitDefaultValue = false)]
         public bool DesktopDock { get; set; }
@@ -303,6 +310,7 @@ namespace QuickPane.Models
             Mode = (m == "beside") ? "beside" : (m == "off") ? "off" : "inside"; // migrate old "inwindow" to "inside"
             var dm = (DialogMode ?? "").Trim().ToLowerInvariant();
             DialogMode = (dm == "beside") ? "beside" : (dm == "off") ? "off" : "same";
+            PaneColor = ThemeService.NormalizePaneColorName(PaneColor);
 
             // Profiles: migrate a pre-profiles settings file into one profile built from the top fields.
             if (Profiles == null) Profiles = new List<Profile>();

@@ -161,7 +161,8 @@ namespace QuickPane.Tests
         {
             "KeyboardNavHotkey", "RecentsMaxCount", "SidebarWidthPx",
             "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops",
-            "ActiveProfile" // derived from Profiles + ActiveProfileIndex, both already in the key
+            "ActiveProfile", // derived from Profiles + ActiveProfileIndex, both already in the key
+            "PaneColor" // live through SidebarBackground's DynamicResource binding, no rebuild (#134)
         };
 
         private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath" };

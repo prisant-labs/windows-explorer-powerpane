@@ -147,6 +147,7 @@ namespace QuickPane
             Settings.Load();
 
             Theme = new ThemeService();
+            Theme.AttachSettings(Settings);   // so Apply can read the saved PaneColor (#134)
             Theme.Start();           // reads registry, installs the first theme dictionary
             Theme.Apply();
 
@@ -169,6 +170,12 @@ namespace QuickPane
                     }
                 }
                 catch (Exception ex) { Log.Error("groups reload", ex); }
+                // Picks up a PaneColor change (#134) by swapping just that one brush; every open pane
+                // already binds SidebarBackground through DynamicResource, so this alone shows the new
+                // color live. Deliberately not Theme.Apply(): that reloads the whole theme dictionary
+                // and fires ThemeChanged, which would rebuild every pane on every settings save, not
+                // just a PaneColor one.
+                try { Theme.ApplyPaneColor(); } catch (Exception ex) { Log.Error("pane color re-apply", ex); }
                 // Defer the host switch so we never tear down a window from inside its own event.
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
