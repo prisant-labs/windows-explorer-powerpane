@@ -89,5 +89,61 @@ namespace QuickPane.Tests
 
             Assert.That(done.Wait(Timeout), Is.True);
         }
+
+        [Test]
+        public void Post_QueueBacksUp_LogsOneDepthLine()
+        {
+            // The bug: a stalled lane's backlog was invisible. Block the lane on the first item, then
+            // post 30 more; the depth line should fire exactly once, at 25 (#77).
+            var lines = new List<string>();
+            var lane = new WorkLane("test-depth", (m, ex) => { }, m => { lock (lines) lines.Add(m); });
+            var release = new ManualResetEventSlim();
+            try
+            {
+                lane.Post(() => release.Wait(Timeout));
+                // Post() reports the depth synchronously on this thread, so no wait is needed: the
+                // lane thread stays blocked on the first item for the whole loop below.
+                for (int i = 0; i < 30; i++) lane.Post(() => { });
+
+                Assert.That(lines, Is.EqualTo(new[] { "test-depth queue depth 25" }));
+            }
+            finally { release.Set(); }
+        }
+
+        [Test]
+        public void ShouldReportDepth_CrossesLinesAndResetsAtEmpty()
+        {
+            int next = 25;
+            Assert.That(WorkLane.ShouldReportDepth(24, ref next), Is.False);
+            Assert.That(next, Is.EqualTo(25));
+
+            Assert.That(WorkLane.ShouldReportDepth(25, ref next), Is.True);
+            Assert.That(next, Is.EqualTo(50));
+
+            Assert.That(WorkLane.ShouldReportDepth(30, ref next), Is.False);
+            Assert.That(next, Is.EqualTo(50));
+
+            Assert.That(WorkLane.ShouldReportDepth(50, ref next), Is.True);
+            Assert.That(next, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void ShouldReportDepth_EmptyQueueResetsNextLine()
+        {
+            int next = 200;
+            Assert.That(WorkLane.ShouldReportDepth(0, ref next), Is.False);
+            Assert.That(next, Is.EqualTo(25));
+            Assert.That(WorkLane.ShouldReportDepth(25, ref next), Is.True);
+        }
+
+        [Test]
+        public void ShouldReportDepth_LargeJump_AdvancesPastIt()
+        {
+            // A burst that jumps straight from 20 to 120 still gets exactly one line, and the next
+            // threshold lands above the jump instead of requiring several more crossings.
+            int next = 25;
+            Assert.That(WorkLane.ShouldReportDepth(120, ref next), Is.True);
+            Assert.That(next, Is.EqualTo(200));
+        }
     }
 }
