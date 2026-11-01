@@ -31,7 +31,8 @@ namespace QuickPane.UI.Settings
     {
         /// <summary>Stable key used for the remembered page, the nav selection, and the
         /// page half of every one of this page's <see cref="SettingsSearchEntry"/>. Never shown to
-        /// the user: "groups", "pane", "sections", "recent", "keyboard", "ssh", "backup", "about".</summary>
+        /// the user: "groups", "pane", "sections", "quickactions", "recent", "keyboard", "ssh",
+        /// "backup", "about".</summary>
         public abstract string Id { get; }
 
         /// <summary>The nav item's label and this page's 28 px title.</summary>
@@ -271,6 +272,7 @@ namespace QuickPane.UI.Settings
                 new GroupsPage(),
                 new PanePage(),
                 new SectionsPage(),
+                new QuickActionsPage(),
                 new RecentAppsPage(),
                 new KeyboardPage(),
                 new SshPage(),

@@ -191,6 +191,7 @@ namespace QuickPane.UI.Settings.Pages
                 case "search": return "Search box";
                 case "appdefaults": return "App Folders";
                 case "recentapps": return "Recent Apps";
+                case "quickactions": return "Quick actions";
                 default: return type;
             }
         }
