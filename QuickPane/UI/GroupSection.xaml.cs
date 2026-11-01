@@ -857,6 +857,8 @@ namespace QuickPane.UI
             {
                 menu.Items.Add(Item("Open", () => { if (pin.Exists) _navigate(pin.TargetPath); }));
                 menu.Items.Add(Item("Open in new window", () => ExplorerNavigator.OpenNewWindow(pin.TargetPath)));
+                var quickActions = BuildQuickActionsSubmenu(pin.TargetPath);
+                if (quickActions != null) menu.Items.Add(quickActions);
             }
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Rename", () => { var v = TextPrompt.Ask("Rename pin", pin.DisplayName); if (v != null) App.Groups.PostEdit(store => store.RenamePin(pin, v)); }));
@@ -878,6 +880,41 @@ namespace QuickPane.UI
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Remove Shortcut", () => App.Groups.PostEdit(store => store.RemovePin(pin))));
             return menu;
+        }
+
+        /// <summary>"Quick actions" submenu for a pinned folder row (quick actions, first version): one
+        /// item per enabled action, acting on this row's own folder. That folder is already known
+        /// synchronously here, unlike the pane's own Quick actions section, which has to resolve "the
+        /// folder the host Explorer window shows" through a COM call first -- so this still posts to
+        /// WorkQueue (every action's own disk/process work must stay off the UI thread the same way)
+        /// but with the folder already in hand. Null when the master switch is off or nothing is
+        /// enabled, so an empty submenu never appears.</summary>
+        private static MenuItem BuildQuickActionsSubmenu(string targetPath)
+        {
+            var settings = App.Settings != null ? App.Settings.Current : null;
+            if (settings == null || settings.Sections == null || settings.QuickActions == null) return null;
+
+            var section = settings.Sections.FirstOrDefault(x => x.Type == "quickactions");
+            if (section == null || !section.Visible) return null;
+
+            var menu = new MenuItem { Header = "Quick actions" };
+            foreach (var setting in settings.QuickActions)
+            {
+                if (!setting.Enabled) continue;
+                var def = QuickActionLibrary.Find(setting.Id);
+                if (def == null) continue;
+
+                if (def.Id == "open-vscode")
+                {
+                    QuickActionLibrary.BeginCodeCheck();
+                    if (QuickActionLibrary.CodeCheckDone && !QuickActionLibrary.CodeOnPath) continue;
+                }
+
+                var id = def.Id;
+                var folder = targetPath;
+                menu.Items.Add(Item(def.Name, () => WorkQueue.Post(() => QuickActionRunner.Run(id, folder))));
+            }
+            return menu.Items.Count > 0 ? menu : null;
         }
 
         private void ConfirmDeleteGroup(PinnedGroup group)

@@ -62,16 +62,18 @@ namespace QuickPane.Tests
             Assert.That(built.Select(e => e.PageId), Is.EqualTo(new[] { "a", "b" }));
         }
 
-        // ---- against the real page list (the shell's own eight pages) ----
+        // ---- against the real page list (the shell's own nine pages) ----
 
         private static List<SettingsPage> RealPages() => SettingsWindow.BuildPages();
 
         [Test]
-        public void RealPages_HaveEightUniqueIds_WithAboutLast()
+        public void RealPages_HaveNineUniqueIds_WithAboutLast()
         {
+            // Nine since the Quick actions page (quick actions, first version) joined the eight pages
+            // this test used to count.
             var pages = RealPages();
-            Assert.That(pages, Has.Count.EqualTo(8));
-            Assert.That(pages.Select(p => p.Id).Distinct().Count(), Is.EqualTo(8));
+            Assert.That(pages, Has.Count.EqualTo(9));
+            Assert.That(pages.Select(p => p.Id).Distinct().Count(), Is.EqualTo(9));
             Assert.That(pages[pages.Count - 1].Id, Is.EqualTo("about"));
         }
 

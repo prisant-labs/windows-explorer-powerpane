@@ -57,6 +57,11 @@ namespace QuickPane.Tests
             {
                 new SshProfile { Name = "Home", Hostname = "home.example", DriveLetter = "S:" }
             };
+            // Populates QuickActions (null straight out of CreateDefault) with every built-in, so the
+            // Quick actions tests below have something to toggle and reorder. Every other field above
+            // is already a valid, normalized value, so this changes nothing the other PaneShapeKey
+            // tests check.
+            s.Normalize();
             return s;
         }
 
@@ -154,7 +159,8 @@ namespace QuickPane.Tests
         private static readonly string[] AppSettingsKeyFields =
         {
             "Sections", "RecentAppsSource", "SshProfiles", "Profiles", "ActiveProfileIndex",
-            "ShowProfileTabs", "ProfileTabsAutoHide", "GroupsPath", "KeyboardNav", "Mode", "DialogMode"
+            "ShowProfileTabs", "ProfileTabsAutoHide", "GroupsPath", "KeyboardNav", "Mode", "DialogMode",
+            "QuickActions"
         };
 
         private static readonly string[] AppSettingsNotRendered =
@@ -177,6 +183,9 @@ namespace QuickPane.Tests
 
         private static readonly string[] SectionSettingKeyFields = { "Type", "Visible", "Order", "Title" };
         private static readonly string[] SectionSettingNotRendered = new string[0];
+
+        private static readonly string[] QuickActionSettingKeyFields = { "Id", "Enabled" };
+        private static readonly string[] QuickActionSettingNotRendered = new string[0];
 
         private static void AssertEveryPropertyIsAccountedFor(Type t, string[] keyFields, string[] notRendered)
         {
@@ -217,6 +226,70 @@ namespace QuickPane.Tests
         public void PaneShapeKey_SectionSettingProperties_AreAllAccountedFor()
         {
             AssertEveryPropertyIsAccountedFor(typeof(SectionSetting), SectionSettingKeyFields, SectionSettingNotRendered);
+        }
+
+        [Test]
+        public void PaneShapeKey_QuickActionSettingProperties_AreAllAccountedFor()
+        {
+            AssertEveryPropertyIsAccountedFor(typeof(QuickActionSetting), QuickActionSettingKeyFields, QuickActionSettingNotRendered);
+        }
+
+        // ---- PaneShapeKey: the Quick actions list itself (quick actions, first version) --------------
+
+        // The action list only matters once the section itself is visible (PaneShapeKey skips it
+        // otherwise, so toggling an action behind an off switch never rebuilds every open pane for
+        // nothing), so each of these turns it on first.
+        private static void ShowQuickActions(AppSettings s)
+        {
+            s.Sections.First(x => x.Type == "quickactions").Visible = true;
+        }
+
+        [Test]
+        public void PaneShapeKey_QuickActionToggled_ChangesTheKey()
+        {
+            var a = MakeSettings();
+            var b = MakeSettings();
+            ShowQuickActions(a);
+            ShowQuickActions(b);
+            b.QuickActions[0].Enabled = !b.QuickActions[0].Enabled;
+
+            Assert.That(SidebarControl.PaneShapeKey(b), Is.Not.EqualTo(SidebarControl.PaneShapeKey(a)));
+        }
+
+        [Test]
+        public void PaneShapeKey_QuickActionsReordered_ChangesTheKey()
+        {
+            var a = MakeSettings();
+            var b = MakeSettings();
+            ShowQuickActions(a);
+            ShowQuickActions(b);
+            var moved = b.QuickActions[0];
+            b.QuickActions.RemoveAt(0);
+            b.QuickActions.Add(moved);
+
+            Assert.That(SidebarControl.PaneShapeKey(b), Is.Not.EqualTo(SidebarControl.PaneShapeKey(a)));
+        }
+
+        [Test]
+        public void PaneShapeKey_QuickActionToggled_WhileSectionIsHidden_KeepsTheSameKey()
+        {
+            // The switch (Sections["quickactions"].Visible) is off by default in MakeSettings, so
+            // nothing on screen reads the action list yet.
+            var a = MakeSettings();
+            var b = MakeSettings();
+            b.QuickActions[0].Enabled = !b.QuickActions[0].Enabled;
+
+            Assert.That(SidebarControl.PaneShapeKey(b), Is.EqualTo(SidebarControl.PaneShapeKey(a)));
+        }
+
+        [Test]
+        public void PaneShapeKey_QuickActionsSectionVisibilityChange_ChangesTheKey()
+        {
+            var a = MakeSettings();
+            var b = MakeSettings();
+            b.Sections.First(x => x.Type == "quickactions").Visible = true;
+
+            Assert.That(SidebarControl.PaneShapeKey(b), Is.Not.EqualTo(SidebarControl.PaneShapeKey(a)));
         }
     }
 }

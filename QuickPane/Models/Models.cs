@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using QuickPane.Services;
@@ -65,6 +66,22 @@ namespace QuickPane.Models
         // Optional custom header text. When null the section uses its default name.
         [DataMember(Name = "title", Order = 3, EmitDefaultValue = false)]
         public string Title { get; set; }
+    }
+
+    /// <summary>Whether one built-in quick action (quick actions, first version) shows in the pane's Quick
+    /// actions section and the pinned-row submenu. The action's display name and description live in
+    /// QuickActionLibrary, keyed by <see cref="Id"/>, so a later release can rename or re-describe a
+    /// built-in without touching anyone's settings.json. Unlike <see cref="SectionSetting"/>, there is
+    /// no separate Order field: this entry's position inside AppSettings.QuickActions is its order in
+    /// the pane, so reordering is a plain list move with nothing left to renumber afterwards.</summary>
+    [DataContract]
+    public sealed class QuickActionSetting
+    {
+        [DataMember(Name = "id", Order = 0)]
+        public string Id { get; set; }
+
+        [DataMember(Name = "enabled", Order = 1)]
+        public bool Enabled { get; set; } = true;
     }
 
     /// <summary>One profile: an independent workspace with its own groups folder and pane settings.
@@ -156,6 +173,14 @@ namespace QuickPane.Models
         // for the ones whose Save and Open dialogs were used, "both" for either.
         [DataMember(Name = "recentAppsSource", Order = 42, EmitDefaultValue = false)]
         public string RecentAppsSource { get; set; } = "both";
+
+        // Quick actions (quick actions, first version): the master switch is the "quickactions" section's
+        // own Visible flag above, so turning it on from this list or from the Pane sections page is
+        // the same setting. This is only which built-in actions show and in what order; Normalize
+        // seeds it with every built-in, enabled, in QuickActionLibrary's own default order, the first
+        // time it sees a null list.
+        [DataMember(Name = "quickActions", Order = 43, EmitDefaultValue = false)]
+        public List<QuickActionSetting> QuickActions { get; set; }
 
         [DataMember(Name = "recentsMaxCount", Order = 2)]
         public int RecentsMaxCount { get; set; } = 15;
@@ -265,7 +290,10 @@ namespace QuickPane.Models
                     new SectionSetting { Type = "ssh",      Visible = true, Order = 5 },
                     new SectionSetting { Type = "search",      Visible = true, Order = -2 },
                     new SectionSetting { Type = "appdefaults", Visible = true, Order = -1 },
-                    new SectionSetting { Type = "recentapps",  Visible = true, Order = 6 }
+                    new SectionSetting { Type = "recentapps",  Visible = true, Order = 6 },
+                    // Off by default (quick actions, first version): the pane matches Explorer until the
+                    // user opts in, unlike every other built-in section above.
+                    new SectionSetting { Type = "quickactions", Visible = false, Order = 7 }
                 },
                 SshProfiles = new List<SshProfile>()
             };
@@ -286,6 +314,8 @@ namespace QuickPane.Models
             EnsureSection("search", -2);
             EnsureSection("appdefaults", -1);
             EnsureSection("recentapps", 6);
+            EnsureSection("quickactions", 7, defaultVisible: false);
+            NormalizeQuickActions();
             if (SshProfiles == null) SshProfiles = new List<SshProfile>();
             foreach (var sp in SshProfiles)
             {
@@ -331,8 +361,37 @@ namespace QuickPane.Models
 
         private void EnsureSection(string type, int fallbackOrder)
         {
+            EnsureSection(type, fallbackOrder, defaultVisible: true);
+        }
+
+        private void EnsureSection(string type, int fallbackOrder, bool defaultVisible)
+        {
             if (!Sections.Exists(s => s.Type == type))
-                Sections.Add(new SectionSetting { Type = type, Visible = true, Order = fallbackOrder });
+                Sections.Add(new SectionSetting { Type = type, Visible = defaultVisible, Order = fallbackOrder });
+        }
+
+        /// <summary>Drops an id with no matching built-in (e.g. a removed action after a downgrade),
+        /// keeps only the first occurrence of a duplicate id, then appends every built-in missing from
+        /// the list so far -- enabled, at the end, in QuickActionLibrary's own order -- which is how a
+        /// later release can add a new built-in action and have it show up for everyone already on an
+        /// older settings.json (quick actions, first version).</summary>
+        private void NormalizeQuickActions()
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var cleaned = new List<QuickActionSetting>();
+            if (QuickActions != null)
+            {
+                foreach (var a in QuickActions)
+                {
+                    if (a == null || string.IsNullOrEmpty(a.Id)) continue;
+                    if (QuickActionLibrary.Find(a.Id) == null) continue;
+                    if (!seen.Add(a.Id)) continue;
+                    cleaned.Add(a);
+                }
+            }
+            foreach (var def in QuickActionLibrary.All)
+                if (seen.Add(def.Id)) cleaned.Add(new QuickActionSetting { Id = def.Id, Enabled = true });
+            QuickActions = cleaned;
         }
     }
 }

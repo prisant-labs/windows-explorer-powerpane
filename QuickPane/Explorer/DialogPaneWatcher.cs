@@ -411,7 +411,12 @@ namespace QuickPane.Explorer
             var owner = DialogNavigator.Owner(hwnd);
             if (fights && !string.IsNullOrEmpty(owner) && owner != "unknown") _besideApps.Add(owner);
             if (!NM.IsWindow(hwnd) || _beside.ContainsKey(hwnd)) return;
-            var pane = new FollowerPane(hwnd, p => WorkQueue.PostNavigation(() => DialogNavigator.Navigate(hwnd, p)));
+            // owner (computed above) must reach FollowerPane's hostApp parameter the same way the two
+            // other FollowerPane(hwnd, nav, owner) call sites in this file do: without it, the pane's
+            // HostApp stays empty, and SidebarControl.BuildSection("quickactions") -- which hides the
+            // section only when HostApp is set -- cannot tell this dialog follower apart from a real
+            // Explorer window, so Quick actions would appear here and silently do nothing.
+            var pane = new FollowerPane(hwnd, p => WorkQueue.PostNavigation(() => DialogNavigator.Navigate(hwnd, p)), owner);
             _beside[hwnd] = pane;
             PositionBeside(hwnd, pane);
             Log.Event("glitch", fights

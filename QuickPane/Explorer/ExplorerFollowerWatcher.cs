@@ -187,6 +187,7 @@ namespace QuickPane.Explorer
             bool dark = App.Theme != null && App.Theme.IsDark;
             var sidebar = new SidebarControl();
             sidebar.HostApp = hostApp;  // set before Attach, which is what builds the sections
+            sidebar.HostWindow = cab;
             _sidebar = sidebar;
             sidebar.SetResizeFromLeft(true); // outer (left) edge resizes; right stays flush to the window
             sidebar.Attach(NavigateThis);

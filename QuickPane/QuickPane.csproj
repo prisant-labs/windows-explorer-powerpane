@@ -99,6 +99,8 @@
     <Compile Include="Services\DriveService.cs" />
     <Compile Include="Services\ThemeService.cs" />
     <Compile Include="Services\FluentThemeService.cs" />
+    <Compile Include="Services\QuickActionLibrary.cs" />
+    <Compile Include="Services\QuickActionRunner.cs" />
     <Compile Include="Themes\Fluent\Controls\AnimationFactorToValueConverter.cs" />
     <Compile Include="Services\ShellLink.cs" />
     <Compile Include="Services\SshfsService.cs" />
@@ -112,6 +114,7 @@
     <Compile Include="UI\SearchSection.cs" />
     <Compile Include="UI\RecentAppsSection.cs" />
     <Compile Include="UI\AppDefaultsSection.cs" />
+    <Compile Include="UI\QuickActionsSection.cs" />
     <Compile Include="UI\SshSection.cs" />
     <Compile Include="UI\DropLineAdorner.cs" />
     <Compile Include="UI\DragGhostAdorner.cs" />
@@ -307,6 +310,7 @@
     <Compile Include="UI\Settings\Pages\GroupsPage.cs" />
     <Compile Include="UI\Settings\Pages\PanePage.cs" />
     <Compile Include="UI\Settings\Pages\SectionsPage.cs" />
+    <Compile Include="UI\Settings\Pages\QuickActionsPage.cs" />
     <Compile Include="UI\Settings\Pages\RecentAppsPage.cs" />
     <Compile Include="UI\Settings\Pages\KeyboardPage.cs" />
     <Compile Include="UI\Settings\Pages\SshPage.cs" />
