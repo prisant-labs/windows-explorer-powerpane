@@ -58,8 +58,8 @@ namespace QuickPane.UI
             if (connected)
             {
                 string drive = SshfsService.DrivePath(profile);
-                var icon = IconHelper.GetIcon(drive, true, false);
-                var node = new FolderTreeNode(profile.Name, drive, true, navigate, 0, false, icon);
+                // No overrideIcon: the node binds its own real icon in the background (#76).
+                var node = new FolderTreeNode(profile.Name, drive, true, navigate, 0, false, null);
                 node.Row.ContextMenu = BuildMenu(profile, true);
                 return node;
             }

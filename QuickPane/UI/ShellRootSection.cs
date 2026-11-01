@@ -46,8 +46,11 @@ namespace QuickPane.UI
                 out chevron, out label);
             header.ContextMenu = RecentsSection.SectionMenu(_type, _defaultTitle);
 
+            // Linux (\\wsl$) passes no overrideIcon, so the node binds its own real icon in the
+            // background (#76); Network has no backing filesystem path, so its icon stays the cached
+            // special-folder lookup.
             var icon = _isLinux
-                ? IconHelper.GetIcon(_rootPath, true, false)
+                ? null
                 : IconHelper.GetSpecialFolderIcon(NM.CSIDL_NETWORK);
 
             var node = new FolderTreeNode(RecentsSection.SectionTitle(_type, _defaultTitle),

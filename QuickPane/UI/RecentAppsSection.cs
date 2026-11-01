@@ -119,7 +119,6 @@ namespace QuickPane.UI
         private FrameworkElement BuildRow(RecentAppsService.Entry entry)
         {
             var captured = entry;
-            var icon = IconHelper.GetAppIcon(entry.ExePath);
             var profiles = BrowserProfiles.For(entry.ExePath);
 
             // A browser is several signed-in identities behind one program, so its row opens out into
@@ -127,26 +126,28 @@ namespace QuickPane.UI
             // same way whether or not it has any, so they line up down one edge.
             bool hasProfiles = profiles.Count > 1;
             var node = new FolderTreeNode(entry.Name, entry.ExePath, true, _navigate, 0,
-                isFile: !hasProfiles, overrideIcon: icon, pinContext: null,
+                isFile: !hasProfiles, overrideIcon: IconHelper.AppPlaceholder(entry.ExePath), pinContext: null,
                 childProvider: hasProfiles ? (Func<int, List<FrameworkElement>>)
-                    (level => ProfileRows(captured, profiles, icon, level)) : null,
+                    (level => ProfileRows(captured, profiles, level)) : null,
                 onClick: () => Launch(captured.ExePath, null));
             node.Row.ToolTip = Tip(entry);
             node.Row.ContextMenu = BuildMenu(captured);
+            IconHelper.BindApp(node.IconImage, entry.ExePath);
             return node;
         }
 
         private List<FrameworkElement> ProfileRows(RecentAppsService.Entry entry,
-            List<BrowserProfiles.Profile> profiles, ImageSource icon, int level)
+            List<BrowserProfiles.Profile> profiles, int level)
         {
             var rows = new List<FrameworkElement>();
             foreach (var p in profiles)
             {
                 var captured = p;
                 var row = new FolderTreeNode(p.Name, entry.ExePath, true, _navigate, level,
-                    isFile: true, overrideIcon: icon, pinContext: null, childProvider: null,
+                    isFile: true, overrideIcon: IconHelper.AppPlaceholder(entry.ExePath), pinContext: null, childProvider: null,
                     onClick: () => Launch(entry.ExePath, captured.Arguments));
                 row.Row.ToolTip = p.Name + Environment.NewLine + entry.Name;
+                IconHelper.BindApp(row.IconImage, entry.ExePath); // every profile shares the app's icon
                 rows.Add(row);
             }
             return rows;

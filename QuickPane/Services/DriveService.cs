@@ -31,8 +31,12 @@ namespace QuickPane.Services
     /// Snapshots fixed, removable, and network drives for the Computer section. IsReady, volume
     /// labels, and sizes are queried in full only on the background worker: a mapped network drive
     /// whose server is gone blocks those calls for many seconds, and this used to run on the UI
-    /// thread on every pane rebuild. The synchronous path returns the cached snapshot (details for
-    /// fixed local drives only on the very first call) and kicks a refresh.
+    /// thread on every pane rebuild. A fixed local drive used to be queried in full on the quick pass
+    /// too, on the assumption that it always answers fast; it is not a speed guarantee (custom icon
+    /// handlers, cloud placeholders, junctions, and slow disks can all block it), so the quick pass
+    /// now reads only DriveType for every drive and the worker fills in the rest
+    /// (prisant-labs/windows-explorer-quickpane#76). The synchronous path returns the cached snapshot
+    /// and kicks a refresh.
     /// </summary>
     public sealed class DriveService
     {
@@ -40,6 +44,7 @@ namespace QuickPane.Services
         public event Action Refreshed;
 
         private volatile List<DriveItem> _cache;
+        private readonly object _cacheGate = new object();
         private int _refreshing;
 
         public List<DriveItem> GetDrives()
@@ -47,8 +52,15 @@ namespace QuickPane.Services
             var c = _cache;
             if (c == null)
             {
-                c = Snapshot(fullDetail: false); // fixed drives only; instant
-                _cache = c;
+                c = Snapshot(fullDetail: false); // drive types only; instant
+                // Startup's RefreshAsync may have written the full snapshot while this one was being
+                // taken. Keep whichever landed first, so the quick one never overwrites real labels,
+                // sizes, and readiness (#76).
+                lock (_cacheGate)
+                {
+                    if (_cache == null) _cache = c;
+                    else c = _cache;
+                }
                 RefreshAsync();
             }
             return c;
@@ -63,7 +75,7 @@ namespace QuickPane.Services
                 try
                 {
                     var list = Snapshot(fullDetail: true);
-                    _cache = list;
+                    lock (_cacheGate) { _cache = list; }
                     WorkQueue.PostUI(() => { Refreshed?.Invoke(); });
                 }
                 finally { System.Threading.Interlocked.Exchange(ref _refreshing, 0); }
@@ -94,9 +106,9 @@ namespace QuickPane.Services
                         IsRemovable = d.DriveType == DriveType.Removable
                     };
 
-                    // IsReady / labels / sizes can block on non-fixed volumes, so the quick pass
-                    // leaves them at optimistic defaults and the worker fills them in.
-                    bool queryDetail = fullDetail || d.DriveType == DriveType.Fixed;
+                    // IsReady / labels / sizes can block on any volume, fixed drives included, so the
+                    // quick pass leaves them at optimistic defaults and the worker fills them in.
+                    bool queryDetail = QueryDetail(fullDetail, d.DriveType);
                     if (queryDetail && d.IsReady)
                     {
                         item.Ready = true;
@@ -120,6 +132,15 @@ namespace QuickPane.Services
                 }
             }
             return list;
+        }
+
+        // The quick pass's decision of whether to read IsReady/label/size for a drive. Pulled out so
+        // a test can pin it down: it is always just fullDetail now, since a fixed drive is no longer
+        // treated as a speed guarantee (#76). driveType is kept as a parameter so a future exception
+        // (a drive type that genuinely never blocks) has somewhere to go without changing every caller.
+        internal static bool QueryDetail(bool full, DriveType driveType)
+        {
+            return full;
         }
 
         private static string DefaultLabel(DriveType type)
