@@ -1,0 +1,73 @@
+name: winget
+# When a release is published, opens a pull request in microsoft/winget-pkgs that adds the new
+# version of PrisantLabs.QuickPane. It runs on publish, never on a tag, because a person publishes a
+# release only after testing its draft on a real desktop. The first version of the package was
+# submitted by hand; this workflow only adds later versions.
+#
+# Needs the repository secret WINGET_TOKEN, a personal access token with public_repo scope: the
+# default token cannot fork microsoft/winget-pkgs. Without the secret, the job skips with a notice.
+# To retry one version, run this workflow by hand with its tag.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of a published release, such as v3.11.0.0
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: winget
+  cancel-in-progress: false
+
+jobs:
+  winget:
+    runs-on: windows-latest
+    steps:
+      # The tag arrives through env, not ${{ }} inside the script, so a tag name can never become code.
+      - name: Open the winget pull request
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if (-not $env:WINGET_TOKEN) {
+              '::notice::WINGET_TOKEN is not set, so no winget pull request was opened.'
+              exit 0
+          }
+          if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+\.\d+)$') {
+              throw "Tag $env:TAG is not v<major>.<minor>.<patch>.<fork>, such as v3.10.0.3."
+          }
+          $version = $Matches[1]
+
+          # A by-hand run could name a draft or a pre-release. Neither may reach winget.
+          $release = gh release view $env:TAG -R $env:REPO --json isDraft,isPrerelease,publishedAt,assets | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Release $env:TAG was not found." }
+          if ($release.isDraft -or $release.isPrerelease) {
+              throw "Release $env:TAG is a draft or a pre-release; winget gets full releases only."
+          }
+          $installer = "QuickPane-$version-x64-setup.exe"
+          if (-not ($release.assets | Where-Object { $_.name -eq $installer })) {
+              throw "Release $env:TAG has no $installer."
+          }
+          $url = "https://github.com/$env:REPO/releases/download/$env:TAG/$installer"
+          $date = ([datetime]$release.publishedAt).ToUniversalTime().ToString('yyyy-MM-dd')
+
+          # Microsoft's manifest tool, pinned to one release and checked against that release's hash,
+          # because this step holds a token that can open pull requests as the maintainer.
+          $tool = Join-Path $env:RUNNER_TEMP 'wingetcreate.exe'
+          Invoke-WebRequest 'https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe' -OutFile $tool
+          $hash = (Get-FileHash $tool -Algorithm SHA256).Hash
+          if ($hash -ne '24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA') {
+              throw "wingetcreate.exe does not match its pinned hash (got $hash)."
+          }
+
+          & $tool update PrisantLabs.QuickPane --version $version --urls $url `
+              --release-notes-url "https://github.com/$env:REPO/releases/tag/$env:TAG" `
+              --release-date $date --submit --token $env:WINGET_TOKEN
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate failed with exit code $LASTEXITCODE." }
