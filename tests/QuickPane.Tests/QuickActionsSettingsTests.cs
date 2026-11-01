@@ -176,6 +176,64 @@ namespace QuickPane.Tests
             Assert.That(QuickActionsPage.ActionList(s), Is.Empty);
         }
 
+        // ---- FindActionById / MoveActionById: survive a Normalize() that swapped the list ------
+        // (reproduces the real bug: AppSettings.Normalize, which every SettingsStore.Save() call
+        // runs -- including the master switch's own save -- always reassigns QuickActions to a new
+        // List instance, even when nothing in it changed. A handler built from an earlier Populate()
+        // that closed over that old list, rather than re-reading the id, would silently move or
+        // toggle nothing once that other save had already happened.)
+
+        [Test]
+        public void FindActionById_AfterNormalizeReplacedTheList_StillFindsTheCurrentObject()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var before = s.QuickActions;
+
+            s.Normalize(); // simulates an unrelated Save() elsewhere, e.g. the master switch
+            Assert.That(s.QuickActions, Is.Not.SameAs(before)); // sanity: confirms the premise
+
+            var found = QuickActionsPage.FindActionById(s, "open-terminal");
+            Assert.That(found, Is.Not.Null);
+            Assert.That(found, Is.SameAs(s.QuickActions.First(a => a.Id == "open-terminal")));
+        }
+
+        [Test]
+        public void FindActionById_UnknownId_ReturnsNull()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            Assert.That(QuickActionsPage.FindActionById(s, "not-a-real-action"), Is.Null);
+        }
+
+        [Test]
+        public void MoveActionById_AfterNormalizeReplacedTheList_StillMovesTheCurrentList()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var before = s.QuickActions;
+
+            s.Normalize(); // simulates an unrelated Save() elsewhere, e.g. the master switch
+            Assert.That(s.QuickActions, Is.Not.SameAs(before)); // sanity: confirms the premise
+
+            int originalIndex = s.QuickActions.FindIndex(a => a.Id == "open-terminal");
+            bool moved = QuickActionsPage.MoveActionById(s, "open-terminal", -1);
+
+            Assert.That(moved, Is.True);
+            Assert.That(s.QuickActions.FindIndex(a => a.Id == "open-terminal"), Is.EqualTo(originalIndex - 1));
+        }
+
+        [Test]
+        public void MoveActionById_UnknownId_ReturnsFalseAndChangesNothing()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var idsBefore = s.QuickActions.Select(a => a.Id).ToList();
+
+            Assert.That(QuickActionsPage.MoveActionById(s, "not-a-real-action", -1), Is.False);
+            Assert.That(s.QuickActions.Select(a => a.Id), Is.EqualTo(idsBefore));
+        }
+
         // ---- round-trips through settings.json, same shape as PaneColorTests ------------------
 
         [Test]

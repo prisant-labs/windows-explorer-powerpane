@@ -88,28 +88,31 @@ namespace QuickPane.UI.Settings.Pages
                 string name = def != null ? def.Name : setting.Id;
                 string description = def != null ? def.Description : "";
                 int index = i;
+                string id = setting.Id;   // captured for the handlers below instead of setting/list/index:
+                                           // see FindActionById/MoveActionById for why.
 
                 var toggle = cards.Toggle(setting.Enabled, on =>
                 {
-                    setting.Enabled = on;
+                    var current = FindActionById(ctx.Settings.Current, id);
+                    if (current != null) current.Enabled = on;
                     ctx.Settings.Save();
-                    Populate(panel, ctx, setting.Id, 0);
+                    Populate(panel, ctx, id, 0);
                 }, "Show " + name + " in the pane");
 
                 var up = cards.IconButton("", "Move " + name + " up", () =>
                 {
-                    if (MoveAction(list, index, -1))
+                    if (MoveActionById(ctx.Settings.Current, id, -1))
                     {
                         ctx.Settings.Save();
-                        Populate(panel, ctx, setting.Id, -1);
+                        Populate(panel, ctx, id, -1);
                     }
                 });
                 var down = cards.IconButton("", "Move " + name + " down", () =>
                 {
-                    if (MoveAction(list, index, 1))
+                    if (MoveActionById(ctx.Settings.Current, id, 1))
                     {
                         ctx.Settings.Save();
-                        Populate(panel, ctx, setting.Id, 1);
+                        Populate(panel, ctx, id, 1);
                     }
                 });
                 // First and last rows have nothing to move into; disabling (rather than hiding) keeps
@@ -157,6 +160,30 @@ namespace QuickPane.UI.Settings.Pages
         internal static List<QuickActionSetting> ActionList(AppSettings settings)
         {
             return settings.QuickActions ?? new List<QuickActionSetting>();
+        }
+
+        /// <summary>Finds the action with <paramref name="id"/> in <paramref name="settings"/>'s
+        /// CURRENT QuickActions list, re-read here rather than trusting any list a caller captured at
+        /// an earlier Populate(). SettingsStore.Save() always runs AppSettings.Normalize, which always
+        /// reassigns QuickActions to a brand-new List instance -- even when nothing in it changed --
+        /// so a button built before some OTHER save (the master switch next to it, say) closed over a
+        /// list that is no longer the one settings.json round-trips from. Reading the id back out
+        /// fresh here, rather than the list itself, is what keeps a Move or a toggle from being lost
+        /// to a save that already happened by the time the click arrives.</summary>
+        internal static QuickActionSetting FindActionById(AppSettings settings, string id)
+        {
+            return ActionList(settings).FirstOrDefault(a => string.Equals(a.Id, id, System.StringComparison.Ordinal));
+        }
+
+        /// <summary>Same staleness concern as <see cref="FindActionById"/>, for a Move: finds
+        /// <paramref name="id"/>'s CURRENT index in <paramref name="settings"/>'s live list and moves
+        /// it there, rather than moving whatever list and index a button's closure captured when it
+        /// was built.</summary>
+        internal static bool MoveActionById(AppSettings settings, string id, int direction)
+        {
+            var list = ActionList(settings);
+            int index = list.FindIndex(a => string.Equals(a.Id, id, System.StringComparison.Ordinal));
+            return index >= 0 && MoveAction(list, index, direction);
         }
 
         /// <summary>Moves <paramref name="list"/>[<paramref name="index"/>] one slot in
