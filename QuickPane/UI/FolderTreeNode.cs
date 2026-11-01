@@ -228,10 +228,15 @@ namespace QuickPane.UI
             // whole folder, so a small menu asks. Modifiers always act silently and exactly like
             // Explorer: Ctrl copies, Shift moves, Alt (or Ctrl+Shift) creates shortcuts.
             bool modifier = (e.KeyStates & (DragDropKeyStates.ControlKey | DragDropKeyStates.ShiftKey | DragDropKeyStates.AltKey)) != 0;
+            // A modifier always acts silently regardless of what was dropped, so the folder check
+            // only matters without one. Bounded like any other check the user waits for
+            // (PathStatus.FolderExistsWithin): a straight Directory.Exists loop here used to cost
+            // the network timeout per source, on the thread Explorer shares input with (#75).
             bool anyFolder = false;
-            foreach (var s in sources)
+            if (!modifier)
             {
-                try { if (Directory.Exists(s)) { anyFolder = true; break; } } catch { }
+                bool timedOut;
+                anyFolder = PathStatus.AnyFolderWithin(sources, PathStatus.InteractiveProbeMs, out timedOut);
             }
 
             if (modifier || !anyFolder)

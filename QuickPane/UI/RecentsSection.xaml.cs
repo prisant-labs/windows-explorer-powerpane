@@ -138,15 +138,18 @@ namespace QuickPane.UI
                 foreach (var g in App.Groups.Groups)
                 {
                     var dest = g;
-                    pinTo.Items.Add(Item(g.Name, () => App.Groups.AddPin(dest, pinTarget)));
+                    pinTo.Items.Add(Item(g.Name, () => App.Groups.PostEdit(store => store.AddPin(dest, pinTarget))));
                 }
                 if (pinTo.Items.Count > 0) pinTo.Items.Add(new Separator());
                 pinTo.Items.Add(Item("New group...", () =>
                 {
                     var name = TextPrompt.Ask("New group name", "");
                     if (string.IsNullOrWhiteSpace(name)) return;
-                    var g = App.Groups.CreateGroup(name);
-                    if (g != null) App.Groups.AddPin(g, pinTarget);
+                    App.Groups.PostEdit(store =>
+                    {
+                        var g = store.CreateGroup(name);
+                        if (g != null) store.AddPin(g, pinTarget);
+                    });
                 }));
             }
             menu.Items.Add(pinTo);

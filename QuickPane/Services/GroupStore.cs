@@ -34,21 +34,51 @@ namespace QuickPane.Services
         private readonly CoalescedPost _rescan;
 
         private readonly Action<string> _info;
+        private readonly Action<Action> _post;
 
-        public GroupStore(SettingsStore settings) : this(settings, null) { }
+        public GroupStore(SettingsStore settings) : this(settings, null, null) { }
 
         /// <summary>info receives notes such as a refused stale edit. It defaults to the log; tests pass
         /// their own so those notes stay out of it.</summary>
-        internal GroupStore(SettingsStore settings, Action<string> info)
+        internal GroupStore(SettingsStore settings, Action<string> info) : this(settings, info, null) { }
+
+        /// <summary>post is the seam PostEdit runs a posted edit through. It defaults to the worker
+        /// lane; a test passes a synchronous or a queuing fake so it can run a posted edit on its own
+        /// schedule (prisant-labs/windows-explorer-quickpane#75).</summary>
+        internal GroupStore(SettingsStore settings, Action<string> info, Action<Action> post)
         {
             _settings = settings;
             _info = info ?? Log.Info;
+            _post = post ?? WorkQueue.Post;
             // A field initializer cannot call an instance method (CS0236), so this is built here
             // instead of alongside _debounce and _gate above.
             _rescan = new CoalescedPost(() => { ScanOnce(); RaiseChanged(); }, WorkQueue.Post);
         }
 
         public string Root { get { return _settings.ExpandedGroupsPath; } }
+
+        /// <summary>Run edit on the worker as one operation with its scan, so a UI handler that
+        /// renames, reorders, or pins something never waits on the scan lock or the shortcut COM
+        /// calls a full ScanOnce makes for every pin (#75). Root is captured here, on the caller's
+        /// thread; if a profile switch changes it before the posted action runs, the edit is refused
+        /// the same way a stale group, tab, or pin already is, through the same _info note. Never
+        /// post a lambda that touches a section or a control: closures here capture only data and the
+        /// store itself (#69).</summary>
+        public void PostEdit(Action<GroupStore> edit)
+        {
+            if (edit == null) return;
+            var root = Root;
+            _post(() =>
+            {
+                if (!SameRoot(root, Root))
+                {
+                    _info("ignored an edit outside the current groups folder; the profile changed under it");
+                    return;
+                }
+                try { edit(this); }
+                catch (Exception ex) { Log.Error("posted group edit failed", ex); }
+            });
+        }
 
         // The first scan and a reload run on the worker. Both walk the groups folder and read every
         // pin's .lnk through COM, and on the UI thread a groups folder on a slow or unreachable share
@@ -211,7 +241,9 @@ namespace QuickPane.Services
                     }
 
                     int active;
-                    _activeTabs.TryGetValue(dir, out active);
+                    // _activeTabs is written on the UI thread (SetActiveTab) and read here on the
+                    // worker; both sides take _gate (#75).
+                    lock (_gate) { _activeTabs.TryGetValue(dir, out active); }
                     group.ActiveTab = Math.Max(0, Math.Min(active, group.Tabs.Count - 1));
                     result.Add(group);
                 }
@@ -421,7 +453,9 @@ namespace QuickPane.Services
             if (index < 0) index = 0;
             if (index >= group.Tabs.Count) index = group.Tabs.Count - 1;
             group.ActiveTab = index;
-            _activeTabs[group.FolderPath] = index;
+            // Memory-only, so this stays on the UI thread; _gate still guards the dictionary
+            // because ScanCore reads it on the worker (#75).
+            lock (_gate) { _activeTabs[group.FolderPath] = index; }
         }
 
         // ---- groups ----------------------------------------------------------
@@ -483,8 +517,12 @@ namespace QuickPane.Services
 
         public void MoveGroup(PinnedGroup group, int delta)
         {
+            if (group == null) return;
             var ordered = _groups.ToList();
-            int idx = ordered.FindIndex(g => ReferenceEquals(g, group));
+            // Matched by path, not reference: a watcher rescan published between the click and this
+            // edit running (PostEdit) replaces every group with a new object, and matching the
+            // group the click captured by reference would turn the move into a silent no-op (#75).
+            int idx = ordered.FindIndex(g => string.Equals(g.FolderPath, group.FolderPath, StringComparison.OrdinalIgnoreCase));
             int dest = idx + delta;
             if (idx < 0 || dest < 0 || dest >= ordered.Count) return;
             ordered.RemoveAt(idx); ordered.Insert(dest, group);
@@ -520,13 +558,22 @@ namespace QuickPane.Services
             Try(() =>
             {
                 if (source == null || dest == null || ReferenceEquals(source, dest)) return;
+                if (string.Equals(source.FolderPath, dest.FolderPath, StringComparison.OrdinalIgnoreCase)) return;
+                if (!Directory.Exists(source.FolderPath)) return;
+                // The tabs are read from disk now, not from the source object the drag captured: an
+                // edit queued before this one (PostEdit, #75) may have moved another tab into the
+                // source group since, and that tab must move with the rest instead of being lost.
                 int order = NextTabOrder(dest.FolderPath);
-                foreach (var tab in source.Tabs.ToList())
+                foreach (var tabDir in Directory.GetDirectories(source.FolderPath).OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
                 {
-                    var destPath = UniqueDir(dest.FolderPath, order++, tab.Name);
-                    if (Directory.Exists(tab.FolderPath)) Directory.Move(tab.FolderPath, destPath);
+                    int o; string name;
+                    Split(Path.GetFileName(tabDir), out o, out name);
+                    Directory.Move(tabDir, UniqueDir(dest.FolderPath, order++, name));
                 }
-                if (Directory.Exists(source.FolderPath)) Directory.Delete(source.FolderPath, true);
+                // Anything still inside, such as a legacy loose pin, goes to the Recycle Bin rather
+                // than being deleted outright; an empty folder is simply removed.
+                if (Directory.EnumerateFileSystemEntries(source.FolderPath).Any()) Recycle(source.FolderPath);
+                else Directory.Delete(source.FolderPath, false);
             });
         }
 
@@ -570,8 +617,14 @@ namespace QuickPane.Services
 
         public void MoveTab(PinnedGroup group, PinnedTab tab, int delta)
         {
+            if (group == null || tab == null) return;
+            // Matched by path against the current scan, for the same reason as MoveGroup (#75): the
+            // group the click captured may be an object a rescan has since replaced.
+            var current = _groups.FirstOrDefault(g => string.Equals(g.FolderPath, group.FolderPath, StringComparison.OrdinalIgnoreCase));
+            if (current == null) return;
+            group = current;
             var ordered = group.Tabs.ToList();
-            int idx = ordered.FindIndex(t => ReferenceEquals(t, tab));
+            int idx = ordered.FindIndex(t => string.Equals(t.FolderPath, tab.FolderPath, StringComparison.OrdinalIgnoreCase));
             int dest = idx + delta;
             if (idx < 0 || dest < 0 || dest >= ordered.Count) return;
             ordered.RemoveAt(idx); ordered.Insert(dest, tab);
@@ -754,8 +807,14 @@ namespace QuickPane.Services
 
         public void MovePin(PinnedTab tab, PinnedFolder folder, int delta)
         {
+            if (tab == null || folder == null) return;
+            // Matched by path against the current scan, for the same reason as MoveGroup (#75).
+            var current = _groups.SelectMany(g => g.Tabs)
+                .FirstOrDefault(t => string.Equals(t.FolderPath, tab.FolderPath, StringComparison.OrdinalIgnoreCase));
+            if (current == null) return;
+            tab = current;
             var ordered = tab.Items.ToList();
-            int idx = ordered.FindIndex(p => ReferenceEquals(p, folder));
+            int idx = ordered.FindIndex(p => string.Equals(p.LinkPath, folder.LinkPath, StringComparison.OrdinalIgnoreCase));
             int dest = idx + delta;
             if (idx < 0 || dest < 0 || dest >= ordered.Count) return;
             ordered.RemoveAt(idx); ordered.Insert(dest, folder);
