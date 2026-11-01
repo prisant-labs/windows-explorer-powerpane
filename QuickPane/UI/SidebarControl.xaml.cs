@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -189,9 +190,72 @@ namespace QuickPane.UI
             QueueBuild();
         }
 
+        // What BuildSections built the pane from last time, so OnSettingsChanged can tell a change
+        // that moves pins or renames a section from one that does not (#51).
+        private string _shapeKey;
+        private AppSettings _shapeSettings;
+
         private void OnSettingsChanged(object sender, EventArgs e)
         {
+            if (_detached) return;
+            var current = App.Settings != null ? App.Settings.Current : null;
+
+            // A reload or an import builds a new AppSettings instance that open menus and pickers
+            // would still hold stale references into, even when its shape key happens to match, so
+            // the instance is checked too, not just the key.
+            if (current != null && ReferenceEquals(current, _shapeSettings) && PaneShapeKey(current) == _shapeKey)
+            {
+                Log.Info("skipped pane rebuild (shape unchanged)");
+                RefreshProfileTabs();
+                ApplyProfileTabsState();
+                ApplyFilter();
+                return;
+            }
+
             QueueBuild();
+        }
+
+        /// <summary>A key for everything about a pane's settings that changes which sections it shows,
+        /// their order or title, or the profile tab row, as opposed to a width, a count, or a field a
+        /// section reads for itself once built. Two settings with the same key build the same pane, so
+        /// OnSettingsChanged can skip the rebuild and just refresh the bits that are cheap to refresh
+        /// (#51). A setting missing here would leave a pane stale after a real shape change, so a
+        /// reflection test in SidebarControlTests requires every public property of AppSettings,
+        /// Profile, SshProfile, and SectionSetting to be listed here or in its explicit not-rendered
+        /// list.</summary>
+        internal static string PaneShapeKey(AppSettings s)
+        {
+            var sb = new StringBuilder();
+            if (s == null) return sb.ToString();
+
+            if (s.Sections != null)
+            {
+                foreach (var sec in s.Sections.Where(x => x.Visible).OrderBy(x => x.Order))
+                    sb.Append(sec.Type).Append('\u0001').Append(sec.Order).Append('\u0001').Append(sec.Title).Append('\u0002');
+            }
+            sb.Append('\u0003').Append(s.RecentAppsSource).Append('\u0003');
+
+            if (s.SshProfiles != null)
+            {
+                foreach (var sp in s.SshProfiles)
+                    sb.Append(sp.Name).Append('\u0001').Append(sp.DriveLetter).Append('\u0002');
+            }
+            sb.Append('\u0003');
+
+            if (s.Profiles != null)
+            {
+                foreach (var p in s.Profiles)
+                    sb.Append(p.Name).Append('\u0001').Append(p.GroupsPath).Append('\u0002');
+            }
+            sb.Append('\u0003').Append(s.ActiveProfileIndex)
+              .Append('\u0001').Append(s.ShowProfileTabs)
+              .Append('\u0001').Append(s.ProfileTabsAutoHide)
+              .Append('\u0003').Append(s.GroupsPath)
+              .Append('\u0001').Append(s.KeyboardNav)
+              .Append('\u0001').Append(s.Mode)
+              .Append('\u0001').Append(s.DialogMode);
+
+            return sb.ToString();
         }
 
         private void QueueBuild()
@@ -214,7 +278,8 @@ namespace QuickPane.UI
             DetachSections();
             SectionsPanel.Children.Clear();
 
-            var ordered = App.Settings.Current.Sections
+            var current = App.Settings.Current;
+            var ordered = current.Sections
                 .Where(s => s.Visible)
                 .OrderBy(s => s.Order)
                 .ToList();
@@ -234,6 +299,11 @@ namespace QuickPane.UI
             WireTabHover();
             ApplyProfileTabsState();
             ApplyFilter();
+
+            // Record what this rebuild used, so the next settings change can skip a rebuild when
+            // nothing that changes the pane's shape actually changed (#51).
+            _shapeKey = PaneShapeKey(current);
+            _shapeSettings = current;
         }
 
         /// <summary>Hide the rows that do not match what was typed in the search box.
