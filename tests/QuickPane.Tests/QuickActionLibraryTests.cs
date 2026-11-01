@@ -297,39 +297,31 @@ namespace QuickPane.Tests
             Assert.That(QuickActionLibrary.Find(id), Is.Null);
         }
 
-        // ---- TerminalArguments: wt.exe vs. the PowerShell fallback's own quoting rules ----------
+        // ---- TerminalArguments: neither branch puts the folder in the argument string at all -----
+        // (an earlier version did, through PowerShell's "-Command" and through wt's "-d <path>", and
+        // both let a folder name reach a second parser: PowerShell's own single-quote look-alikes
+        // U+2018-U+201B closed a '...' literal early and ran whatever followed it, a plain ASCII "''"
+        // doubling did not stop that, and wt treats an unescaped ";" as its own tab separator).
 
         [Test]
-        public void TerminalArguments_WithWt_UsesDashDAndQuoteArgument()
+        public void TerminalArguments_WithWt_IsJustDashDDot()
         {
-            Assert.That(QuickActionLibrary.TerminalArguments(@"C:\Demo\R&D notes", haveWt: true),
-                Is.EqualTo("-d " + QuickActionLibrary.QuoteArgument(@"C:\Demo\R&D notes")));
+            Assert.That(QuickActionLibrary.TerminalArguments(haveWt: true), Is.EqualTo("-d ."));
         }
 
         [Test]
-        public void TerminalArguments_WithoutWt_WrapsThePathInPowerShellSingleQuotes()
+        public void TerminalArguments_WithoutWt_IsJustNoExit()
         {
-            Assert.That(QuickActionLibrary.TerminalArguments(@"C:\Demo\Apollo", haveWt: false),
-                Is.EqualTo("-NoExit -Command Set-Location -LiteralPath 'C:\\Demo\\Apollo'"));
+            Assert.That(QuickActionLibrary.TerminalArguments(haveWt: false), Is.EqualTo("-NoExit"));
         }
 
         [Test]
-        public void TerminalArguments_WithoutWt_DollarSignIsNotExpandable()
+        public void TerminalArguments_NeitherBranchContainsAPathOrAQuoteOrASemicolon()
         {
-            // CommandLineToArgvW-style quoting (QuoteArgument) protects argv parsing, not
-            // PowerShell's -Command script parsing: a double-quoted "$RECYCLE.BIN" would still have
-            // $RECYCLE read as a variable. Single quotes are PowerShell's own literal string, so $
-            // inside one is just a character.
-            var args = QuickActionLibrary.TerminalArguments(@"C:\$RECYCLE.BIN", haveWt: false);
-            Assert.That(args, Is.EqualTo("-NoExit -Command Set-Location -LiteralPath 'C:\\$RECYCLE.BIN'"));
-            Assert.That(args, Does.Not.Contain("\""));
-        }
-
-        [Test]
-        public void TerminalArguments_WithoutWt_EmbeddedSingleQuoteIsDoubled()
-        {
-            var args = QuickActionLibrary.TerminalArguments(@"C:\Demo\O'Brien", haveWt: false);
-            Assert.That(args, Is.EqualTo("-NoExit -Command Set-Location -LiteralPath 'C:\\Demo\\O''Brien'"));
+            // The strongest statement this helper can make: no folder name, however hostile, can ever
+            // reach either program's own parser, because no folder name is ever substituted in here.
+            Assert.That(QuickActionLibrary.TerminalArguments(haveWt: true), Does.Not.Contain(";").And.Not.Contain("'").And.Not.Contain("\""));
+            Assert.That(QuickActionLibrary.TerminalArguments(haveWt: false), Does.Not.Contain(";").And.Not.Contain("'").And.Not.Contain("\""));
         }
 
         // ---- ResolveCodeExe: the real Code.exe beside code.cmd's install root ------------------

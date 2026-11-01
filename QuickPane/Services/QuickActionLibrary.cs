@@ -164,18 +164,23 @@ namespace QuickPane.Services
             return sb.ToString();
         }
 
-        /// <summary>The argument string for "Open in Terminal": "-d &lt;path&gt;" for wt.exe, quoted
-        /// through <see cref="QuoteArgument"/> like every other process this file starts, or a
-        /// PowerShell fallback that must quote the path a different way. PowerShell's own -Command
-        /// parses the rest of the line as script text, not as a plain argv, so CommandLineToArgvW
-        /// quoting does not protect a folder name containing "$" (e.g. "$RECYCLE.BIN") from being read
-        /// as a variable reference; wrapping it in PowerShell's single-quoted string literal does,
-        /// since nothing expands inside one except a doubled single quote.</summary>
-        public static string TerminalArguments(string folder, bool haveWt)
+        /// <summary>The argument string for "Open in Terminal": neither branch puts the folder in the
+        /// argument string at all -- the caller places the new process directly in that folder through
+        /// <see cref="System.Diagnostics.ProcessStartInfo.WorkingDirectory"/> instead, which the OS
+        /// sets before the process's own command-line parsing ever runs. Two earlier approaches both
+        /// let a folder name reach a second parser once the argument got there: wt.exe treats an
+        /// unescaped ";" in "-d &lt;path&gt;" as its own tab/pane separator (a folder such as
+        /// "C:\x;calc" could start a second tab), and PowerShell's "-Command" re-parses its remainder
+        /// as script text, not argv -- so even a correctly argv-quoted path let "$RECYCLE.BIN" be read
+        /// as a variable, and let a folder name holding one of PowerShell's non-ASCII single-quote
+        /// look-alikes (U+2018-U+201B, which PowerShell also treats as a quote character) close the
+        /// literal early and run whatever followed. "-d ." tells wt.exe to use its own process's
+        /// current directory -- the same pattern Microsoft's own "Open in Windows Terminal here" shell
+        /// extension uses -- and "-NoExit" alone starts PowerShell interactively in whatever directory
+        /// CreateProcess already placed it in, with no script text to parse at all.</summary>
+        public static string TerminalArguments(bool haveWt)
         {
-            if (haveWt) return "-d " + QuoteArgument(folder);
-            string psLiteral = "'" + (folder ?? string.Empty).Replace("'", "''") + "'";
-            return "-NoExit -Command Set-Location -LiteralPath " + psLiteral;
+            return haveWt ? "-d ." : "-NoExit";
         }
 
         // ---- unique naming ---------------------------------------------------

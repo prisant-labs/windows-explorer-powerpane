@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.IO;
+using System.Threading.Tasks;
 using NUnit.Framework;
 using QuickPane.Services;
 
@@ -95,7 +97,9 @@ namespace QuickPane.Tests
             {
                 QuickActionRunner.Run("new-markdown-file", temp.Path);
 
-                string expectedName = System.DateTime.Now.ToString("yyyy-MM-dd") + "-untitled.md";
+                // InvariantCulture to match production: the current thread's culture (e.g. Thai
+                // Buddhist, th-TH) must not be able to put a different year in either side.
+                string expectedName = System.DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "-untitled.md";
                 string path = Path.Combine(temp.Path, expectedName);
                 Assert.That(File.Exists(path), Is.True);
                 Assert.That(File.ReadAllText(path), Does.Contain("# Untitled"));
@@ -109,7 +113,7 @@ namespace QuickPane.Tests
             {
                 QuickActionRunner.Run("new-dated-folder", temp.Path);
 
-                string expectedName = System.DateTime.Now.ToString("yyyy-MM-dd");
+                string expectedName = System.DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 Assert.That(Directory.Exists(Path.Combine(temp.Path, expectedName)), Is.True);
             }
         }
@@ -122,8 +126,43 @@ namespace QuickPane.Tests
                 QuickActionRunner.Run("new-dated-folder", temp.Path);
                 QuickActionRunner.Run("new-dated-folder", temp.Path);
 
-                string baseName = System.DateTime.Now.ToString("yyyy-MM-dd");
+                string baseName = System.DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
                 Assert.That(Directory.Exists(Path.Combine(temp.Path, baseName + " (2)")), Is.True);
+            }
+        }
+
+        // ---- race safety: UniqueFileName/UniqueFolderName only check a name is free; nothing holds
+        // it reserved, so a single existence check followed by an unconditional write could overwrite
+        // whatever a second, near-simultaneous call had just created there. These race multiple real
+        // calls against the very same folder, on real OS threads, rather than trying to simulate the
+        // race deterministically -- the only way to actually exercise the FileMode.CreateNew retry.
+
+        [Test]
+        public void Run_NewTextFile_ConcurrentCallsNeverOverwriteEachOther()
+        {
+            using (var temp = new TempDir())
+            {
+                const int n = 8;
+                var tasks = new Task[n];
+                for (int i = 0; i < n; i++) tasks[i] = Task.Run(() => QuickActionRunner.Run("new-text-file", temp.Path));
+                Task.WaitAll(tasks);
+
+                var created = Directory.GetFiles(temp.Path, "New Text Document*.txt");
+                Assert.That(created, Has.Length.EqualTo(n)); // one file per call; none silently lost to another
+            }
+        }
+
+        [Test]
+        public void Run_NewDatedFolder_ConcurrentCallsNeverCollapseIntoFewerFolders()
+        {
+            using (var temp = new TempDir())
+            {
+                const int n = 8;
+                var tasks = new Task[n];
+                for (int i = 0; i < n; i++) tasks[i] = Task.Run(() => QuickActionRunner.Run("new-dated-folder", temp.Path));
+                Task.WaitAll(tasks);
+
+                Assert.That(Directory.GetDirectories(temp.Path), Has.Length.EqualTo(n));
             }
         }
 

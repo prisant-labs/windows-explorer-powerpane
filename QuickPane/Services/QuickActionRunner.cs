@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -86,13 +87,21 @@ namespace QuickPane.Services
             }
         }
 
+        // UniqueFileName/UniqueFolderName only check whether a name is free; nothing holds that name
+        // reserved between the check and the create call below it, so two quick clicks (or a second
+        // process) can both pick the same candidate. A capped retry loop, not a single attempt, is
+        // what actually keeps the "never overwrite" promise under that race.
+        private const int MaxUniqueNameAttempts = 100;
+
         private static void NewTextFile(string folder)
         {
             try
             {
-                var path = QuickActionLibrary.UniqueFileName(folder, "New Text Document", ".txt");
-                File.WriteAllText(path, string.Empty);
-                Log.Info("quick action 'new-text-file': created '" + path + "'.");
+                string path;
+                if (TryCreateUniqueFile(folder, "New Text Document", ".txt", string.Empty, out path))
+                    Log.Info("quick action 'new-text-file': created '" + path + "'.");
+                else
+                    Log.Error("quick action 'new-text-file': could not find a free name in '" + folder + "'.");
             }
             catch (Exception ex) { Log.Error("quick action 'new-text-file'", ex); }
         }
@@ -101,28 +110,98 @@ namespace QuickPane.Services
         {
             try
             {
-                string baseName = DateTime.Now.ToString("yyyy-MM-dd") + "-untitled";
-                var path = QuickActionLibrary.UniqueFileName(folder, baseName, ".md");
-                File.WriteAllText(path, "# Untitled" + Environment.NewLine);
-                Log.Info("quick action 'new-markdown-file': created '" + path + "'.");
+                // InvariantCulture, not the current thread's culture: a non-Gregorian calendar (e.g.
+                // Thai Buddhist, th-TH) would otherwise put a different year in the name.
+                string baseName = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) + "-untitled";
+                string path;
+                if (TryCreateUniqueFile(folder, baseName, ".md", "# Untitled" + Environment.NewLine, out path))
+                    Log.Info("quick action 'new-markdown-file': created '" + path + "'.");
+                else
+                    Log.Error("quick action 'new-markdown-file': could not find a free name in '" + folder + "'.");
             }
             catch (Exception ex) { Log.Error("quick action 'new-markdown-file'", ex); }
+        }
+
+        /// <summary>Creates a file holding <paramref name="content"/> under a name
+        /// <see cref="QuickActionLibrary.UniqueFileName"/> reports free, retrying with the next
+        /// candidate (up to <see cref="MaxUniqueNameAttempts"/>) whenever <see cref="FileMode.CreateNew"/>
+        /// finds that name already taken -- which only an exclusive create-or-fail open can detect
+        /// reliably, since a plain existence check followed by <see cref="File.WriteAllText"/> would
+        /// silently overwrite whatever had just appeared there.</summary>
+        private static bool TryCreateUniqueFile(string folder, string baseName, string extension, string content, out string createdPath)
+        {
+            for (int attempt = 0; attempt < MaxUniqueNameAttempts; attempt++)
+            {
+                string path = QuickActionLibrary.UniqueFileName(folder, baseName, extension);
+                try
+                {
+                    using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+                    using (var writer = new StreamWriter(stream))
+                        writer.Write(content);
+                    createdPath = path;
+                    return true;
+                }
+                catch (IOException)
+                {
+                    // Somebody else (another click, another process) created this exact name between
+                    // UniqueFileName's check and here; ask it for the next candidate instead of
+                    // overwriting what just appeared.
+                }
+            }
+            createdPath = null;
+            return false;
         }
 
         private static void NewDatedFolder(string folder)
         {
             try
             {
-                var path = QuickActionLibrary.UniqueFolderName(folder, DateTime.Now.ToString("yyyy-MM-dd"));
-                Directory.CreateDirectory(path);
-                Log.Info("quick action 'new-dated-folder': created '" + path + "'.");
+                // InvariantCulture for the same reason as NewMarkdownFile above.
+                string baseName = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                for (int attempt = 0; attempt < MaxUniqueNameAttempts; attempt++)
+                {
+                    string path = QuickActionLibrary.UniqueFolderName(folder, baseName);
+                    if (TryCreateDirectoryExclusive(path))
+                    {
+                        Log.Info("quick action 'new-dated-folder': created '" + path + "'.");
+                        return;
+                    }
+                    // Somebody else (another click, another process) created this exact name between
+                    // UniqueFolderName's check and here; ask it for the next candidate instead of
+                    // reusing what just appeared.
+                }
+                Log.Error("quick action 'new-dated-folder': could not find a free name in '" + folder + "'.");
             }
             catch (Exception ex) { Log.Error("quick action 'new-dated-folder'", ex); }
         }
 
+        // Directory.CreateDirectory cannot tell "I created it" apart from "it was already there" --
+        // it succeeds silently either way, which is exactly how two near-simultaneous calls can both
+        // "succeed" on the identical path and collapse into one folder. The underlying Win32
+        // CreateDirectoryW does distinguish the two cases (ERROR_ALREADY_EXISTS the second time), so
+        // this P/Invoke, not .NET's own wrapper, is what the retry loop above can actually trust.
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        private static extern bool CreateDirectoryW(string lpPathName, IntPtr lpSecurityAttributes);
+
+        private const int ErrorAlreadyExists = 183;
+
+        /// <summary>True only if this call is the one that actually created <paramref name="path"/>;
+        /// false (never throwing for this one reason) if it already existed, so the caller can treat
+        /// that as "somebody else just took this name" and try the next candidate.</summary>
+        private static bool TryCreateDirectoryExclusive(string path)
+        {
+            if (CreateDirectoryW(path, IntPtr.Zero)) return true;
+            int error = Marshal.GetLastWin32Error();
+            if (error == ErrorAlreadyExists) return false;
+            throw new IOException("Could not create '" + path + "' (Win32 error " + error + ").");
+        }
+
         /// <summary>wt.exe when it is on PATH, else powershell.exe, started directly through
         /// ProcessStartInfo with its own argument list -- never "cmd /c" -- so a folder name holding
-        /// an ampersand or a caret cannot start a second command (quick actions, first version). Never
+        /// an ampersand or a caret cannot start a second command (quick actions, first version). The
+        /// folder never appears in the argument string at all (see TerminalArguments): WorkingDirectory
+        /// alone places the new process there, which is what keeps a ";" (wt.exe's own tab separator)
+        /// or a PowerShell quote character from ever reaching either program's own parser. Never
         /// elevated: ProcessStartInfo.UseShellExecute defaults false and nothing here sets Verb.</summary>
         private static void OpenTerminal(string folder)
         {
@@ -133,7 +212,7 @@ namespace QuickPane.Services
                 {
                     Process.Start(new ProcessStartInfo(wt)
                     {
-                        Arguments = QuickActionLibrary.TerminalArguments(folder, haveWt: true),
+                        Arguments = QuickActionLibrary.TerminalArguments(haveWt: true),
                         WorkingDirectory = folder,
                         UseShellExecute = false
                     });
@@ -142,7 +221,7 @@ namespace QuickPane.Services
                 }
                 Process.Start(new ProcessStartInfo("powershell.exe")
                 {
-                    Arguments = QuickActionLibrary.TerminalArguments(folder, haveWt: false),
+                    Arguments = QuickActionLibrary.TerminalArguments(haveWt: false),
                     WorkingDirectory = folder,
                     UseShellExecute = false
                 });
