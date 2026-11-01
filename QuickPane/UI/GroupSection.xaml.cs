@@ -106,7 +106,11 @@ namespace QuickPane.UI
                 var tr = e.Data.GetData(TabFormat) as TabRef;
                 if (tr == null) return;
                 var src = FindTab(tr.TabFolder);
-                if (src.Item2 != null) App.Groups.MoveTabToNewGroup(src.Item1, src.Item2);
+                if (src.Item2 != null)
+                {
+                    var srcGroup = src.Item1; var srcTab = src.Item2;
+                    App.Groups.PostEdit(store => store.MoveTabToNewGroup(srcGroup, srcTab));
+                }
                 return;
             }
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -121,14 +125,16 @@ namespace QuickPane.UI
         private static void PinToLastGroup(string[] paths)
         {
             if (paths == null || paths.Length == 0 || App.Groups == null) return;
-            WorkQueue.Post(() =>
+            // Through PostEdit, so a profile switch before this runs cannot create "Pinned" in the
+            // new profile's folder: CreateGroup takes no group for a stale check to catch (#75).
+            App.Groups.PostEdit(store =>
             {
                 try
                 {
-                    var groups = App.Groups.Groups;
-                    var last = groups.Count > 0 ? groups[groups.Count - 1] : App.Groups.CreateGroup("Pinned");
+                    var groups = store.Groups;
+                    var last = groups.Count > 0 ? groups[groups.Count - 1] : store.CreateGroup("Pinned");
                     if (last == null) return;
-                    App.Groups.AddPins(last.Active, paths.Where(PathIsReal).ToList());
+                    store.AddPins(last.Active, paths.Where(PathIsReal).ToList());
                 }
                 catch (Exception ex) { Log.Error("pin to last group", ex); }
             });
@@ -139,9 +145,9 @@ namespace QuickPane.UI
         private static void PinPaths(PinnedGroup group, string[] paths)
         {
             if (group == null || paths == null || paths.Length == 0 || App.Groups == null) return;
-            WorkQueue.Post(() =>
+            App.Groups.PostEdit(store =>
             {
-                try { App.Groups.AddPins(group.Active, paths.Where(PathIsReal).ToList()); }
+                try { store.AddPins(group.Active, paths.Where(PathIsReal).ToList()); }
                 catch (Exception ex) { Log.Error("pin paths", ex); }
             });
         }
@@ -297,7 +303,7 @@ namespace QuickPane.UI
             addTab.Click += (s, e) =>
             {
                 var v = TextPrompt.Ask("New tab name", "");
-                if (!string.IsNullOrWhiteSpace(v)) App.Groups.AddTab(group, v);
+                if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v));
             };
             Grid.SetColumn(addTab, 2);
             grid.Children.Add(addTab);
@@ -471,11 +477,12 @@ namespace QuickPane.UI
                 if (index < 0) index = 0;
                 if (index > ordered.Count) index = ordered.Count;
                 ordered.Insert(index, src.Item2);
-                App.Groups.ReorderTabs(destGroup, ordered);
+                App.Groups.PostEdit(store => store.ReorderTabs(destGroup, ordered));
             }
             else
             {
-                App.Groups.MoveTabToGroup(src.Item2, destGroup);
+                var srcTab = src.Item2;
+                App.Groups.PostEdit(store => store.MoveTabToGroup(srcTab, destGroup));
             }
         }
 
@@ -539,7 +546,7 @@ namespace QuickPane.UI
                     var src = App.Groups.Groups.FirstOrDefault(g => gr != null && string.Equals(g.FolderPath, gr.FolderPath, StringComparison.OrdinalIgnoreCase));
                     if (src == null || ReferenceEquals(src, group)) return;
                     double y = e.GetPosition(target).Y, h = Math.Max(1, target.ActualHeight);
-                    if (y >= h * 0.33 && y <= h * 0.66) App.Groups.MergeGroups(src, group);
+                    if (y >= h * 0.33 && y <= h * 0.66) App.Groups.PostEdit(store => store.MergeGroups(src, group));
                     else ReorderGroupRelative(src, group, y > h * 0.66);
                     return;
                 }
@@ -554,7 +561,7 @@ namespace QuickPane.UI
             int idx = ordered.FindIndex(g => ReferenceEquals(g, target));
             if (idx < 0) return;
             ordered.Insert(after ? idx + 1 : idx, dragged);
-            App.Groups.ReorderGroups(ordered);
+            App.Groups.PostEdit(store => store.ReorderGroups(ordered));
         }
 
         private void OnGroupDrop(PinnedGroup group, DragEventArgs e)
@@ -565,14 +572,18 @@ namespace QuickPane.UI
                 {
                     var gr = e.Data.GetData(GroupFormat) as GroupRef;
                     var src = App.Groups.Groups.FirstOrDefault(g => string.Equals(g.FolderPath, gr.FolderPath, StringComparison.OrdinalIgnoreCase));
-                    if (src != null && !ReferenceEquals(src, group)) App.Groups.MergeGroups(src, group);
+                    if (src != null && !ReferenceEquals(src, group)) App.Groups.PostEdit(store => store.MergeGroups(src, group));
                     return;
                 }
                 if (e.Data.GetDataPresent(TabFormat))
                 {
                     var tr = e.Data.GetData(TabFormat) as TabRef;
                     var src = FindTab(tr.TabFolder);
-                    if (src.Item2 != null && !ReferenceEquals(src.Item1, group)) App.Groups.MoveTabToGroup(src.Item2, group);
+                    if (src.Item2 != null && !ReferenceEquals(src.Item1, group))
+                    {
+                        var srcTab = src.Item2;
+                        App.Groups.PostEdit(store => store.MoveTabToGroup(srcTab, group));
+                    }
                     return;
                 }
                 if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -675,12 +686,12 @@ namespace QuickPane.UI
                     var dropped = e.Data.GetData(DataFormats.FileDrop) as string[];
                     var tab = group.Active;
                     int at = index;
-                    WorkQueue.Post(() =>
+                    App.Groups.PostEdit(store =>
                     {
                         try
                         {
                             foreach (var path in dropped ?? new string[0])
-                                if (PathIsReal(path)) { App.Groups.AddPinAtIndex(tab, path, at); at++; }
+                                if (PathIsReal(path)) { store.AddPinAtIndex(tab, path, at); at++; }
                         }
                         catch (Exception ex) { Log.Error("pin at index", ex); }
                     });
@@ -713,18 +724,27 @@ namespace QuickPane.UI
         {
             var hit = FindPin(linkPath);
             if (hit.Item2 == null || destTab == null) return;
-            if (!ReferenceEquals(hit.Item1, destTab)) { App.Groups.MovePinToTab(hit.Item2, destTab); return; }
+            if (!ReferenceEquals(hit.Item1, destTab))
+            {
+                var folder = hit.Item2;
+                App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
+                return;
+            }
             var ordered = destTab.Items.Where(p => !ReferenceEquals(p, hit.Item2)).ToList();
             if (index < 0) index = 0;
             if (index > ordered.Count) index = ordered.Count;
             ordered.Insert(index, hit.Item2);
-            App.Groups.ReorderPins(destTab, ordered);
+            App.Groups.PostEdit(store => store.ReorderPins(destTab, ordered));
         }
 
         private void MovePinToTabEnd(string linkPath, PinnedTab destTab)
         {
             var hit = FindPin(linkPath);
-            if (hit.Item2 != null && destTab != null) App.Groups.MovePinToTab(hit.Item2, destTab);
+            if (hit.Item2 != null && destTab != null)
+            {
+                var folder = hit.Item2;
+                App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
+            }
         }
 
         private static Tuple<PinnedTab, PinnedFolder> FindPin(string linkPath)
@@ -754,12 +774,12 @@ namespace QuickPane.UI
             var menu = new ContextMenu();
             menu.Items.Add(Item("Rename", () => RenameGroupOrTab(group, group.Tabs.Count == 1 ? group.Tabs[0] : activeTab)));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Add tab", () => { var v = TextPrompt.Ask("New tab name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.AddTab(group, v); }));
-            menu.Items.Add(Item("Add group below", () => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.CreateGroupAfter(group, v); }));
-            menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.AddPin(group, p); }));
-            menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.AddPin(group, p); }));
-            menu.Items.Add(Item("Move up", () => App.Groups.MoveGroup(group, -1)));
-            menu.Items.Add(Item("Move down", () => App.Groups.MoveGroup(group, +1)));
+            menu.Items.Add(Item("Add tab", () => { var v = TextPrompt.Ask("New tab name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v)); }));
+            menu.Items.Add(Item("Add group below", () => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroupAfter(group, v)); }));
+            menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(group, p)); }));
+            menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(group, p)); }));
+            menu.Items.Add(Item("Move up", () => App.Groups.PostEdit(store => store.MoveGroup(group, -1))));
+            menu.Items.Add(Item("Move down", () => App.Groups.PostEdit(store => store.MoveGroup(group, +1))));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Delete group", () => ConfirmDeleteGroup(group)));
             return menu;
@@ -773,12 +793,12 @@ namespace QuickPane.UI
             // These land in the tab that was right-clicked, not the group's active tab: a group with
             // several tabs otherwise has no way to add a pin anywhere but the narrow strip past the
             // last tab, which always targets whichever tab happened to be active.
-            menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.AddPin(tab, p); }));
-            menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.AddPin(tab, p); }));
+            menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(tab, p)); }));
+            menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(tab, p)); }));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Move tab left", () => App.Groups.MoveTab(group, tab, -1)));
-            menu.Items.Add(Item("Move tab right", () => App.Groups.MoveTab(group, tab, +1)));
-            menu.Items.Add(Item("Make tab its own group", () => App.Groups.MoveTabToNewGroup(group, tab)));
+            menu.Items.Add(Item("Move tab left", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, -1))));
+            menu.Items.Add(Item("Move tab right", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, +1))));
+            menu.Items.Add(Item("Make tab its own group", () => App.Groups.PostEdit(store => store.MoveTabToNewGroup(group, tab))));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Delete tab", () => ConfirmDeleteTab(group, tab)));
             return menu;
@@ -839,7 +859,7 @@ namespace QuickPane.UI
                 menu.Items.Add(Item("Open in new window", () => ExplorerNavigator.OpenNewWindow(pin.TargetPath)));
             }
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Rename", () => { var v = TextPrompt.Ask("Rename pin", pin.DisplayName); if (v != null) App.Groups.RenamePin(pin, v); }));
+            menu.Items.Add(Item("Rename", () => { var v = TextPrompt.Ask("Rename pin", pin.DisplayName); if (v != null) App.Groups.PostEdit(store => store.RenamePin(pin, v)); }));
             menu.Items.Add(Item("Edit path", () => EditPinPath(pin)));
             menu.Items.Add(new Separator());
 
@@ -847,16 +867,16 @@ namespace QuickPane.UI
             foreach (var g in App.Groups.Groups.Where(x => !ReferenceEquals(x, group)))
             {
                 var dest = g;
-                moveTo.Items.Add(Item(GroupStore.DisplayName(g), () => App.Groups.MovePinToGroup(pin, dest)));
+                moveTo.Items.Add(Item(GroupStore.DisplayName(g), () => App.Groups.PostEdit(store => store.MovePinToGroup(pin, dest))));
             }
             if (moveTo.Items.Count == 0) moveTo.IsEnabled = false;
             menu.Items.Add(moveTo);
 
-            menu.Items.Add(Item("Move up", () => App.Groups.MovePin(tab, pin, -1)));
-            menu.Items.Add(Item("Move down", () => App.Groups.MovePin(tab, pin, +1)));
+            menu.Items.Add(Item("Move up", () => App.Groups.PostEdit(store => store.MovePin(tab, pin, -1))));
+            menu.Items.Add(Item("Move down", () => App.Groups.PostEdit(store => store.MovePin(tab, pin, +1))));
             menu.Items.Add(Item("Copy path", () => SafeClipboard(pin.TargetPath)));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Remove Shortcut", () => App.Groups.RemovePin(pin)));
+            menu.Items.Add(Item("Remove Shortcut", () => App.Groups.PostEdit(store => store.RemovePin(pin))));
             return menu;
         }
 
@@ -870,7 +890,7 @@ namespace QuickPane.UI
                     WinForms.MessageBoxButtons.YesNo, WinForms.MessageBoxIcon.Warning);
                 if (r != WinForms.DialogResult.Yes) return;
             }
-            App.Groups.DeleteGroup(group);
+            App.Groups.PostEdit(store => store.DeleteGroup(group));
         }
 
         private void ConfirmDeleteTab(PinnedGroup group, PinnedTab tab)
@@ -883,7 +903,7 @@ namespace QuickPane.UI
                     WinForms.MessageBoxButtons.YesNo, WinForms.MessageBoxIcon.Warning);
                 if (r != WinForms.DialogResult.Yes) return;
             }
-            App.Groups.DeleteTab(group, tab);
+            App.Groups.PostEdit(store => store.DeleteTab(group, tab));
         }
 
         private void RenameGroupOrTab(PinnedGroup group, PinnedTab tab)
@@ -895,13 +915,13 @@ namespace QuickPane.UI
         private void RenameGroupSingle(PinnedGroup group)
         {
             var v = TextPrompt.Ask("Rename", group.Tabs.Count == 1 ? group.Tabs[0].Name : GroupStore.DisplayName(group));
-            if (v != null) App.Groups.RenameGroup(group, v);
+            if (v != null) App.Groups.PostEdit(store => store.RenameGroup(group, v));
         }
 
         private void RenameTab(PinnedTab tab)
         {
             var v = TextPrompt.Ask("Rename tab", tab.Name);
-            if (v != null) App.Groups.RenameTab(tab, v);
+            if (v != null) App.Groups.PostEdit(store => store.RenameTab(tab, v));
         }
 
         // ---- add group affordances ----
@@ -922,7 +942,7 @@ namespace QuickPane.UI
                 ToolTip = "Add group below"
             };
             UiHelpers.Named(plus, "Add group below");
-            plus.Click += (s, e) => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.CreateGroupAfter(group, v); };
+            plus.Click += (s, e) => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroupAfter(group, v)); };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(plus, header.ColumnDefinitions.Count - 1);
             header.Children.Add(plus);
@@ -943,7 +963,7 @@ namespace QuickPane.UI
                 Padding = new Thickness(8, 6, 8, 6),
                 FontSize = 12
             };
-            btn.Click += (s, e) => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.CreateGroup(v); };
+            btn.Click += (s, e) => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroup(v)); };
             return UiHelpers.Named(btn, "Add group");
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace QuickPane.Services
 {
@@ -38,6 +39,28 @@ namespace QuickPane.Services
             {
                 var task = System.Threading.Tasks.Task.Run(() => check(path));
                 if (!task.Wait(timeoutMs)) { timedOut = true; return false; }
+                return task.Result;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Whether any of sources is a folder, giving up after timeoutMs. Classifying a
+        /// drop used to call Directory.Exists in a loop straight on the UI thread; one source on an
+        /// unreachable share cost the network timeout, right on the thread Explorer shares input
+        /// with (prisant-labs/windows-explorer-quickpane#75). A timeout reads as "contains a
+        /// folder": the caller then offers the ambiguous-drop menu rather than moving silently what
+        /// might have been a folder.</summary>
+        internal static bool AnyFolderWithin(string[] sources, int timeoutMs, out bool timedOut,
+            Func<string, bool> exists = null)
+        {
+            timedOut = false;
+            if (sources == null || sources.Length == 0) return false;
+            var check = exists ?? Directory.Exists;
+            try
+            {
+                var task = System.Threading.Tasks.Task.Run(() =>
+                    sources.Any(s => { try { return check(s); } catch { return false; } }));
+                if (!task.Wait(timeoutMs)) { timedOut = true; return true; }
                 return task.Result;
             }
             catch { return false; }

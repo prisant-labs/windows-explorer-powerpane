@@ -51,6 +51,48 @@ namespace QuickPane.Tests
             Assert.That(PathStatus.FolderExistsWithin("", 1000, out timedOut, p => true), Is.False);
         }
 
+        // ---- AnyFolderWithin (#75) --------------------------------------------
+        // Drop classification used to call Directory.Exists in a loop straight on the UI thread.
+
+        [Test]
+        public void AnyFolderWithin_OneSourceIsAFolder_ReturnsTrue()
+        {
+            bool timedOut;
+            Assert.That(PathStatus.AnyFolderWithin(
+                new[] { @"C:\Demo\File.txt", @"C:\Demo\Folder" }, 1000, out timedOut,
+                p => p == @"C:\Demo\Folder"), Is.True);
+            Assert.That(timedOut, Is.False);
+        }
+
+        [Test]
+        public void AnyFolderWithin_NoFolderAmongSources_ReturnsFalse()
+        {
+            bool timedOut;
+            Assert.That(PathStatus.AnyFolderWithin(
+                new[] { @"C:\Demo\File.txt", @"C:\Demo\Other.txt" }, 1000, out timedOut, p => false), Is.False);
+            Assert.That(timedOut, Is.False);
+        }
+
+        [Test]
+        public void AnyFolderWithin_NoAnswer_GivesUpAtTheTimeoutAndReadsAsAFolder()
+        {
+            // A timeout reads as "contains a folder": the caller offers the ambiguous-drop menu
+            // rather than moving silently what might have been one.
+            bool timedOut;
+            var clock = Stopwatch.StartNew();
+            Assert.That(PathStatus.AnyFolderWithin(new[] { @"\\demo-server\share" }, 100, out timedOut, Hang), Is.True);
+            Assert.That(timedOut, Is.True);
+            Assert.That(clock.ElapsedMilliseconds, Is.LessThan(2000));
+        }
+
+        [Test]
+        public void AnyFolderWithin_EmptyOrNullSources_IsFalse()
+        {
+            bool timedOut;
+            Assert.That(PathStatus.AnyFolderWithin(new string[0], 1000, out timedOut, p => true), Is.False);
+            Assert.That(PathStatus.AnyFolderWithin(null, 1000, out timedOut, p => true), Is.False);
+        }
+
         [Test]
         public void NearestExistingFolder_WalksUpToAnExistingAncestor()
         {

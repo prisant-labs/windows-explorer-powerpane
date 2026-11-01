@@ -109,7 +109,12 @@ namespace QuickPane.Tests
             public readonly GroupStore Store;
             public readonly List<string> Notes = new List<string>();
 
-            public TwoProfiles()
+            public TwoProfiles() : this(null) { }
+
+            /// <summary>post is the seam PostEdit runs a posted edit through. A synchronous fake
+            /// (action => action()) applies a posted edit at once; a queuing fake collects it so the
+            /// test can run it after a profile switch (#75).</summary>
+            public TwoProfiles(System.Action<System.Action> post)
             {
                 RootA = Path.Combine(Temp.Path, "ProfileA");
                 RootB = Path.Combine(Temp.Path, "ProfileB");
@@ -129,7 +134,7 @@ namespace QuickPane.Tests
                     new DataContractJsonSerializer(typeof(AppSettings)).WriteObject(fs, config);
                 Settings = new SettingsStore(Temp.Path);
                 Settings.Load();
-                Store = new GroupStore(Settings, Notes.Add);
+                Store = new GroupStore(Settings, Notes.Add, post);
             }
 
             public void SwitchToB() { Settings.Current.GroupsPath = RootB; }
@@ -280,6 +285,108 @@ namespace QuickPane.Tests
                 f.SwitchToB();
                 Assert.That(f.Store.IsCurrent(pin), Is.False);
                 Assert.That(f.Notes.Count, Is.EqualTo(1));
+            }
+        }
+
+        // ---- PostEdit (#75) ---------------------------------------------------
+        // PostEdit runs an edit through the post seam instead of in line, so a UI handler that
+        // renames, reorders, or pins something never waits on the scan lock on the calling thread.
+
+        [Test]
+        public void PostEdit_SynchronousPost_AppliesTheEdit()
+        {
+            using (var f = new TwoProfiles(action => action()))
+            {
+                f.Store.ScanOnce();
+                var gamma = f.Store.Groups[1]; // the single-tab group; DisplayName follows its tab
+
+                f.Store.PostEdit(s => s.RenameGroup(gamma, "Renamed"));
+
+                Assert.That(GroupStore.DisplayName(f.Store.Groups[1]), Is.EqualTo("Renamed"));
+                Assert.That(f.Notes, Is.Empty);
+            }
+        }
+
+        [Test]
+        public void PostEdit_QueuedEditRunAfterASwitch_LeavesTheTreeUnchanged()
+        {
+            var queued = new List<System.Action>();
+            using (var f = new TwoProfiles(queued.Add))
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups[0];
+                var before = f.Tree();
+
+                // Root is captured when PostEdit is called, on this (the caller's) thread.
+                f.Store.PostEdit(s => s.RenameGroup(alpha, "Renamed"));
+                Assert.That(queued.Count, Is.EqualTo(1));
+
+                f.SwitchToB();
+                queued[0](); // the posted action, running as if on the worker after the switch
+
+                Assert.That(f.Tree(), Is.EqualTo(before));
+                Assert.That(f.Notes.Count, Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void MoveGroup_WithAGroupObjectFromBeforeARescan_StillMovesIt()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups[0]; // 01_Alpha
+
+                // A watcher rescan between the click and this call replaces every group with a new
+                // object for the same folder; nothing changed on disk.
+                f.Store.ScanOnce();
+
+                f.Store.MoveGroup(alpha, +1); // move the OLD alpha object past gamma
+
+                f.Store.ScanOnce();
+                Assert.That(f.Store.Groups.Select(g => g.Name), Is.EqualTo(new[] { "Gamma", "Alpha" }));
+            }
+        }
+
+        [Test]
+        public void MergeGroups_AlsoMovesATabThatArrivedAfterTheClick()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var gammaAtClick = f.Store.Groups[1];   // 02_Gamma, one tab
+                var alpha = f.Store.Groups[0];          // 01_Alpha: Main, Second
+
+                // An edit queued before the merge moves Alpha's "Second" tab into Gamma.
+                f.Store.MoveTabToGroup(alpha.Tabs[1], gammaAtClick);
+
+                // The merge still carries the one-tab Gamma the drag captured. Merging it into Alpha
+                // must bring "Second" back too, never delete it with Gamma's folder.
+                f.Store.MergeGroups(gammaAtClick, f.Store.Groups.First(g => g.Name == "Alpha"));
+
+                f.Store.ScanOnce();
+                Assert.That(f.Store.Groups.Select(g => g.Name), Is.EqualTo(new[] { "Alpha" }));
+                Assert.That(f.Store.Groups[0].Tabs.Select(t => t.Name), Is.EquivalentTo(new[] { "Main", "Main", "Second" }));
+                Assert.That(Directory.Exists(Path.Combine(f.RootA, "02_Gamma")), Is.False);
+            }
+        }
+
+        [Test]
+        public void MoveTab_WithAGroupObjectFromBeforeATabWasAdded_KeepsEveryTab()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alphaAtClick = f.Store.Groups[0];   // Main, Second
+                var secondAtClick = alphaAtClick.Tabs[1];
+
+                // An edit queued before the move adds a third tab.
+                f.Store.AddTab(alphaAtClick, "Third");
+
+                f.Store.MoveTab(alphaAtClick, secondAtClick, -1);
+
+                f.Store.ScanOnce();
+                Assert.That(f.Store.Groups[0].Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Second", "Main", "Third" }));
             }
         }
     }
