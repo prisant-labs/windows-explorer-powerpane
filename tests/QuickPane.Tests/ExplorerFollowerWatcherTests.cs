@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using QuickPane.Explorer;
+using NM = QuickPane.Interop.NativeMethods;
 
 namespace QuickPane.Tests
 {
@@ -51,6 +52,35 @@ namespace QuickPane.Tests
             // The boundary itself counts as expired (">=" in the implementation), not just values past it.
             Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 4000, leftButtonDown: false, capMs: 4000), Is.True);
             Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 3999, leftButtonDown: false, capMs: 4000), Is.False);
+        }
+
+        private static NM.RECT Rect(int left, int top, int right, int bottom)
+        {
+            return new NM.RECT { Left = left, Top = top, Right = right, Bottom = bottom };
+        }
+
+        [Test]
+        public void HideForMove_TitleBarClickWithoutMoving_KeepsThePane()
+        {
+            // Windows enters the move loop on a plain title-bar click; hiding then made the pane blink.
+            var start = Rect(400, 200, 1200, 800);
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1200, 800)), Is.False);
+        }
+
+        [Test]
+        public void HideForMove_AnyEdgeMoved_HidesThePane()
+        {
+            var start = Rect(400, 200, 1200, 800);
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(401, 200, 1201, 800)), Is.True); // dragged
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 199, 1200, 799)), Is.True); // dragged up
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1250, 800)), Is.True); // resized right
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1200, 850)), Is.True); // resized down
+        }
+
+        [Test]
+        public void HideForMove_NoStartRect_HidesAtOnce()
+        {
+            Assert.That(FollowerPane.HideForMove(false, default(NM.RECT), Rect(400, 200, 1200, 800)), Is.True);
         }
     }
 }

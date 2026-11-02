@@ -119,9 +119,6 @@ namespace QuickPane.Explorer
 
         private void Position(IntPtr hwnd, FollowerPane pane)
         {
-            // The window is being dragged: stay hidden and do not touch it (MakeRoom moves the window
-            // itself, which must never happen while the user has hold of it) until the drag ends (#147).
-            if (pane.Dragging) return;
             // Hide the pane only when its window is gone, minimized, or hidden. The owner relationship
             // takes care of virtual-desktop visibility on its own.
             if (!NM.IsWindow(hwnd) || !NM.IsWindowVisible(hwnd) || NM.IsIconic(hwnd)) { pane.Hide(); return; }
@@ -202,6 +199,8 @@ namespace QuickPane.Explorer
         private NM.RECT _lastVisible;
         private bool _dragging;
         private int _dragSince;
+        private NM.RECT _dragStart;     // the window's visible rect when its move loop began
+        private bool _dragHavePos;
 
         // A lost MOVESIZEEND (host window destroyed mid-drag, or some other way the drag ends
         // without the event reaching us) cannot hide the pane forever. The sweep clears the flag
@@ -209,10 +208,6 @@ namespace QuickPane.Explorer
         private const int DragSafetyCapMs = 4000;
 
         public IntPtr Handle { get { return _handle; } }
-
-        /// <summary>True while the window this pane follows is being moved or sized by the user.
-        /// Callers must not reposition or show the pane while this is set (#147).</summary>
-        public bool Dragging { get { return _dragging; } }
 
         /// <summary>The pane content, for moving keyboard focus into it.</summary>
         public SidebarControl Sidebar { get { return _sidebar; } }
@@ -270,6 +265,15 @@ namespace QuickPane.Explorer
         public void PositionBeside(NM.RECT visible, int widthPx)
         {
             if (_window == null || _handle == IntPtr.Zero) return;
+            // While its window is in a move or size loop, the pane never follows (it would trail a frame
+            // late) and MakeRoom below never runs (it would move a window the user has hold of). The
+            // pane hides only once the window has actually left where the loop began, because Windows
+            // enters the loop on a plain title-bar click too, and hiding then made the pane blink (#147).
+            if (_dragging)
+            {
+                if (HideForMove(_dragHavePos, _dragStart, visible)) Hide();
+                return;
+            }
             _lastVisible = visible; _havePos = true;
             int effW = _collapsed ? CollapsedPx : widthPx;
             int height = visible.Bottom - visible.Top;
@@ -343,16 +347,28 @@ namespace QuickPane.Explorer
                 _window.Visibility = Visibility.Hidden;
         }
 
-        /// <summary>The window this pane follows started being moved or sized. The pane is a
-        /// separate top-level window that only moves after a LOCATIONCHANGE notification reaches us,
-        /// which lags a fast drag by one or more frames (#147). Hiding for the length of the drag,
-        /// rather than chasing it, never shows the pane in the wrong place.</summary>
+        /// <summary>The window this pane follows entered a move or size loop. The pane is a separate
+        /// top-level window that only moves after a LOCATIONCHANGE notification reaches us, which lags
+        /// a fast drag by one or more frames (#147). From here until EndDrag, PositionBeside hides the
+        /// pane once the window moves, rather than chasing it, so it is never shown in the wrong place.
+        /// It does not hide here: a click on the title bar enters the same loop without moving.</summary>
         public void BeginDrag()
         {
             if (_dragging) return;
             _dragging = true;
             _dragSince = Environment.TickCount;
-            Hide();
+            _dragStart = _lastVisible;
+            _dragHavePos = _havePos;
+        }
+
+        /// <summary>Pure decision behind the drag hide: during a move loop, hide once the window's
+        /// visible rect differs from the one it had when the loop began. With no known start rect,
+        /// hide at once, since there is nothing to compare against (#147).</summary>
+        internal static bool HideForMove(bool haveStart, NM.RECT start, NM.RECT current)
+        {
+            if (!haveStart) return true;
+            return start.Left != current.Left || start.Top != current.Top
+                || start.Right != current.Right || start.Bottom != current.Bottom;
         }
 
         /// <summary>The drag ended. Clearing the flag lets the next PositionBeside call show the pane

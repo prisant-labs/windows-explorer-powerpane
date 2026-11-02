@@ -340,9 +340,8 @@ namespace QuickPane.Explorer
 
         private void PositionBeside(IntPtr hwnd, FollowerPane pane)
         {
-            // The dialog is being dragged: stay hidden and leave it alone until the drag ends. Nothing
-            // here may call SetWindowPos on the dialog itself while the user has hold of it (#147).
-            if (pane.Dragging) return;
+            // During a drag of the dialog, FollowerPane.PositionBeside hides the pane instead of
+            // following it, and never moves the dialog the user has hold of (#147).
             if (!NM.IsWindow(hwnd) || !NM.IsWindowVisible(hwnd) || NM.IsIconic(hwnd)) { pane.Hide(); return; }
             NM.RECT r;
             if (NM.DwmGetWindowAttribute(hwnd, NM.DWMWA_EXTENDED_FRAME_BOUNDS, out r, Marshal.SizeOf(typeof(NM.RECT))) != 0)
