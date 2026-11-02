@@ -176,12 +176,25 @@ namespace QuickPane.Explorer
             else if (_beside.TryGetValue(hwnd, out var pane)) PositionBeside(hwnd, pane);
         }
 
-        // A title-bar move needs nothing, because the controls move with the dialog, so only a press on
-        // the border starts the inside pane's resize handling. A keyboard resize is not recognised; it
-        // changes the width under the pane, which demotes that one dialog and nothing more.
+        // Inside mode needs nothing for a title-bar move, because the controls move with the dialog,
+        // so only a press on the border starts the inside pane's resize handling; a keyboard resize is
+        // not recognised, and just changes the width under the pane, which demotes that one dialog and
+        // nothing more. A beside pane is a separate top-level window, so it hides for any move or
+        // resize of its dialog -- a title-bar drag included -- rather than trail it a frame late
+        // through LOCATIONCHANGE (#147).
         private void OnMoveSize(uint evt, IntPtr hwnd, int idObject, int idChild, uint thread)
         {
-            if (idObject != NM.OBJID_WINDOW || !_inside.TryGetValue(hwnd, out var win)) return;
+            if (idObject != NM.OBJID_WINDOW) return;
+
+            if (_beside.TryGetValue(hwnd, out var pane))
+            {
+                if (evt == NM.EVENT_SYSTEM_MOVESIZESTART) { pane.BeginDrag(); return; }
+                pane.EndDrag();
+                PositionBeside(hwnd, pane);
+                return;
+            }
+
+            if (!_inside.TryGetValue(hwnd, out var win)) return;
             if (evt == NM.EVENT_SYSTEM_MOVESIZESTART) { if (ResizeBorder.CursorOn(hwnd)) win.BeginUserResize(); return; }
             win.EndUserResize();
             if (win.Failed) DemoteToBeside(hwnd);
@@ -327,6 +340,9 @@ namespace QuickPane.Explorer
 
         private void PositionBeside(IntPtr hwnd, FollowerPane pane)
         {
+            // The dialog is being dragged: stay hidden and leave it alone until the drag ends. Nothing
+            // here may call SetWindowPos on the dialog itself while the user has hold of it (#147).
+            if (pane.Dragging) return;
             if (!NM.IsWindow(hwnd) || !NM.IsWindowVisible(hwnd) || NM.IsIconic(hwnd)) { pane.Hide(); return; }
             NM.RECT r;
             if (NM.DwmGetWindowAttribute(hwnd, NM.DWMWA_EXTENDED_FRAME_BOUNDS, out r, Marshal.SizeOf(typeof(NM.RECT))) != 0)
@@ -378,6 +394,11 @@ namespace QuickPane.Explorer
                     if (!NM.IsWindow(kv.Key)) (gone ?? (gone = new List<IntPtr>())).Add(kv.Key);
                 if (gone != null) foreach (var h in gone) ForgetWindow(h);
             }
+
+            // A drag whose MOVESIZEEND never reached us (the dialog was destroyed mid-drag, or some
+            // other way the event is lost) cannot hide a beside pane forever; the sweep clears the
+            // flag once the safety cap elapses with the left button no longer down (#147).
+            foreach (var kv in besideNow) kv.Value.DragSafetyExpired();
 
             foreach (var kv in besideNow) PositionBeside(kv.Key, kv.Value);
             foreach (var kv in insideNow) kv.Value.Relayout();

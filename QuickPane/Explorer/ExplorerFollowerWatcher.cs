@@ -21,7 +21,7 @@ namespace QuickPane.Explorer
     internal sealed class ExplorerFollowerWatcher : IDisposable
     {
         private readonly Dictionary<IntPtr, FollowerPane> _panes = new Dictionary<IntPtr, FollowerPane>();
-        private WinEventHook _life, _loc, _fg;
+        private WinEventHook _life, _loc, _fg, _moveSize;
         private DispatcherTimer _sweep;
         private IntPtr _active;
 
@@ -33,6 +33,10 @@ namespace QuickPane.Explorer
             _loc.Event += OnLoc; _loc.Install();
             _fg = new WinEventHook(NM.EVENT_SYSTEM_FOREGROUND, NM.EVENT_SYSTEM_FOREGROUND);
             _fg.Event += OnFg; _fg.Install();
+            // The pane hides for the length of a drag of its own Explorer window, rather than
+            // chasing it a frame late through LOCATIONCHANGE (#147).
+            _moveSize = new WinEventHook(NM.EVENT_SYSTEM_MOVESIZESTART, NM.EVENT_SYSTEM_MOVESIZEEND);
+            _moveSize.Event += OnMoveSize; _moveSize.Install();
 
             _sweep = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
             _sweep.Tick += (s, e) => Rescan();
@@ -87,6 +91,20 @@ namespace QuickPane.Explorer
             PositionAll();
         }
 
+        // Both a title-bar move and a border resize fire MOVESIZESTART/END here; either one makes the
+        // separate pane window trail behind by a frame or more through LOCATIONCHANGE, so both hide
+        // the pane for the length of the drag and place it once, from the final rect, when it ends
+        // (#147).
+        private void OnMoveSize(uint evt, IntPtr hwnd, int idObject, int idChild, uint thread)
+        {
+            if (idObject != NM.OBJID_WINDOW) return;
+            FollowerPane pane;
+            if (!_panes.TryGetValue(hwnd, out pane)) return;
+            if (evt == NM.EVENT_SYSTEM_MOVESIZESTART) { pane.BeginDrag(); return; }
+            pane.EndDrag();
+            Position(hwnd, pane);
+        }
+
         private void PositionAll()
         {
             foreach (var kv in _panes) Position(kv.Key, kv.Value);
@@ -101,6 +119,9 @@ namespace QuickPane.Explorer
 
         private void Position(IntPtr hwnd, FollowerPane pane)
         {
+            // The window is being dragged: stay hidden and do not touch it (MakeRoom moves the window
+            // itself, which must never happen while the user has hold of it) until the drag ends (#147).
+            if (pane.Dragging) return;
             // Hide the pane only when its window is gone, minimized, or hidden. The owner relationship
             // takes care of virtual-desktop visibility on its own.
             if (!NM.IsWindow(hwnd) || !NM.IsWindowVisible(hwnd) || NM.IsIconic(hwnd)) { pane.Hide(); return; }
@@ -140,6 +161,10 @@ namespace QuickPane.Explorer
             foreach (var kv in _panes) if (!NM.IsWindow(kv.Key)) dead.Add(kv.Key);
             foreach (var h in dead) { _panes[h].Close(); _panes.Remove(h); }
 
+            // A drag whose MOVESIZEEND never reached us cannot hide a pane forever; the sweep clears
+            // it once the safety cap elapses with the left button no longer down (#147).
+            foreach (var kv in _panes) kv.Value.DragSafetyExpired();
+
             // Keep every pane glued beside its Explorer window, regardless of which is in front.
             var fg = NM.GetForegroundWindow();
             if (IsFolder(fg)) { _active = fg; EnsurePane(fg); }
@@ -157,6 +182,7 @@ namespace QuickPane.Explorer
             try { _life?.Dispose(); } catch { }
             try { _loc?.Dispose(); } catch { }
             try { _fg?.Dispose(); } catch { }
+            try { _moveSize?.Dispose(); } catch { }
             foreach (var kv in _panes) { try { kv.Value.Close(); } catch { } }
             _panes.Clear();
         }
@@ -174,8 +200,19 @@ namespace QuickPane.Explorer
         private bool _collapsed;
         private bool _havePos;
         private NM.RECT _lastVisible;
+        private bool _dragging;
+        private int _dragSince;
+
+        // A lost MOVESIZEEND (host window destroyed mid-drag, or some other way the drag ends
+        // without the event reaching us) cannot hide the pane forever. The sweep clears the flag
+        // once this many milliseconds have passed with the left button no longer down (#147).
+        private const int DragSafetyCapMs = 4000;
 
         public IntPtr Handle { get { return _handle; } }
+
+        /// <summary>True while the window this pane follows is being moved or sized by the user.
+        /// Callers must not reposition or show the pane while this is set (#147).</summary>
+        public bool Dragging { get { return _dragging; } }
 
         /// <summary>The pane content, for moving keyboard focus into it.</summary>
         public SidebarControl Sidebar { get { return _sidebar; } }
@@ -304,6 +341,47 @@ namespace QuickPane.Explorer
             if (_handle != IntPtr.Zero) NM.ShowWindow(_handle, NM.SW_HIDE);
             if (_window != null && _window.Visibility == Visibility.Visible)
                 _window.Visibility = Visibility.Hidden;
+        }
+
+        /// <summary>The window this pane follows started being moved or sized. The pane is a
+        /// separate top-level window that only moves after a LOCATIONCHANGE notification reaches us,
+        /// which lags a fast drag by one or more frames (#147). Hiding for the length of the drag,
+        /// rather than chasing it, never shows the pane in the wrong place.</summary>
+        public void BeginDrag()
+        {
+            if (_dragging) return;
+            _dragging = true;
+            _dragSince = Environment.TickCount;
+            Hide();
+        }
+
+        /// <summary>The drag ended. Clearing the flag lets the next PositionBeside call show the pane
+        /// again, at the window's final rect; the caller makes that call.</summary>
+        public void EndDrag()
+        {
+            _dragging = false;
+        }
+
+        /// <summary>Pure decision behind the sweep's safety net: true when a drag that began
+        /// `elapsedMs` ago has run past `capMs` with the left button no longer held, so a MOVESIZEEND
+        /// that never arrived should be treated as a drag that is already over (#147). Kept static so
+        /// the cap can be tested without a live mouse, a timer, or a window.</summary>
+        internal static bool DragTimedOut(bool dragging, int elapsedMs, bool leftButtonDown, int capMs)
+        {
+            return dragging && elapsedMs >= capMs && !leftButtonDown;
+        }
+
+        /// <summary>Called from the watcher's sweep tick. Clears a dragging flag whose MOVESIZEEND
+        /// never arrived, once DragTimedOut says it is safe to, and reports whether it did so the
+        /// caller knows to reposition the pane (#147).</summary>
+        public bool DragSafetyExpired()
+        {
+            if (!_dragging) return false;
+            bool buttonDown = (NM.GetAsyncKeyState(NM.VK_LBUTTON) & 0x8000) != 0;
+            if (!DragTimedOut(_dragging, unchecked(Environment.TickCount - _dragSince), buttonDown, DragSafetyCapMs))
+                return false;
+            EndDrag();
+            return true;
         }
 
         public void Close()

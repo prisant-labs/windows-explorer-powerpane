@@ -14,6 +14,9 @@ On `main` after 3.11.0.0; these ship in the next release.
 - Changing a setting that does not affect what the pane shows, such as ending a drag of the pane's width or editing the keyboard shortcut, no longer rebuilds every open pane, so expanded folders stay open. Changes to sections, profiles, the groups folder, or SSH drives still rebuild the pane ([#51](https://github.com/prisant-labs/windows-explorer-quickpane/issues/51)).
 - Renaming, moving, merging, adding, and deleting groups, tabs, and pins from the pane now happens in the background, so a groups folder on a slow or network disk no longer freezes Explorer during an edit. An edit started just before a profile switch is dropped instead of landing in the other profile, and checking whether a drop on the pane holds folders gives up after a short wait instead of the network timeout ([#75](https://github.com/prisant-labs/windows-explorer-quickpane/issues/75)).
 
+### Fixed
+- A beside pane (a "Beside Explorer window" pane, or a dialog's pane after it was moved or forced beside) no longer trails behind the window it follows while that window is dragged. It now hides for the length of the drag and reappears in place once the drag ends ([#147](https://github.com/prisant-labs/windows-explorer-quickpane/issues/147)).
+
 ## [3.11.0.0] - Unreleased
 
 Settings is now a Windows 11 Settings-style window, with its own navigation pane, search box, and cards, in place of the old tabbed panel.
