@@ -181,6 +181,9 @@ namespace QuickPane.UI.Settings
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var icon = Glyph(glyph, 20);
+            // Set here rather than inherited: a card's icon sits under no control that supplies a
+            // theme foreground, so it fell back to WPF's black and vanished on a dark card (#149).
+            icon.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
             icon.Margin = new Thickness(0, 0, 20, 0);
             icon.VerticalAlignment = VerticalAlignment.Top;
             Grid.SetColumn(icon, 0);
