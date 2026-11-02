@@ -513,6 +513,18 @@ namespace QuickPane.Interop
             return wa;
         }
 
+        /// <summary>Full bounds of the monitor holding hwnd, taskbar and appbars included, falling
+        /// back to the primary screen. An appbar must size its strip from this, not from the work
+        /// area: the work area already has the appbar's own strip taken out (#145).</summary>
+        public static RECT MonitorRectFor(IntPtr hwnd)
+        {
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+            IntPtr mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (mon != IntPtr.Zero && GetMonitorInfo(mon, ref mi)) return mi.rcMonitor;
+
+            return new RECT { Left = 0, Top = 0, Right = GetSystemMetrics(SM_CXSCREEN), Bottom = GetSystemMetrics(SM_CYSCREEN) };
+        }
+
         /// <summary>Pixels per inch of the monitor holding hwnd. GetDpiForWindow needs Windows 10, so
         /// older builds fall back to the desktop DC, which reports the system DPI.</summary>
         public static int DpiForWindow(IntPtr hwnd)

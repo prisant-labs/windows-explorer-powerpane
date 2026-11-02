@@ -15,6 +15,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 - Renaming, moving, merging, adding, and deleting groups, tabs, and pins from the pane now happens in the background, so a groups folder on a slow or network disk no longer freezes Explorer during an edit. An edit started just before a profile switch is dropped instead of landing in the other profile, and checking whether a drop on the pane holds folders gives up after a short wait instead of the network timeout ([#75](https://github.com/prisant-labs/windows-explorer-quickpane/issues/75)).
 
 ### Fixed
+- Turning on the desktop dock with auto-hide off no longer walks the dock across the screen and squeezes every maximized window into a narrow strip at the far edge. The dock now reserves one strip at the monitor's left edge and keeps it through settings changes and taskbar changes ([#145](https://github.com/prisant-labs/windows-explorer-quickpane/issues/145)).
 - The icon at the left of each Settings card is now drawn in the theme's text color. In dark mode it was near-black on a dark card and almost invisible ([#149](https://github.com/prisant-labs/windows-explorer-quickpane/issues/149)).
 
 ## [3.11.0.0] - Unreleased
