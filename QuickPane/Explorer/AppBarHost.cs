@@ -26,6 +26,8 @@ namespace QuickPane.Explorer
         private IntPtr _handle;
         private uint _callbackMsg;
         private bool _registered;
+        private NM.RECT _reserved;      // the strip last passed to ABM_SETPOS
+        private bool _haveReserved;
         private SidebarControl _sidebar;
         private DispatcherTimer _collapseTimer;
         private DispatcherTimer _pinTimer;
@@ -198,7 +200,6 @@ namespace QuickPane.Explorer
         {
             if (_handle == IntPtr.Zero) return;
             int width = WidthPx();
-            NM.RECT wa; GetWorkArea(out wa);
 
             var abd = new NM.APPBARDATA
             {
@@ -207,12 +208,35 @@ namespace QuickPane.Explorer
                 uEdge = NM.ABE_LEFT
             };
             // Reserve against the monitor the dock occupies, so a second screen gets a strip of the
-            // right height in the right place instead of the primary screen's geometry.
-            abd.rc.Left = wa.Left; abd.rc.Top = wa.Top; abd.rc.Right = wa.Left + width; abd.rc.Bottom = wa.Bottom;
+            // right height in the right place instead of the primary screen's geometry. The proposal
+            // starts from the monitor's full bounds and QUERYPOS moves it clear of the taskbar and any
+            // other appbar. Starting from the work area made every call begin one dock width further
+            // right, because the work area already excludes the strip this dock holds, so each settings
+            // save or ABN_POSCHANGED walked the dock across the screen and squeezed every maximized
+            // window into what was left (#145).
+            abd.rc = ProposedStrip(NM.MonitorRectFor(_handle), width);
             NM.SHAppBarMessage(NM.ABM_QUERYPOS, ref abd);
             abd.rc.Right = abd.rc.Left + width;
+
+            // Every SETPOS makes Windows recompute the work area and re-lay-out the desktop, and this
+            // runs on every settings save, so only reserve again when the strip actually changes.
+            if (_haveReserved && SameRect(abd.rc, _reserved)) return;
             NM.SHAppBarMessage(NM.ABM_SETPOS, ref abd);
+            _reserved = abd.rc; _haveReserved = true;
             NM.MoveWindow(_handle, abd.rc.Left, abd.rc.Top, abd.rc.Right - abd.rc.Left, abd.rc.Bottom - abd.rc.Top, true);
+        }
+
+        /// <summary>The strip a left-edge dock asks the shell for: the monitor's full height, at its
+        /// left edge, <paramref name="widthPx"/> wide. It depends only on the monitor and the width,
+        /// never on the work area, so asking twice asks for the same strip (#145).</summary>
+        internal static NM.RECT ProposedStrip(NM.RECT monitor, int widthPx)
+        {
+            return new NM.RECT { Left = monitor.Left, Top = monitor.Top, Right = monitor.Left + widthPx, Bottom = monitor.Bottom };
+        }
+
+        internal static bool SameRect(NM.RECT a, NM.RECT b)
+        {
+            return a.Left == b.Left && a.Top == b.Top && a.Right == b.Right && a.Bottom == b.Bottom;
         }
 
         private bool CursorOverWindow()
@@ -287,6 +311,7 @@ namespace QuickPane.Explorer
             }
             catch (Exception ex) { Log.Error("appbar remove", ex); }
             _registered = false;
+            _haveReserved = false;
         }
 
         public void Dispose()
