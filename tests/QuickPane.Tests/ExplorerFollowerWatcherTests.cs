@@ -1,3 +1,4 @@
+using System;
 using NUnit.Framework;
 using QuickPane.Explorer;
 using NM = QuickPane.Interop.NativeMethods;
@@ -5,11 +6,11 @@ using NM = QuickPane.Interop.NativeMethods;
 namespace QuickPane.Tests
 {
     /// <summary>
-    /// Covers FollowerPane.DragTimedOut, the pure decision behind the beside-pane drag safety net
-    /// (prisant-labs/windows-explorer-quickpane#147). A beside pane hides for the length of a drag of
-    /// the window it follows and reappears once MOVESIZEEND arrives; this is the fallback for a drag
-    /// whose end event never does. No window, no timer, and no live mouse state are needed for any of
-    /// this.
+    /// Covers FollowerPane.DragTimedOut and FollowerPane.MoveSizeLoopActive, the pure decisions
+    /// behind the beside-pane drag safety net (prisant-labs/windows-explorer-quickpane#147, #161). A
+    /// beside pane hides for the length of a drag of the window it follows and reappears once
+    /// MOVESIZEEND arrives; this is the fallback for a drag whose end event never does. No window, no
+    /// timer, and no live mouse state are needed for any of this.
     /// </summary>
     [TestFixture]
     public class ExplorerFollowerWatcherTests
@@ -17,41 +18,60 @@ namespace QuickPane.Tests
         [Test]
         public void NotDragging_NeverTimesOut()
         {
-            // Even past the cap, with the button up, a pane that was never marked as dragging has
-            // nothing to clear.
-            Assert.That(FollowerPane.DragTimedOut(dragging: false, elapsedMs: 10000, leftButtonDown: false, capMs: 4000), Is.False);
+            // Even past the cap, with the loop no longer running, a pane that was never marked as
+            // dragging has nothing to clear.
+            Assert.That(FollowerPane.DragTimedOut(dragging: false, elapsedMs: 10000, moveLoopActive: false, capMs: 4000), Is.False);
         }
 
         [Test]
         public void Dragging_BeforeCap_NeverTimesOut()
         {
-            // A drag still well within its first few seconds is a normal drag, button down or not.
-            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 1000, leftButtonDown: true, capMs: 4000), Is.False);
-            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 1000, leftButtonDown: false, capMs: 4000), Is.False);
+            // A drag still well within its first few seconds is a normal drag, loop active or not.
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 1000, moveLoopActive: true, capMs: 4000), Is.False);
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 1000, moveLoopActive: false, capMs: 4000), Is.False);
         }
 
         [Test]
-        public void Dragging_PastCap_ButtonStillDown_NeverTimesOut()
+        public void Dragging_PastCap_KeyboardMoveStillRunning_NeverTimesOut()
         {
-            // A long but genuine drag must not be cut short just because it ran past the cap; only the
-            // button coming up says the drag is actually over.
-            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 60000, leftButtonDown: true, capMs: 4000), Is.False);
+            // Alt+Space, Move, then holding the arrow keys for more than the cap keeps the followed
+            // window's thread in its move loop the whole time, with the physical left mouse button up
+            // throughout. The loop still being active must not let the sweep end the drag early and
+            // let the pane reappear mid-move (#161).
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 60000, moveLoopActive: true, capMs: 4000), Is.False);
         }
 
         [Test]
-        public void Dragging_PastCap_ButtonUp_TimesOut()
+        public void Dragging_PastCap_LostMoveSizeEnd_TimesOut()
         {
             // The MOVESIZEEND that should have cleared the flag never arrived, the cap has elapsed, and
-            // the button is no longer down: treat the drag as over.
-            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 4000, leftButtonDown: false, capMs: 4000), Is.True);
+            // the followed window's thread is no longer in a move or size loop: treat the drag as over.
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 4000, moveLoopActive: false, capMs: 4000), Is.True);
         }
 
         [Test]
-        public void Dragging_RightAtCap_ButtonUp_TimesOut()
+        public void Dragging_PastCap_ThreadGone_TimesOut()
+        {
+            // The followed window's thread (and so its move loop) can no longer be queried at all -
+            // the window or its process is gone. That answers the "is it still moving" question with
+            // no just as surely as an observed, cleared loop flag does.
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 4000, moveLoopActive: false, capMs: 4000), Is.True);
+        }
+
+        [Test]
+        public void Dragging_RightAtCap_LoopEnded_TimesOut()
         {
             // The boundary itself counts as expired (">=" in the implementation), not just values past it.
-            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 4000, leftButtonDown: false, capMs: 4000), Is.True);
-            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 3999, leftButtonDown: false, capMs: 4000), Is.False);
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 4000, moveLoopActive: false, capMs: 4000), Is.True);
+            Assert.That(FollowerPane.DragTimedOut(dragging: true, elapsedMs: 3999, moveLoopActive: false, capMs: 4000), Is.False);
+        }
+
+        [Test]
+        public void MoveSizeLoopActive_NoSuchWindow_ReportsInactive()
+        {
+            // A handle that is not a window at all (destroyed, or never valid) means the thread and
+            // its loop cannot be found, which must read as "not running" rather than throw or hang.
+            Assert.That(FollowerPane.MoveSizeLoopActive(new IntPtr(0x7FFFFFF)), Is.False);
         }
 
         private static NM.RECT Rect(int left, int top, int right, int bottom)

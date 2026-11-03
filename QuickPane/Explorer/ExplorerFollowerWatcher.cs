@@ -204,7 +204,8 @@ namespace QuickPane.Explorer
 
         // A lost MOVESIZEEND (host window destroyed mid-drag, or some other way the drag ends
         // without the event reaching us) cannot hide the pane forever. The sweep clears the flag
-        // once this many milliseconds have passed with the left button no longer down (#147).
+        // once this many milliseconds have passed with the followed window's thread no longer in
+        // a move or size loop (#147, #161).
         private const int DragSafetyCapMs = 4000;
 
         public IntPtr Handle { get { return _handle; } }
@@ -379,22 +380,43 @@ namespace QuickPane.Explorer
         }
 
         /// <summary>Pure decision behind the sweep's safety net: true when a drag that began
-        /// `elapsedMs` ago has run past `capMs` with the left button no longer held, so a MOVESIZEEND
-        /// that never arrived should be treated as a drag that is already over (#147). Kept static so
-        /// the cap can be tested without a live mouse, a timer, or a window.</summary>
-        internal static bool DragTimedOut(bool dragging, int elapsedMs, bool leftButtonDown, int capMs)
+        /// `elapsedMs` ago has run past `capMs` while the followed window's thread is no longer in a
+        /// move or size loop, so a MOVESIZEEND that never arrived should be treated as a drag that is
+        /// already over. A keyboard move (Alt+Space, Move, then the arrow keys) keeps the loop
+        /// running for as long as the user holds the arrow keys, well past the cap, with the physical
+        /// left mouse button up the whole time; reading the loop itself, not the button, is what keeps
+        /// that case from being cut short (#147, #161). Kept static so the cap can be tested without a
+        /// live mouse, a timer, or a window.</summary>
+        internal static bool DragTimedOut(bool dragging, int elapsedMs, bool moveLoopActive, int capMs)
         {
-            return dragging && elapsedMs >= capMs && !leftButtonDown;
+            return dragging && elapsedMs >= capMs && !moveLoopActive;
+        }
+
+        /// <summary>Whether `hwnd`'s thread is still running a move or size loop, via
+        /// GetGUIThreadInfo's GUI_INMOVESIZE flag. False whenever the question cannot be answered -
+        /// the window is gone, its thread cannot be found, or GetGUIThreadInfo itself fails for that
+        /// thread - which is itself reason enough to stop treating the drag as still in progress
+        /// (#161). Kept internal and static so it can be tested against a handle with no live window
+        /// behind it.</summary>
+        internal static bool MoveSizeLoopActive(IntPtr hwnd)
+        {
+            if (!NM.IsWindow(hwnd)) return false;
+            uint pid;
+            uint threadId = NM.GetWindowThreadProcessId(hwnd, out pid);
+            if (threadId == 0) return false;
+            var info = new NM.GUITHREADINFO { cbSize = Marshal.SizeOf(typeof(NM.GUITHREADINFO)) };
+            if (!NM.GetGUIThreadInfo(threadId, ref info)) return false;
+            return (info.flags & NM.GUI_INMOVESIZE) != 0;
         }
 
         /// <summary>Called from the watcher's sweep tick. Clears a dragging flag whose MOVESIZEEND
         /// never arrived, once DragTimedOut says it is safe to, and reports whether it did so the
-        /// caller knows to reposition the pane (#147).</summary>
+        /// caller knows to reposition the pane (#147, #161).</summary>
         public bool DragSafetyExpired()
         {
             if (!_dragging) return false;
-            bool buttonDown = (NM.GetAsyncKeyState(NM.VK_LBUTTON) & 0x8000) != 0;
-            if (!DragTimedOut(_dragging, unchecked(Environment.TickCount - _dragSince), buttonDown, DragSafetyCapMs))
+            bool moveLoopActive = MoveSizeLoopActive(_cab);
+            if (!DragTimedOut(_dragging, unchecked(Environment.TickCount - _dragSince), moveLoopActive, DragSafetyCapMs))
                 return false;
             EndDrag();
             return true;

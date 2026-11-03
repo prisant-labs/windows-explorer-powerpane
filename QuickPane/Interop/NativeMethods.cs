@@ -87,16 +87,33 @@ namespace QuickPane.Interop
         public const int WM_KEYUP = 0x0101;
         public const int WM_CHAR = 0x0102;
         public const int VK_RETURN = 0x0D;
-        public const int VK_LBUTTON = 0x01;
-
-        // Whether the left mouse button is down right now, independent of any window's message
-        // queue. The drag-safety sweep uses this to tell a drag still in progress from one whose
-        // MOVESIZEEND never arrived (#147).
-        [DllImport("user32.dll")]
-        public static extern short GetAsyncKeyState(int vKey);
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        // Whether a window's thread is still running a move or size loop (GUI_INMOVESIZE), read
+        // through GetGUIThreadInfo. The drag-safety sweep uses this, rather than the physical left
+        // mouse button, to tell a drag still in progress from one whose MOVESIZEEND never arrived:
+        // a keyboard move (Alt+Space, Move, then the arrow keys) and a drag with the mouse buttons
+        // swapped both keep the loop running with the physical left button up (#147, #161).
+        [StructLayout(LayoutKind.Sequential)]
+        public struct GUITHREADINFO
+        {
+            public int cbSize;
+            public uint flags;
+            public IntPtr hwndActive;
+            public IntPtr hwndFocus;
+            public IntPtr hwndCapture;
+            public IntPtr hwndMenuOwner;
+            public IntPtr hwndMoveSize;
+            public IntPtr hwndCaret;
+            public RECT rcCaret;
+        }
+
+        public const uint GUI_INMOVESIZE = 0x2;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
 
         [DllImport("user32.dll")]
         public static extern bool IsWindow(IntPtr hWnd);
