@@ -17,7 +17,7 @@ namespace QuickPane.UI.Settings.Pages
     {
         public override string Id => "recent";
         public override string Title => "Recent apps";
-        public override string Glyph => "";   // Segoe Fluent Icons History
+        public override string Glyph => "\uE81C";   // Segoe Fluent Icons History
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
@@ -41,7 +41,7 @@ namespace QuickPane.UI.Settings.Pages
                 v => { s.RecentAppsSource = v; ctx.Settings.Save(); });
 
             var panel = new StackPanel();
-            panel.Children.Add(cards.Card("recentAppsSource", "", "Which apps to list",
+            panel.Children.Add(cards.Card("recentAppsSource", "\uE81C", "Which apps to list",
                 "A row opens its app. The folder that app's dialog was last sent to is on the row's right-click menu.",
                 combo, "Recent apps source"));
             return panel;

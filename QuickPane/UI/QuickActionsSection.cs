@@ -177,10 +177,10 @@ namespace QuickPane.UI
         {
             switch (kind)
             {
-                case QuickActionKind.CopyPath: return "";
-                case QuickActionKind.NewItem: return "";
-                case QuickActionKind.OpenTool: return "";
-                default: return "";
+                case QuickActionKind.CopyPath: return "\uE8C8";
+                case QuickActionKind.NewItem: return "\uE710";
+                case QuickActionKind.OpenTool: return "\uE8A7";
+                default: return "\uE8C8";
             }
         }
 

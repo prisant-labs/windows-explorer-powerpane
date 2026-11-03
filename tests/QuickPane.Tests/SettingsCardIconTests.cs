@@ -16,7 +16,7 @@ namespace QuickPane.Tests
     [Apartment(ApartmentState.STA)]
     public class SettingsCardIconTests
     {
-        private const string Glyph = "";
+        private const string Glyph = "\uE7C4";
         private static readonly SolidColorBrush Themed = new SolidColorBrush(Color.FromRgb(0x12, 0x34, 0x56));
 
         private static TextBlock FindIcon(DependencyObject root)

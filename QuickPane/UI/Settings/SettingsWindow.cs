@@ -38,7 +38,7 @@ namespace QuickPane.UI.Settings
         /// <summary>The nav item's label and this page's 28 px title.</summary>
         public abstract string Title { get; }
 
-        /// <summary>A Segoe Fluent Icons glyph (one UTF-16 char, e.g. ""), shown at 16 px in
+        /// <summary>A Segoe Fluent Icons glyph (one UTF-16 char, e.g. "\uE716"), shown at 16 px in
         /// the navigation pane.</summary>
         public abstract string Glyph { get; }
 

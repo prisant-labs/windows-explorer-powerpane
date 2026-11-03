@@ -34,7 +34,7 @@ namespace QuickPane.UI.Settings.Pages
 
         public override string Id => "backup";
         public override string Title => "Backup & restore";
-        public override string Glyph => "";   // Segoe Fluent Icons UpdateRestore
+        public override string Glyph => "\uE777";   // Segoe Fluent Icons UpdateRestore
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {

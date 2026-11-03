@@ -117,7 +117,7 @@ namespace QuickPane.Tests
 
             public override string Id => _id;
             public override string Title => _id;
-            public override string Glyph => "";
+            public override string Glyph => "\uE946";
 
             public override IEnumerable<SettingsSearchEntry> SearchEntries
             {

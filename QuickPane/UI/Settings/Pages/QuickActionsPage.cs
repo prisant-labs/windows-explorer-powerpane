@@ -22,7 +22,7 @@ namespace QuickPane.UI.Settings.Pages
     {
         public override string Id => "quickactions";
         public override string Title => "Quick actions";
-        public override string Glyph => "";   // Segoe Fluent Icons Flash
+        public override string Glyph => "\uE945";   // Segoe Fluent Icons Flash
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
@@ -99,7 +99,7 @@ namespace QuickPane.UI.Settings.Pages
                     Populate(panel, ctx, id, 0);
                 }, "Show " + name + " in the pane");
 
-                var up = cards.IconButton("", "Move " + name + " up", () =>
+                var up = cards.IconButton("\uE70E", "Move " + name + " up", () =>
                 {
                     if (MoveActionById(ctx.Settings.Current, id, -1))
                     {
@@ -107,7 +107,7 @@ namespace QuickPane.UI.Settings.Pages
                         Populate(panel, ctx, id, -1);
                     }
                 });
-                var down = cards.IconButton("", "Move " + name + " down", () =>
+                var down = cards.IconButton("\uE70D", "Move " + name + " down", () =>
                 {
                     if (MoveActionById(ctx.Settings.Current, id, 1))
                     {
