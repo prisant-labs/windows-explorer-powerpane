@@ -86,3 +86,6 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 Write-Host 'check-rules: clean'
+# Explicit, so a caller that reads $LASTEXITCODE sees 0. A script that ends without exit leaves it
+# unset in a fresh shell, which test.ps1 would read as a failure.
+exit 0
