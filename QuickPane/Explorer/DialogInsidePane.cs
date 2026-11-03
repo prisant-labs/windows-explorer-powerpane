@@ -518,6 +518,10 @@ namespace QuickPane.Explorer
         {
             Log.Activity("restoring the " + QuickPane.Interop.DialogNavigator.Owner(_dlg) + " dialog " +
                 _dlg.ToString("X") + " to its own layout");
+            // Detach the pane's text boxes first: the restore below sends to the dialog's thread, and
+            // a dialog that dies while that call waits must not leave WPF's move/size hook walking up
+            // from a dead handle (#159).
+            StaleSourceGuard.ReleaseContent(_host, "release dialog pane content");
             try
             {
                 if (NM.IsWindow(_dlg))

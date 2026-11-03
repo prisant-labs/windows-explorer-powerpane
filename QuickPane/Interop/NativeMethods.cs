@@ -439,6 +439,7 @@ namespace QuickPane.Interop
         public const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
 
         public const int OBJID_WINDOW = 0;
+        public const int CHILDID_SELF = 0;
         public const int OBJID_CLIENT = unchecked((int)0xFFFFFFFC);
 
         public static readonly IntPtr HWND_TOP = IntPtr.Zero;
@@ -599,6 +600,11 @@ namespace QuickPane.Interop
         // Sent to every top-level window when a monitor is connected, disconnected, rearranged, or
         // changes resolution. AppBarHost's WndProc hook re-places the dock on it (#146).
         public const int WM_DISPLAYCHANGE = 0x007E;
+
+        // Sent to a window as its own move or size loop begins and ends. StaleSourceGuard checks on
+        // both, because the shared WinEvent hook never sees a move of a window in this process (#159).
+        public const int WM_ENTERSIZEMOVE = 0x0231;
+        public const int WM_EXITSIZEMOVE = 0x0232;
 
         /// <summary>Pixels per inch of the monitor holding hwnd. GetDpiForWindow needs Windows 10, so
         /// older builds fall back to the desktop DC, which reports the system DPI.</summary>

@@ -74,5 +74,81 @@ namespace QuickPane.Tests
             IntPtr dead;
             Assert.That(Walk(new Dictionary<IntPtr, IntPtr>(), new HashSet<IntPtr>(), IntPtr.Zero, out dead), Is.True);
         }
+
+        // ---- which events and messages run a check (#159) ----
+
+        private const int SomeChild = 3;           // an object inside a window, such as a list item
+
+        [Test]
+        public void CheckOnEvent_RunsWhenAnyMoveOrSizeLoopStartsOrEnds()
+        {
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_SYSTEM_MOVESIZESTART, NativeMethods.OBJID_WINDOW, 0), Is.True);
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_SYSTEM_MOVESIZEEND, NativeMethods.OBJID_WINDOW, 0), Is.True);
+        }
+
+        [Test]
+        public void CheckOnEvent_RunsWhenAWindowItselfIsDestroyed()
+        {
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_OBJECT_DESTROY, NativeMethods.OBJID_WINDOW, NativeMethods.CHILDID_SELF), Is.True);
+        }
+
+        [Test]
+        public void CheckOnEvent_SkipsTheDestructionOfAnObjectInsideAWindow()
+        {
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_OBJECT_DESTROY, NativeMethods.OBJID_CLIENT, NativeMethods.CHILDID_SELF), Is.False);
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_OBJECT_DESTROY, NativeMethods.OBJID_WINDOW, SomeChild), Is.False);
+        }
+
+        [Test]
+        public void CheckOnEvent_SkipsTheOtherEventsInTheSharedLifecycleRange()
+        {
+            // The guard shares the CREATE..SHOW hook with the Explorer watchers, so it sees these too.
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_OBJECT_CREATE, NativeMethods.OBJID_WINDOW, 0), Is.False);
+            Assert.That(StaleSourceGuard.CheckOnEvent(NativeMethods.EVENT_OBJECT_SHOW, NativeMethods.OBJID_WINDOW, 0), Is.False);
+        }
+
+        [Test]
+        public void CheckOnMessage_RunsAsAnOwnWindowEntersOrLeavesItsMoveLoop()
+        {
+            Assert.That(StaleSourceGuard.CheckOnMessage(NativeMethods.WM_ENTERSIZEMOVE), Is.True);
+            Assert.That(StaleSourceGuard.CheckOnMessage(NativeMethods.WM_EXITSIZEMOVE), Is.True);
+        }
+
+        [Test]
+        public void CheckOnMessage_SkipsEveryOtherMessage()
+        {
+            Assert.That(StaleSourceGuard.CheckOnMessage(NativeMethods.WM_DISPLAYCHANGE), Is.False);
+            Assert.That(StaleSourceGuard.CheckOnMessage(NativeMethods.WM_KEYDOWN), Is.False);
+            Assert.That(StaleSourceGuard.CheckOnMessage(0), Is.False);
+        }
+
+        [Test]
+        public void LeaveToWatcher_WhenThePanesOwnHostIsTheWindowBeingDestroyed()
+        {
+            // The routine close: the watcher tears this pane down from the same DESTROY event.
+            Assert.That(StaleSourceGuard.LeaveToWatcher(Cabinet, Cabinet), Is.True);
+        }
+
+        [Test]
+        public void ReleaseAtOnce_WhenTheChainDiesAtAWindowOtherThanTheOneBeingDestroyed()
+        {
+            // A neighbouring window's DESTROY exposed a host whose own DESTROY never arrived (#148).
+            Assert.That(StaleSourceGuard.LeaveToWatcher(Cabinet, Owner), Is.False);
+            // The pane's own window vanished without its HwndSource being told.
+            Assert.That(StaleSourceGuard.LeaveToWatcher(Pane, Cabinet), Is.False);
+        }
+
+        [Test]
+        public void ReleaseAtOnce_ForEveryTriggerOtherThanADestroy()
+        {
+            Assert.That(StaleSourceGuard.LeaveToWatcher(Cabinet, IntPtr.Zero), Is.False);
+        }
+
+        [Test]
+        public void ReleaseContent_TreatsAMissingSourceAsAlreadyReleased()
+        {
+            // A pane torn down before its window was ever created has no source to release.
+            Assert.That(StaleSourceGuard.ReleaseContent(null, "test"), Is.True);
+        }
     }
 }

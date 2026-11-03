@@ -471,6 +471,11 @@ namespace QuickPane.Explorer
                 App.Settings.WidthChangedLive -= OnSettingsChanged;
             }
 
+            // Detach the pane's text boxes before anything else. The restore below sends to Explorer's
+            // thread, which can stall while Explorer shuts down, and a host that dies during that
+            // stall would otherwise leave WPF's move/size hook walking up from a dead handle (#159).
+            StaleSourceGuard.ReleaseContent(_host, "release pane content");
+
             // Restore Explorer's content hosts to full width so the window looks normal afterwards.
             try
             {
