@@ -251,5 +251,27 @@ namespace QuickPane.Tests
         {
             Assert.That(AppSettings.CreateDefault().DesktopDockDisplay, Is.Null);
         }
+
+        // ---- AppSettings.DesktopDockEdge normalization (#177) ------------------
+
+        [TestCase("right", "right")]
+        [TestCase(" Right ", "right")]
+        [TestCase("left", null)]
+        [TestCase("", null)]
+        [TestCase("top", null)]
+        [TestCase(null, null)]
+        public void Normalize_DesktopDockEdge_OnlyRightSurvives(string input, string expected)
+        {
+            var s = AppSettings.CreateDefault();
+            s.DesktopDockEdge = input;
+            s.Normalize();
+            Assert.That(s.DesktopDockEdge, Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void CreateDefault_DesktopDockEdgeIsNull()
+        {
+            Assert.That(AppSettings.CreateDefault().DesktopDockEdge, Is.Null);
+        }
     }
 }

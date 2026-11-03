@@ -225,6 +225,12 @@ namespace QuickPane.Models
         [DataMember(Name = "desktopDockDisplay", Order = 15, EmitDefaultValue = false)]
         public string DesktopDockDisplay { get; set; }
 
+        // Which edge of that display the desktop dock sits on: "left" or "right" (#177). Null, blank,
+        // or anything unrecognized means left, so a settings file from before this setting keeps its
+        // placement and a default file does not gain the key. AppBarHost reads it live.
+        [DataMember(Name = "desktopDockEdge", Order = 44, EmitDefaultValue = false)]
+        public string DesktopDockEdge { get; set; }
+
         // Profiles: independent workspaces. The active one's folder/recents/width are mirrored into the
         // top-level fields above. Groups, sections, and dock settings stay global across profiles.
         [DataMember(Name = "profiles", Order = 8, EmitDefaultValue = false)]
@@ -353,6 +359,8 @@ namespace QuickPane.Models
             // normalizing a stray blank to null keeps the field out of a saved settings.json
             // (EmitDefaultValue = false above only skips an actual null).
             if (string.IsNullOrWhiteSpace(DesktopDockDisplay)) DesktopDockDisplay = null;
+            // Only "right" is a real choice; left is the default, stored as null so it stays out of the file (#177).
+            DesktopDockEdge = string.Equals((DesktopDockEdge ?? "").Trim(), "right", StringComparison.OrdinalIgnoreCase) ? "right" : null;
 
             // Profiles: migrate a pre-profiles settings file into one profile built from the top fields.
             if (Profiles == null) Profiles = new List<Profile>();

@@ -54,7 +54,7 @@ QuickPane puts your folders one click away inside Explorer itself, with:
 - 🕘 **Real Recent**: it tracks the folders you actually browse in Explorer, not only the ones clicked inside the pane
 - 🖥️ **This PC, Network, and Linux**: expandable drives and lazy folder trees, plus Network and WSL sections
 - 🪟 **Stays at the window's z-level**: the beside pane is an owned window of its Explorer window, never forced above everything else
-- 📌 **Desktop dock**: an optional screen-edge AppBar with auto-hide and all-virtual-desktops pinning
+- 📌 **Desktop dock**: an optional screen-edge AppBar on the left or right edge of a display, with auto-hide and all-virtual-desktops pinning
 - 💾 **Open and Save dialog support**: the pane attaches to file dialogs and navigates them too
 - 🔎 **Search box**: filters every folder in the pane as you type
 - 🚀 **Recent Apps**: the programs you have been using, where a row opens its app and browser rows open out into their profiles
@@ -104,11 +104,12 @@ Drag files from Explorer onto a pinned folder to file them. Dropping moves on th
 
 ### Desktop dock
 
-An optional AppBar at the left screen edge, independent of the window pane.
+An optional AppBar at the left or right screen edge, independent of the window pane.
 
 - Auto-hide collapses it to a thin strip that slides out on hover
 - A setting shows it on every virtual desktop instead of only the one it opened on
 - On a multi-monitor computer, a Display setting picks which monitor it sits on; "Primary display" (the default) tracks whichever monitor Windows currently calls primary, and a specific choice falls back to Primary display if that monitor is ever disconnected ([#146](https://github.com/prisant-labs/windows-explorer-quickpane/issues/146))
+- An Edge setting puts it on the left (the default) or right edge of its display. On an edge shared with another display, auto-hide waits briefly before opening, so crossing between displays does not open it ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177))
 - Clicking a folder navigates the active Explorer window and brings it forward, or opens a new window when none is open
 
 ### Open and Save dialog support

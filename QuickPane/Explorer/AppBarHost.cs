@@ -13,7 +13,8 @@ using NM = QuickPane.Interop.NativeMethods;
 namespace QuickPane.Explorer
 {
     /// <summary>
-    /// Optional desktop dock. A borderless top-level window at the left edge of the screen. Every
+    /// Optional desktop dock. A borderless top-level window at the left or right edge of the chosen
+    /// display (Settings > Pane > Desktop dock > Edge, #177; left by default). Every
     /// folder click opens a new Explorer window. In reserved mode it registers as an AppBar so the
     /// desktop keeps that strip clear. In auto-hide mode it is a 1px trigger that slides out on hover
     /// and back when the cursor leaves, overlaying whatever is beneath it.
@@ -32,6 +33,8 @@ namespace QuickPane.Explorer
         private bool _haveLastMonitorId;
         private SidebarControl _sidebar;
         private DispatcherTimer _collapseTimer;
+        private DispatcherTimer _dwellTimer;   // delays expanding on an edge shared with another display (#177)
+        private bool _lastEdgeRight;           // the edge as of the last reposition
         private DispatcherTimer _pinTimer;
         private WinEventHook _foregroundHook;
         private IntPtr _lastExplorer;
@@ -63,7 +66,7 @@ namespace QuickPane.Explorer
                 Title = "QuickPane",
                 Background = new SolidColorBrush(dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF3, 0xF3, 0xF3)),
                 Content = _sidebar,
-                Left = wa.Left,
+                Left = EdgeIsRight() ? wa.Right - (_autoHide ? 1 : WidthPx()) : wa.Left,
                 Top = wa.Top,
                 Height = wa.Height,
                 Width = _autoHide ? 1 : WidthDip()
@@ -86,8 +89,24 @@ namespace QuickPane.Explorer
                     if (SidebarControl.SuppressAutoHide || CursorOverWindow()) { _collapseTimer.Start(); return; }
                     Collapse();
                 };
-                _window.MouseEnter += (s, e) => { _collapseTimer.Stop(); Expand(); };
-                _window.MouseLeave += (s, e) => { _collapseTimer.Stop(); _collapseTimer.Start(); };
+                // On an edge shared with another display, the pointer crossing to that display passes
+                // through the 4 px trigger strip, so expanding on contact would flash the dock open on
+                // every crossing. Wait until the pointer has rested in the strip (#177). On an outer
+                // edge the pointer cannot be passing through, so expand at once as before.
+                _dwellTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DwellMs) };
+                _dwellTimer.Tick += (s, e) =>
+                {
+                    _dwellTimer.Stop();
+                    if (CursorOverWindow()) Expand();
+                };
+                _window.MouseEnter += (s, e) =>
+                {
+                    _collapseTimer.Stop();
+                    if (_expanded) return;
+                    if (IsDockEdgeShared()) { _dwellTimer.Stop(); _dwellTimer.Start(); }
+                    else Expand();
+                };
+                _window.MouseLeave += (s, e) => { _dwellTimer.Stop(); _collapseTimer.Stop(); _collapseTimer.Start(); };
             }
 
             if (App.Settings != null)
@@ -156,7 +175,7 @@ namespace QuickPane.Explorer
 
             if (_autoHide)
             {
-                SetAutoHide(false); // start collapsed at the left edge
+                SetAutoHide(false); // start collapsed at the chosen edge
             }
             else
             {
@@ -202,25 +221,37 @@ namespace QuickPane.Explorer
             return MonitorPicker.ResolveMonitor(monitors, storedId);
         }
 
-        // Position the auto-hide dock on the LEFT screen edge, full work-area height. Collapsed it is a
-        // thin trigger strip; expanded it grows rightward keeping its left edge at the screen edge.
+        // Position the auto-hide dock on the chosen screen edge, full work-area height. Collapsed it is
+        // a thin trigger strip; expanded it grows inward from that edge (rightward from the left edge,
+        // leftward from the right edge).
         private void SetAutoHide(bool expanded)
         {
             if (_handle == IntPtr.Zero) return;
             NM.RECT wa; GetWorkArea(out wa);
-            int width = expanded ? WidthPx() : 4;
+            bool right = EdgeIsRight();
+            _lastEdgeRight = right;
+            var r = AutoHideRect(wa, WidthPx(), expanded, right);
+            NM.SetWindowPos(_handle, NM.HWND_TOP, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top,
+                NM.SWP_NOACTIVATE | NM.SWP_SHOWWINDOW);
+        }
+
+        /// <summary>The auto-hide window's rectangle: <paramref name="widthPx"/> wide and the full work
+        /// area tall when expanded, a 4 px trigger strip when collapsed, flush with the work area's left
+        /// or right edge. The collapsed strip leaves 46 px dead at the top and bottom on either edge, so
+        /// the maximized-window buttons (top-right: close; top-left: the window menu) and the
+        /// taskbar/Start or clock corner stay reachable without the pane sliding out by accident.</summary>
+        internal static NM.RECT AutoHideRect(NM.RECT wa, int widthPx, bool expanded, bool right)
+        {
+            int width = expanded ? widthPx : 4;
             int top = wa.Top;
-            int height = wa.Bottom - wa.Top;
+            int bottom = wa.Bottom;
             if (!expanded)
             {
-                // Leave the top and bottom corners out of the collapsed trigger so the maximized-window
-                // menu (top-left) and the taskbar/Start corner (bottom-left) stay reachable without the
-                // pane sliding out by accident. The expanded pane still spans the full height.
                 const int dead = 46;
-                if (height > 2 * dead + 10) { top = wa.Top + dead; height = (wa.Bottom - wa.Top) - 2 * dead; }
+                if (bottom - top > 2 * dead + 10) { top += dead; bottom -= dead; }
             }
-            NM.SetWindowPos(_handle, NM.HWND_TOP, wa.Left, top, width, height,
-                NM.SWP_NOACTIVATE | NM.SWP_SHOWWINDOW);
+            int left = right ? wa.Right - width : wa.Left;
+            return new NM.RECT { Left = left, Top = top, Right = left + width, Bottom = bottom };
         }
 
         private void SetReservedPosition()
@@ -235,8 +266,12 @@ namespace QuickPane.Explorer
             // forget it and force a fresh ABM_SETPOS even if the newly queried rect coincidentally
             // matches the old one. Repeated calls with the same monitor keep the #145 guard below.
             var monitor = ResolveChosenMonitor();
-            if (!_haveLastMonitorId || !string.Equals(monitor.Id, _lastMonitorId, StringComparison.Ordinal))
+            // The edge counts the same way: a left strip and a right strip are different reservations,
+            // and the old one must be replaced, not left standing, when the edge changes (#177).
+            bool right = EdgeIsRight();
+            if (!_haveLastMonitorId || !string.Equals(monitor.Id, _lastMonitorId, StringComparison.Ordinal) || right != _lastEdgeRight)
             {
+                _lastEdgeRight = right;
                 _haveReserved = false;
                 _lastMonitorId = monitor.Id;
                 _haveLastMonitorId = true;
@@ -246,7 +281,7 @@ namespace QuickPane.Explorer
             {
                 cbSize = Marshal.SizeOf(typeof(NM.APPBARDATA)),
                 hWnd = _handle,
-                uEdge = NM.ABE_LEFT
+                uEdge = right ? NM.ABE_RIGHT : NM.ABE_LEFT
             };
             // Reserve against the monitor the dock occupies, so a second screen gets a strip of the
             // right height in the right place instead of the primary screen's geometry. The proposal
@@ -255,9 +290,11 @@ namespace QuickPane.Explorer
             // right, because the work area already excludes the strip this dock holds, so each settings
             // save or ABN_POSCHANGED walked the dock across the screen and squeezed every maximized
             // window into what was left (#145).
-            abd.rc = ProposedStrip(monitor.MonitorRect, width);
+            abd.rc = ProposedStrip(monitor.MonitorRect, width, right);
             NM.SHAppBarMessage(NM.ABM_QUERYPOS, ref abd);
-            abd.rc.Right = abd.rc.Left + width;
+            // The shell may have moved the side of the strip that faces the screen edge it is anchored
+            // to; keep our width on the other side.
+            abd.rc = AdjustQueriedStrip(abd.rc, width, right);
 
             // Every SETPOS makes Windows recompute the work area and re-lay-out the desktop, and this
             // runs on every settings save, so only reserve again when the strip actually changes.
@@ -267,12 +304,73 @@ namespace QuickPane.Explorer
             NM.MoveWindow(_handle, abd.rc.Left, abd.rc.Top, abd.rc.Right - abd.rc.Left, abd.rc.Bottom - abd.rc.Top, true);
         }
 
-        /// <summary>The strip a left-edge dock asks the shell for: the monitor's full height, at its
-        /// left edge, <paramref name="widthPx"/> wide. It depends only on the monitor and the width,
-        /// never on the work area, so asking twice asks for the same strip (#145).</summary>
-        internal static NM.RECT ProposedStrip(NM.RECT monitor, int widthPx)
+        /// <summary>The strip a dock asks the shell for: the monitor's full height, flush with its
+        /// left or right edge, <paramref name="widthPx"/> wide. It depends only on the monitor, the
+        /// width, and the edge, never on the work area, so asking twice asks for the same strip
+        /// (#145).</summary>
+        internal static NM.RECT ProposedStrip(NM.RECT monitor, int widthPx, bool right)
         {
-            return new NM.RECT { Left = monitor.Left, Top = monitor.Top, Right = monitor.Left + widthPx, Bottom = monitor.Bottom };
+            return right
+                ? new NM.RECT { Left = monitor.Right - widthPx, Top = monitor.Top, Right = monitor.Right, Bottom = monitor.Bottom }
+                : new NM.RECT { Left = monitor.Left, Top = monitor.Top, Right = monitor.Left + widthPx, Bottom = monitor.Bottom };
+        }
+
+        /// <summary>After ABM_QUERYPOS the shell has moved the strip clear of the taskbar and other
+        /// appbars, adjusting only the side that faces the edge the strip is anchored to: Right for the
+        /// left edge, Left for the right edge. Re-derive the far side from our width. Fixing Right on a
+        /// right-edge strip would keep the shell's Left and make the strip the wrong width, so the dock
+        /// would land in the wrong place (#177).</summary>
+        internal static NM.RECT AdjustQueriedStrip(NM.RECT queried, int widthPx, bool right)
+        {
+            if (right) queried.Left = queried.Right - widthPx;
+            else queried.Right = queried.Left + widthPx;
+            return queried;
+        }
+
+        /// <summary>True when another monitor touches the given vertical side of
+        /// <paramref name="dockMonitor"/> and overlaps it vertically. On such an edge the pointer
+        /// crosses the dock's trigger strip on its way to the neighbor, so auto-hide must dwell instead
+        /// of expanding on contact (#177). The dock's own monitor is skipped by rectangle, since a
+        /// descriptor's Id can be null.</summary>
+        internal static bool IsEdgeShared(MonitorDescriptor dockMonitor, System.Collections.Generic.List<MonitorDescriptor> monitors, bool right)
+        {
+            if (monitors == null) return false;
+            var d = dockMonitor.MonitorRect;
+            foreach (var m in monitors)
+            {
+                var o = m.MonitorRect;
+                if (SameRect(o, d)) continue;
+                bool touches = right ? o.Left == d.Right : o.Right == d.Left;
+                bool overlapsVertically = Math.Min(o.Bottom, d.Bottom) > Math.Max(o.Top, d.Top);
+                if (touches && overlapsVertically) return true;
+            }
+            return false;
+        }
+
+        private bool EdgeIsRight()
+        {
+            return App.Settings != null && IsRightEdge(App.Settings.Current.DesktopDockEdge);
+        }
+
+        internal static bool IsRightEdge(string edge)
+        {
+            return string.Equals((edge ?? "").Trim(), "right", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // How long the pointer must rest in the trigger strip before an edge shared with another
+        // display expands (#177): long enough that a crossing never opens it, short enough to feel prompt.
+        private const int DwellMs = 300;
+
+        private bool IsDockEdgeShared()
+        {
+            try
+            {
+                var monitors = MonitorPicker.DescribeMonitors();
+                if (monitors.Count == 0) return false;
+                string storedId = App.Settings != null ? App.Settings.Current.DesktopDockDisplay : null;
+                return IsEdgeShared(MonitorPicker.ResolveMonitor(monitors, storedId), monitors, EdgeIsRight());
+            }
+            catch (Exception ex) { Log.Error("appbar edge shared", ex); return false; }
         }
 
         internal static bool SameRect(NM.RECT a, NM.RECT b)
@@ -378,6 +476,7 @@ namespace QuickPane.Explorer
                 App.Settings.WidthChangedLive -= OnSettingsChanged;
             }
             try { _collapseTimer?.Stop(); } catch { }
+            try { _dwellTimer?.Stop(); } catch { }
             try { _pinTimer?.Stop(); } catch { }
             try { _foregroundHook?.Dispose(); } catch { }
             RemoveAppBar();
