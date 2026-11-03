@@ -13,20 +13,15 @@ namespace QuickPane.UI.Settings.Pages
     /// <summary>Back up and Restore buttons, with the result in an info bar. A successful restore
     /// calls <see cref="SettingsPageContext.Rebuild"/>, as today.
     ///
-    /// <see cref="SettingsStore.ExportTo"/> and <see cref="SettingsStore.ImportFrom"/> run
-    /// synchronously on the UI thread, exactly like the old handlers at 068301b, and like every
-    /// other settings.json writer in the app today -- not posted through <c>WorkQueue</c>.
-    /// <see cref="SettingsStore.Save"/> raises <c>Changed</c>, whose handler in
-    /// <c>App.xaml.cs</c> calls <c>Groups.Reload()</c> inline (not deferred), and
-    /// <see cref="SettingsStore.ImportFrom"/> replaces <c>Current</c> itself before saving: both
-    /// assume the thread that owns the window and the rest of the app's state, exactly the UI
-    /// thread they already run on for every other caller. Moving either call to a
-    /// <c>WorkQueue</c> worker would fire those handlers off-thread and let a background restore
-    /// swap <c>Current</c> out from under a UI-thread reader -- a correctness regression the
-    /// off-UI-thread rule does not ask for, since a settings.json file is a few KB of local JSON,
-    /// not the SSH or backup-of-a-large-file case that rule is aimed at. If a future change needs this off the UI
-    /// thread, <c>SettingsStore</c> itself needs a worker-safe deserialize step separate from the
-    /// UI-thread adopt (Current swap + Save + event raise); that split is not made here.</summary>
+    /// <see cref="SettingsStore.ExportTo"/> and <see cref="SettingsStore.ImportFrom"/> are called on
+    /// the UI thread, exactly like the old handlers at 068301b. Both change or serialize
+    /// <c>Current</c>, and <see cref="SettingsStore.Save"/> raises <c>Changed</c> on the caller,
+    /// whose handler in <c>App.xaml.cs</c> calls <c>Groups.Reload()</c> inline, so both need the
+    /// thread that owns the window and the rest of the app's state. Only the settings.json write
+    /// itself runs on the settings lane (#163). Export waits for that write, with a bounded
+    /// <see cref="SettingsStore.Flush()"/>, before it copies the file, and throws if the write
+    /// timed out or failed, which shows "Backup failed" below. The read of the chosen restore file
+    /// stays on the UI thread: it is a few KB the user just picked.</summary>
     internal sealed class BackupPage : SettingsPage
     {
         private const string CardId = "backup-restore";

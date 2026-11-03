@@ -12,12 +12,11 @@ namespace QuickPane.UI.Settings.Pages
     /// card with a text box that validates as today and reverts to the last valid value.
     ///
     /// Both controls write straight through <see cref="SettingsPageContext.Settings"/> and call
-    /// <c>Save()</c> synchronously, exactly like the old checkbox and text box at commit 068301b
+    /// <c>Save()</c>, exactly like the old checkbox and text box at commit 068301b
     /// (<c>SettingsPanel.xaml.cs</c>'s <c>HotkeysBlock</c>) and like every other settings.json
-    /// writer in the app today (<c>SidebarControl.xaml.cs</c>, <c>AppBarHost.cs</c>,
-    /// <c>RecentsSection.xaml.cs</c>): a settings.json write is small and local, unlike the
-    /// SSH/backup file work that stays off the UI thread, so this is "exactly as today"
-    /// rather than a new <c>WorkQueue</c> post.</summary>
+    /// writer in the app (<c>SidebarControl.xaml.cs</c>, <c>AppBarHost.cs</c>,
+    /// <c>RecentsSection.xaml.cs</c>). <c>Save()</c> serializes on this thread and queues the file
+    /// write on the settings lane itself (#163), so no caller posts it.</summary>
     internal sealed class KeyboardPage : SettingsPage
     {
         private const string ToggleCardId = "keyboard-enabled";

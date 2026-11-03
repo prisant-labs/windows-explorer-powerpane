@@ -23,8 +23,18 @@ namespace QuickPane.Services
         private static readonly WorkLane General = new WorkLane("QuickPaneWorker");
         private static readonly WorkLane Navigation = new WorkLane("QuickPaneNavigator");
 
+        // settings.json writes get a lane of their own too. App exit, session end, and a backup wait
+        // for the pending write with a bounded Flush, and on the general lane that wait would sit
+        // behind a group scan or a probe of a dead share, the same stall #38 took clicks off it for
+        // (prisant-labs/windows-explorer-quickpane#163).
+        private static readonly WorkLane SettingsWrites = new WorkLane("QuickPaneSettingsWriter");
+
         /// <summary>Queue work on the general worker. Never blocks the caller.</summary>
         public static void Post(Action work) { General.Post(work); }
+
+        /// <summary>Queue a settings.json write. Only <see cref="SettingsStore"/> posts here, so a
+        /// Flush waits for that write and nothing else.</summary>
+        public static void PostSettingsWrite(Action work) { SettingsWrites.Post(work); }
 
         /// <summary>Queue a navigation the user asked for: driving an Explorer window or a file
         /// dialog to a folder. Never blocks the caller. Keep anything else off this lane, so a click
