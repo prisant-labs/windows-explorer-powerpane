@@ -377,7 +377,12 @@ namespace QuickPane.UI.Settings
             if (!string.IsNullOrEmpty(label))
             {
                 var text = new TextBlock { Text = label, FontSize = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
-                text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+                // A local foreground ignores IsEnabled, so a row greyed by LinkEnabled (#150) kept
+                // full-strength text; swap to the disabled brush the way a Fluent control does.
+                Action paintLabel = () => text.SetResourceReference(TextBlock.ForegroundProperty,
+                    text.IsEnabled ? "TextFillColorPrimaryBrush" : "TextFillColorDisabledBrush");
+                paintLabel();
+                text.IsEnabledChanged += (s, e) => paintLabel();
                 panel.Children.Add(text);
             }
 
@@ -420,15 +425,20 @@ namespace QuickPane.UI.Settings
             };
             SetAccessibleName(button, accessibleName);
 
+            // Painted in code, so the disabled look has to be too: a switch greyed by LinkEnabled
+            // (#150) otherwise stayed accent-blue and read as active. The keys are the ones WinUI's
+            // ToggleSwitch uses for its Disabled state.
             Action paint = () =>
             {
                 bool on = button.IsChecked == true;
+                bool enabled = button.IsEnabled;
                 label.Text = on ? "On" : "Off";
+                label.SetResourceReference(TextBlock.ForegroundProperty, enabled ? "TextFillColorSecondaryBrush" : "TextFillColorDisabledBrush");
                 if (on)
                 {
-                    track.SetResourceReference(Border.BackgroundProperty, "AccentFillColorDefaultBrush");
+                    track.SetResourceReference(Border.BackgroundProperty, enabled ? "AccentFillColorDefaultBrush" : "AccentFillColorDisabledBrush");
                     track.BorderThickness = new Thickness(0);
-                    thumb.SetResourceReference(Shape.FillProperty, "TextOnAccentFillColorPrimaryBrush");
+                    thumb.SetResourceReference(Shape.FillProperty, enabled ? "TextOnAccentFillColorPrimaryBrush" : "TextOnAccentFillColorDisabledBrush");
                     thumb.HorizontalAlignment = HorizontalAlignment.Right;
                     thumb.Margin = new Thickness(0, 0, 3, 0);
                 }
@@ -436,8 +446,9 @@ namespace QuickPane.UI.Settings
                 {
                     track.Background = Brushes.Transparent;
                     track.BorderThickness = new Thickness(1);
-                    track.SetResourceReference(Border.BorderBrushProperty, "ControlStrongStrokeColorDefaultBrush");
-                    thumb.SetResourceReference(Shape.FillProperty, "ControlStrongStrokeColorDefaultBrush");
+                    string stroke = enabled ? "ControlStrongStrokeColorDefaultBrush" : "ControlStrongStrokeColorDisabledBrush";
+                    track.SetResourceReference(Border.BorderBrushProperty, stroke);
+                    thumb.SetResourceReference(Shape.FillProperty, stroke);
                     thumb.HorizontalAlignment = HorizontalAlignment.Left;
                     thumb.Margin = new Thickness(3, 0, 0, 0);
                 }
@@ -445,11 +456,36 @@ namespace QuickPane.UI.Settings
             paint();
             button.Checked += (s, e) => { paint(); onChanged?.Invoke(true); };
             button.Unchecked += (s, e) => { paint(); onChanged?.Invoke(false); };
+            button.IsEnabledChanged += (s, e) => paint();
 
             var panel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Tag = button };
             panel.Children.Add(label);
             panel.Children.Add(button);
             return panel;
+        }
+
+        // ---- dependent rows ----------------------------------------------
+
+        /// <summary>Greys each row in <paramref name="rows"/> while <paramref name="parentToggle"/>
+        /// (the value <see cref="Toggle"/> returned for the card's own on/off switch) is off, and
+        /// un-greys them when it is on, leaving the rows' stored values untouched either way --
+        /// Windows Settings greys a dependent control the same way while its parent switch is off
+        /// (#150). Safe to call with any <see cref="FrameworkElement"/> that stashes its real
+        /// <c>ToggleButton</c> in <c>Tag</c> the way <see cref="Toggle"/> does; does nothing if it
+        /// does not.</summary>
+        public void LinkEnabled(FrameworkElement parentToggle, params UIElement[] rows)
+        {
+            var button = parentToggle?.Tag as ToggleButton ?? parentToggle as ToggleButton;
+            if (button == null || rows == null) return;
+            Action sync = () =>
+            {
+                bool on = button.IsChecked == true;
+                foreach (var row in rows)
+                    if (row != null) row.IsEnabled = on;
+            };
+            button.Checked += (s, e) => sync();
+            button.Unchecked += (s, e) => sync();
+            sync();
         }
 
         // ---- number box -------------------------------------------------

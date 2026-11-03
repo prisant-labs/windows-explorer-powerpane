@@ -67,6 +67,15 @@ namespace QuickPane.Tests
         private static List<SettingsPage> RealPages() => SettingsWindow.BuildPages();
 
         [Test]
+        public void RealPages_EachHaveANavigationIcon()
+        {
+            // An edit to the Pane page once emptied its icon strings, which left a blank space in
+            // the navigation pane and on four cards.
+            foreach (var page in RealPages())
+                Assert.That(page.Glyph, Is.Not.Null.And.Not.Empty, page.Id);
+        }
+
+        [Test]
         public void RealPages_HaveNineUniqueIds_WithAboutLast()
         {
             // Nine since the Quick actions page (quick actions, first version) joined the eight pages

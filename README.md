@@ -105,6 +105,7 @@ An optional AppBar at the left screen edge, independent of the window pane.
 
 - Auto-hide collapses it to a thin strip that slides out on hover
 - A setting shows it on every virtual desktop instead of only the one it opened on
+- On a multi-monitor computer, a Display setting picks which monitor it sits on; "Primary display" (the default) tracks whichever monitor Windows currently calls primary, and a specific choice falls back to Primary display if that monitor is ever disconnected ([#146](https://github.com/prisant-labs/windows-explorer-quickpane/issues/146))
 - Clicking a folder navigates the active Explorer window and brings it forward, or opens a new window when none is open
 
 ### Open and Save dialog support
@@ -353,7 +354,8 @@ QuickPane/
     │   ├── DialogPaneWatcher.cs # Panes for Open/Save dialogs
     │   ├── DialogInsidePane.cs # Inside-mode pane for a dialog
     │   ├── RecentTracker.cs   # Capture real Explorer navigation
-    │   └── AppBarHost.cs      # Desktop dock AppBar
+    │   ├── AppBarHost.cs      # Desktop dock AppBar
+    │   └── MonitorPicker.cs   # Lists and resolves monitors for the dock's Display setting
     ├── Models/
     │   └── Models.cs          # Settings, profiles, and pinned-folder models
     ├── Services/

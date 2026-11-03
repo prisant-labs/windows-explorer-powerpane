@@ -166,7 +166,7 @@ namespace QuickPane.Tests
         private static readonly string[] AppSettingsNotRendered =
         {
             "KeyboardNavHotkey", "RecentsMaxCount", "SidebarWidthPx",
-            "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops",
+            "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops", "DesktopDockDisplay",
             "ActiveProfile", // derived from Profiles + ActiveProfileIndex, both already in the key
             "PaneColor" // live through SidebarBackground's DynamicResource binding, no rebuild (#134)
         };

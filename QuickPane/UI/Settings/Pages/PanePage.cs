@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using QuickPane.Explorer;
 using QuickPane.Models;
 using QuickPane.Services;
 
@@ -16,17 +17,19 @@ namespace QuickPane.UI.Settings.Pages
     // 068301b.
 
     /// <summary>Pane mode and File dialogs cards (combo boxes), a Pane color card (swatches, #134),
-    /// a Desktop dock expander (toggle in the header, auto-hide and all-desktops as child rows), and
-    /// a Profile tabs expander (toggle in the header, auto-hide as a child row). Every setting here
-    /// reads and writes the same <see cref="AppSettings"/> field, with the same values and the same
-    /// immediate <c>SettingsStore.Save()</c>, as the matching handler in <c>SettingsPanel.xaml.cs</c>
-    /// at commit 068301b (<c>PaneModeBlock</c>, <c>DialogModeBlock</c>, <c>DockBlock</c>,
-    /// <c>ProfileTabsBlock</c>).</summary>
+    /// a Desktop dock expander (toggle in the header, auto-hide, all-desktops, and which display it
+    /// sits on as child rows, #146), and a Profile tabs expander (toggle in the header, auto-hide as
+    /// a child row). Every setting here reads and writes the same <see cref="AppSettings"/> field,
+    /// with the same values and the same immediate <c>SettingsStore.Save()</c>, as the matching
+    /// handler in <c>SettingsPanel.xaml.cs</c> at commit 068301b (<c>PaneModeBlock</c>,
+    /// <c>DialogModeBlock</c>, <c>DockBlock</c>, <c>ProfileTabsBlock</c>). Each expander's dependent
+    /// child rows grey out while its own header toggle is off, via <c>SettingsCards.LinkEnabled</c>,
+    /// matching how Windows Settings treats a dependent control (#150).</summary>
     internal sealed class PanePage : SettingsPage
     {
         public override string Id => "pane";
         public override string Title => "Pane";
-        public override string Glyph => "";   // Segoe Fluent Icons Dock panel
+        public override string Glyph => "\uE90C";   // Segoe Fluent Icons Dock panel; escaped, since an edit once dropped the literal character
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
@@ -36,6 +39,7 @@ namespace QuickPane.UI.Settings.Pages
                 yield return new SettingsSearchEntry(Id, "fileDialogs", "File dialogs", "Where the pane attaches to Open and Save dialogs.", "dialog", "open", "save");
                 yield return new SettingsSearchEntry(Id, "paneColor", "Pane color", "A background tint for the pane.", "color", "colour", "swatch", "theme");
                 yield return new SettingsSearchEntry(Id, "desktopDock", "Desktop dock", "A screen-edge dock independent of the window pane.", "dock", "auto-hide", "virtual desktop");
+                yield return new SettingsSearchEntry(Id, "desktopDockDisplay", "Display", "Which display the desktop dock sits on.", "monitor", "screen", "multi-monitor", "multiple monitors");
                 yield return new SettingsSearchEntry(Id, "profileTabs", "Profile tabs", "The row of profile tabs under the title.", "profile tabs", "tab row");
             }
         }
@@ -57,7 +61,7 @@ namespace QuickPane.UI.Settings.Pages
                 },
                 mode,
                 v => { s.Mode = v; ctx.Settings.Save(); });
-            panel.Children.Add(cards.Card("paneMode", "", "Pane mode",
+            panel.Children.Add(cards.Card("paneMode", "\uE7C4", "Pane mode",
                 "Where the pane attaches to an Explorer window", modeCombo, "Pane mode"));
 
             // ---- File dialogs (old: DialogModeBlock, lines 393-412) ----
@@ -71,7 +75,7 @@ namespace QuickPane.UI.Settings.Pages
                 },
                 dialogMode,
                 v => { s.DialogMode = v; ctx.Settings.Save(); });
-            panel.Children.Add(cards.Card("fileDialogs", "", "File dialogs",
+            panel.Children.Add(cards.Card("fileDialogs", "\uE8B7", "File dialogs",
                 "Off also hides App Folders and \"Always start here\", which only appear in dialog panes.",
                 dialogCombo, "File dialogs"));
 
@@ -80,27 +84,61 @@ namespace QuickPane.UI.Settings.Pages
 
             // ---- Desktop dock (old: DockBlock, lines 414-424) ----
             var dockToggle = cards.Toggle(s.DesktopDock, on => { s.DesktopDock = on; ctx.Settings.Save(); });
-            var dockExpander = cards.Expander("desktopDock", "", "Desktop dock",
+            var dockExpander = cards.Expander("desktopDock", "\uE90C", "Desktop dock",
                 "Pin a small dock to a screen edge", dockToggle, accessibleName: "Show desktop dock");
-            dockExpander.AddChild(cards.ChildRow("Auto-hide (slide out on hover)",
+            var autoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
                 cards.Toggle(s.DesktopDockAutoHide, on => { s.DesktopDockAutoHide = on; ctx.Settings.Save(); }),
-                "Auto-hide the desktop dock"));
-            dockExpander.AddChild(cards.ChildRow("Show on all virtual desktops",
+                "Auto-hide the desktop dock");
+            var allDesktopsRow = cards.ChildRow("Show on all virtual desktops",
                 cards.Toggle(s.DesktopDockAllDesktops, on => { s.DesktopDockAllDesktops = on; ctx.Settings.Save(); }),
-                "Show the desktop dock on all virtual desktops"));
+                "Show the desktop dock on all virtual desktops");
+            // Always shown, even with one monitor connected: it then just lists that one monitor
+            // plus "Primary display", which keeps the row's presence (and search entry) the same on
+            // every machine rather than making the Pane page's layout depend on how many displays
+            // happen to be connected right now (#146).
+            var displayRow = cards.ChildRow("Display", BuildDisplayCombo(ctx, s), "Which display the desktop dock sits on");
+            dockExpander.AddChild(autoHideRow);
+            dockExpander.AddChild(allDesktopsRow);
+            dockExpander.AddChild(displayRow);
+            // Auto-hide, all-desktops, and which display all do nothing while the dock itself is off
+            // (#150); grey them out the way the header toggle's own on/off state already implies.
+            cards.LinkEnabled(dockToggle, autoHideRow, allDesktopsRow, displayRow);
             panel.Children.Add(dockExpander.Root);
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----
             var tabsToggle = cards.Toggle(s.ShowProfileTabs, on => { s.ShowProfileTabs = on; ctx.Settings.Save(); });
-            var tabsExpander = cards.Expander("profileTabs", "", "Profile tabs",
+            var tabsExpander = cards.Expander("profileTabs", "\uE8AB", "Profile tabs",
                 "The row appears once there are two or more profiles.", tabsToggle,
                 accessibleName: "Show profiles tab row");
-            tabsExpander.AddChild(cards.ChildRow("Auto-hide (slide out on hover)",
+            var tabsAutoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
                 cards.Toggle(s.ProfileTabsAutoHide, on => { s.ProfileTabsAutoHide = on; ctx.Settings.Save(); }),
-                "Auto-hide the profiles tab row"));
+                "Auto-hide the profiles tab row");
+            tabsExpander.AddChild(tabsAutoHideRow);
+            // Auto-hide does nothing while the tab row itself is off (#150).
+            cards.LinkEnabled(tabsToggle, tabsAutoHideRow);
             panel.Children.Add(tabsExpander.Root);
 
             return panel;
+        }
+
+        // ---- Display picker (#146) ------------------------------------------
+
+        /// <summary>The Desktop dock's Display row: "Primary display" (tracks whichever monitor
+        /// Windows currently calls primary, live) plus one entry per connected monitor, built by the
+        /// same pure <see cref="MonitorPicker.BuildDisplayOptions"/> AppBarHost's own tests exercise
+        /// with an invented list. Stores an empty value back as null, matching
+        /// <see cref="MonitorPicker.PrimaryDisplayId"/> and <see cref="AppSettings.DesktopDockDisplay"/>'s
+        /// own "null means primary" convention.</summary>
+        private static ComboBox BuildDisplayCombo(SettingsPageContext ctx, AppSettings settings)
+        {
+            var monitors = MonitorPicker.DescribeMonitors();
+            var options = MonitorPicker.BuildDisplayOptions(monitors);
+            string current = settings.DesktopDockDisplay ?? MonitorPicker.PrimaryDisplayId;
+            return ctx.Cards.Combo(options, current, v =>
+            {
+                settings.DesktopDockDisplay = string.IsNullOrEmpty(v) ? null : v;
+                ctx.Settings.Save();
+            });
         }
 
         // ---- Pane color card (#134) -----------------------------------------
@@ -226,7 +264,7 @@ namespace QuickPane.UI.Settings.Pages
                 new Binding("BorderBrush") { RelativeSource = RelativeSource.TemplatedParent });
 
             var check = new FrameworkElementFactory(typeof(TextBlock), "Check");
-            check.SetValue(TextBlock.TextProperty, "");   // Segoe Fluent Icons CheckMark, same glyph as CheckBoxCheckedGlyph
+            check.SetValue(TextBlock.TextProperty, "\uE73E");   // Segoe Fluent Icons CheckMark, same glyph as CheckBoxCheckedGlyph
             check.SetValue(TextBlock.FontFamilyProperty, FluentIconFont);
             check.SetValue(TextBlock.FontSizeProperty, 14.0);
             check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
