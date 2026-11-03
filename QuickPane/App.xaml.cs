@@ -441,6 +441,15 @@ namespace QuickPane
 
         // ---- Teardown --------------------------------------------------------
 
+        /// <summary>Sign-out and shutdown can end the process once the session-end messages are
+        /// answered, before the Shutdown that WPF queues here ever reaches OnExit, so the pending
+        /// settings write is flushed now. The Flush in OnExit is then a no-op (#163).</summary>
+        protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+        {
+            try { Settings?.Flush(); } catch (Exception ex) { Log.Error("settings flush on session end", ex); }
+            base.OnSessionEnding(e);
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
             Log.Info("QuickPane shutting down.");
@@ -462,6 +471,11 @@ namespace QuickPane
             try { Groups?.Dispose(); } catch (Exception ex) { Log.Error("groups dispose", ex); }
             try { Theme?.Dispose(); } catch (Exception ex) { Log.Error("theme dispose", ex); }
             try { _staleSources?.Dispose(); } catch (Exception ex) { Log.Error("stale source guard dispose", ex); }
+
+            // After the teardown above, which can still save (a pane persisting its width), and before
+            // the process ends: the settings lane is a background thread, so a write still queued
+            // there would be dropped with it (#163).
+            try { Settings?.Flush(); } catch (Exception ex) { Log.Error("settings flush on exit", ex); }
 
             if (_tray != null)
             {
