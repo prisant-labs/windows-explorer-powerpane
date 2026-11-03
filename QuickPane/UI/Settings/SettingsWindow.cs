@@ -134,9 +134,9 @@ namespace QuickPane.UI.Settings
 
     // ---- the window itself ----------------------------------------------
 
-    /// <summary>The native Windows 11 Settings window: a navigation pane with search and seven
-    /// pages, "About" pinned at the bottom, and a content area that hosts whichever page is
-    /// selected. Replaces <c>SettingsPanel.xaml.cs</c> and its tab strip (#90).
+    /// <summary>The native Windows 11 Settings window: a navigation pane with search and its
+    /// pages, About last, and a content area that hosts whichever page is selected. Replaces
+    /// <c>SettingsPanel.xaml.cs</c> and its tab strip (#90).
     ///
     /// Built entirely in code, like the window it replaces, so a reviewer can compare a handler
     /// here against the matching one in <c>SettingsPanel.xaml.cs</c> at commit 068301b line by
@@ -265,8 +265,9 @@ namespace QuickPane.UI.Settings
         /// unique ids, About last) with no window and no stores -- see SettingsSearchIndexTests.</summary>
         internal static List<SettingsPage> BuildPages()
         {
-            // "About" is last; everything that pins it to the bottom of the nav pane relies
-            // on that order, not on a flag checked per page.
+            // "About" is last; the nav pane's visual order (BuildNavPane) and
+            // RealPages_HaveNineUniqueIds_WithAboutLast both rely on that order, not on a flag
+            // checked per page.
             return new List<SettingsPage>
             {
                 new GroupsPage(),
@@ -448,25 +449,14 @@ namespace QuickPane.UI.Settings
             dock.Children.Add(_searchResults);
 
             // Build every nav button, About included, in _pages order (About last) so _navOrder
-            // -- what OnNavItemArrowKey's Up/Down walks -- matches the pane's visual order top to
-            // bottom. About is laid out separately, pinned below the free space with DockPanel's
-            // Dock.Bottom, but it is built here rather than after the loop so the arrow-key
-            // order and the explicit TabIndex below both read top to bottom without a special case.
+            // -- what OnNavItemArrowKey's Up/Down walks -- and mainList's visual order both read
+            // top to bottom with no special case for About.
             var navButtons = new List<Button>(_pages.Count);
             for (int i = 0; i < _pages.Count; i++) navButtons.Add(BuildNavItem(_pages[i]));
             for (int i = 0; i < navButtons.Count; i++) KeyboardNavigation.SetTabIndex(navButtons[i], 2 + i);
 
-            var aboutPage = _pages[_pages.Count - 1];
-            var aboutHost = new StackPanel();
-            var divider = new Border { Height = 1, Margin = new Thickness(8, 8, 8, 4) };
-            divider.SetResourceReference(Border.BackgroundProperty, "CardStrokeColorDefaultBrush");
-            aboutHost.Children.Add(divider);
-            aboutHost.Children.Add(navButtons[navButtons.Count - 1]);
-            DockPanel.SetDock(aboutHost, Dock.Bottom);
-            dock.Children.Add(aboutHost);
-
             var mainList = new StackPanel();
-            for (int i = 0; i < navButtons.Count - 1; i++) mainList.Children.Add(navButtons[i]);
+            for (int i = 0; i < navButtons.Count; i++) mainList.Children.Add(navButtons[i]);
             var mainScroller = new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -474,7 +464,7 @@ namespace QuickPane.UI.Settings
                 Content = mainList,
                 Focusable = false,   // a bare ScrollViewer is otherwise its own tab stop between the nav buttons and the page
             };
-            dock.Children.Add(mainScroller);   // added last with no Dock set: fills the remaining height, so About sits pinned below the free space
+            dock.Children.Add(mainScroller);   // added last with no Dock set: fills the remaining height below the search box
 
             return dock;
         }
@@ -491,7 +481,19 @@ namespace QuickPane.UI.Settings
             pill.SetResourceReference(Border.BackgroundProperty, "AccentFillColorDefaultBrush");
             _navPills[page.Id] = pill;
 
-            var icon = new TextBlock { Text = page.Glyph, FontFamily = NavIconFont, FontSize = 16, Width = 16, TextAlignment = TextAlignment.Center };
+            var icon = new TextBlock
+            {
+                Text = page.Glyph,
+                FontFamily = NavIconFont,
+                FontSize = 16,
+                Width = 16,
+                TextAlignment = TextAlignment.Center,
+                // Without this the icon (no VerticalAlignment of its own) stretched to the row's
+                // full height and drew at the top of that box, while the 14 px label beside it
+                // centred in a box sized to its own text -- so the label sat visibly lower than
+                // the icon (#154). Matches QuickActionsSection.BuildRow's icon+label row.
+                VerticalAlignment = VerticalAlignment.Center,
+            };
             icon.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
 
             var label = new TextBlock
@@ -533,6 +535,11 @@ namespace QuickPane.UI.Settings
             var button = SettingsCards.Invokable(bg, page.Title, () => Navigate(page.Id));
             button.Cursor = Cursors.Hand;
             button.KeyDown += (s, e) => OnNavItemArrowKey(button, e);
+            // The implicit Fluent Button style's own FocusVisualStyle rings the whole (stretched,
+            // full-width) button; NavItemFocusVisualStyle rings bg's own Margin(4,2,4,0)/
+            // CornerRadius(4) instead, so keyboard focus hugs the rounded highlight rather than
+            // drawing thin lines above and below it (#150).
+            button.SetResourceReference(FrameworkElement.FocusVisualStyleProperty, "NavItemFocusVisualStyle");
 
             _navOrder.Add(button);
             _navItemsByPageId[page.Id] = bg;
@@ -541,11 +548,8 @@ namespace QuickPane.UI.Settings
 
         private static readonly FontFamily NavIconFont = new FontFamily("Segoe Fluent Icons, Segoe MDL2 Assets");
 
-        /// <summary>Up/Down moves to the neighbour in nav order, crossing from the main list into
-        /// the pinned "About" item and back. Enter/Space is the button's own default
-        /// activation, so only the arrow keys need handling here. The nav pane holds two visual
-        /// groups but one logical order, so this is the one place that stitches them back into a
-        /// single arrow-key sequence.</summary>
+        /// <summary>Up/Down moves to the neighbour in nav order. Enter/Space is the button's own
+        /// default activation, so only the arrow keys need handling here.</summary>
         private void OnNavItemArrowKey(Button item, KeyEventArgs e)
         {
             if (e.Key != Key.Up && e.Key != Key.Down) return;
@@ -558,6 +562,10 @@ namespace QuickPane.UI.Settings
             var target = _navOrder[next];
             target.Focus();
             Keyboard.Focus(target);
+            // Focus() alone does not scroll: mainScroller only grew a scrollbar once About moved
+            // inside it (#154), and arrowing Down onto About (or any item a search had scrolled
+            // past) must still bring it on screen.
+            target.BringIntoView();
             e.Handled = true;
         }
 
