@@ -535,6 +535,11 @@ namespace QuickPane.UI.Settings
             var button = SettingsCards.Invokable(bg, page.Title, () => Navigate(page.Id));
             button.Cursor = Cursors.Hand;
             button.KeyDown += (s, e) => OnNavItemArrowKey(button, e);
+            // The implicit Fluent Button style's own FocusVisualStyle rings the whole (stretched,
+            // full-width) button; NavItemFocusVisualStyle rings bg's own Margin(4,2,4,0)/
+            // CornerRadius(4) instead, so keyboard focus hugs the rounded highlight rather than
+            // drawing thin lines above and below it (#150).
+            button.SetResourceReference(FrameworkElement.FocusVisualStyleProperty, "NavItemFocusVisualStyle");
 
             _navOrder.Add(button);
             _navItemsByPageId[page.Id] = bg;

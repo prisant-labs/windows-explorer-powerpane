@@ -18,6 +18,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 
 ### Fixed
 - A navigation pane item's icon sat slightly above its label instead of centred on the same line ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
+- Keyboard focus on a navigation pane item drew thin lines above and below it, across the full width of the column, instead of a ring around the item's own rounded highlight ([#150](https://github.com/prisant-labs/windows-explorer-quickpane/issues/150)).
 - Turning on the desktop dock with auto-hide off no longer walks the dock across the screen and squeezes every maximized window into a narrow strip at the far edge. The dock now reserves one strip at the monitor's left edge and keeps it through settings changes and taskbar changes ([#145](https://github.com/prisant-labs/windows-explorer-quickpane/issues/145)).
 - The icon at the left of each Settings card is now drawn in the theme's text color. In dark mode it was near-black on a dark card and almost invisible ([#149](https://github.com/prisant-labs/windows-explorer-quickpane/issues/149)).
 
