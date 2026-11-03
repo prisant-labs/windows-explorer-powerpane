@@ -693,18 +693,30 @@ namespace QuickPane.UI.Settings
         /// Yes/Cancel buttons. Used for every delete/remove action in the inventory.</summary>
         public FrameworkElement ConfirmRow(string message, string confirmLabel, Action onConfirm, Action onCancel)
         {
-            var text = new TextBlock { Text = message, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
+            // The message wraps in a star column and the buttons keep their own Auto columns. A
+            // horizontal StackPanel gave the message unlimited width, so a long one (the #178 Reset
+            // confirmation) pushed Reset half out of the window and Cancel out of sight.
+            var text = new TextBlock { Text = message, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 12, 0) };
             text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
 
-            var confirm = new Button { Content = confirmLabel ?? "Yes", Margin = new Thickness(0, 0, 8, 0) };
-            var cancel = new Button { Content = "Cancel" };
+            var confirm = new Button { Content = confirmLabel ?? "Yes", Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            var cancel = new Button { Content = "Cancel", VerticalAlignment = VerticalAlignment.Center };
             confirm.Click += (s, e) => onConfirm?.Invoke();
             cancel.Click += (s, e) => onCancel?.Invoke();
 
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(ChildRowIndent, 8, 0, 8) };
+            var row = new Grid { Margin = new Thickness(ChildRowIndent, 8, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(text, 0);
+            Grid.SetColumn(confirm, 1);
+            Grid.SetColumn(cancel, 2);
             row.Children.Add(text);
             row.Children.Add(confirm);
             row.Children.Add(cancel);
+            // A confirmation under the last card can open below the visible part of the page; scroll
+            // it into view so the question is never asked off-screen.
+            row.Loaded += (s, e) => row.BringIntoView();
             return row;
         }
 
