@@ -195,7 +195,7 @@ namespace QuickPane.UI.Settings
             _theme = theme;
             _pages = BuildPages();
             _searchIndex = SettingsSearchIndex.Build(_pages);
-            _currentPageId = _pages[0].Id;   // "Groups & profiles" opens first, same as the old window's default tab
+            _currentPageId = _pages[0].Id;   // "Pane" opens first: the pane's look and the dock are what people change most
 
             Title = "QuickPane Settings";
             Width = 960;
@@ -267,12 +267,14 @@ namespace QuickPane.UI.Settings
         {
             // "About" is last; the nav pane's visual order (BuildNavPane) and
             // RealPages_HaveNineUniqueIds_WithAboutLast both rely on that order, not on a flag
-            // checked per page.
+            // checked per page. The first page is the one Settings opens on. Pane, then Pane
+            // sections, then Groups & profiles: the maintainer chose this order over a dashboard
+            // landing page, which would be built on every open and count against #97's budget.
             return new List<SettingsPage>
             {
-                new GroupsPage(),
                 new PanePage(),
                 new SectionsPage(),
+                new GroupsPage(),
                 new QuickActionsPage(),
                 new RecentAppsPage(),
                 new KeyboardPage(),

@@ -87,6 +87,18 @@ namespace QuickPane.Tests
         }
 
         [Test]
+        public void RealPages_OpenOnPane_ThenPaneSections_ThenGroups()
+        {
+            // Settings opens on the first page. The order was chosen in place of a dashboard
+            // landing page, so a reorder should be a decision, not an accident.
+            var ids = RealPages().Select(p => p.Id).ToList();
+            Assert.That(ids, Is.EqualTo(new[]
+            {
+                "pane", "sections", "groups", "quickactions", "recent", "keyboard", "ssh", "backup", "about",
+            }));
+        }
+
+        [Test]
         public void RealPages_EverySearchEntry_NamesItsOwnPageId()
         {
             foreach (var page in RealPages())
