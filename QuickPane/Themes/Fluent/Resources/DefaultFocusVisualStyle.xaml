@@ -40,4 +40,28 @@
 
     <Style x:Key="{x:Static SystemParameters.FocusVisualStyleKey}" BasedOn="{StaticResource DefaultControlFocusVisualStyle}" />
 
+    <!-- QuickPane addition: DefaultControlFocusVisualStyle's Margin="-3" draws its ring just
+         outside a control's own bounds, which is right when the control's bounds are the thing
+         that should be ringed. SettingsWindow's nav item button stretches across the full nav
+         column, but its visible, rounded highlight is a child Border inset by
+         Margin(4,2,4,0) and CornerRadius(4), so the default ring drew thin lines across the
+         button's full-width top and bottom edges instead of a ring around that highlight (#150).
+         This style matches the highlight's own margin and radius instead, and is applied only to
+         the nav button (SettingsWindow.BuildNavItem), not through FocusVisualStyleKey. -->
+    <Style x:Key="NavItemFocusVisualStyle">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Rectangle
+                        RadiusX="4"
+                        RadiusY="4"
+                        Margin="4,2,4,0"
+                        SnapsToDevicePixels="True"
+                        Stroke="{DynamicResource KeyboardFocusBorderColorBrush}"
+                        StrokeThickness="2" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

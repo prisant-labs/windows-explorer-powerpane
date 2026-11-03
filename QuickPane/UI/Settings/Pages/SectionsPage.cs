@@ -73,8 +73,9 @@ namespace QuickPane.UI.Settings.Pages
                 string friendly = Friendly(sec.Type);
                 int index = i;   // captured per-iteration
 
-                // Repainted after a toggle: the card's "Shown in the pane" / "Hidden from the pane"
-                // description is fixed text, so without this it keeps describing the old state.
+                // Rebuilt after a toggle (not just Move up/down) so refocusDirection == 0 below can
+                // land keyboard focus back on this row's own toggle, the same way a move lands it on
+                // this row's Move button.
                 var toggle = cards.Toggle(sec.Visible, on =>
                 {
                     sec.Visible = on;
@@ -115,8 +116,9 @@ namespace QuickPane.UI.Settings.Pages
                 controls.Children.Add(up);
                 controls.Children.Add(down);
 
-                string description = sec.Visible ? "Shown in the pane" : "Hidden from the pane";
-                panel.Children.Add(cards.Card("section-" + sec.Type, "", friendly, description, controls));
+                // No description: the On/Off switch already says whether the section shows, so
+                // CompactCard's single-line row replaces Card's two-line one (#154).
+                panel.Children.Add(cards.CompactCard("section-" + sec.Type, "", friendly, controls));
             }
 
             Control refocusButton = refocusDirection == 0
