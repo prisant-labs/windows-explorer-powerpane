@@ -66,7 +66,7 @@ namespace QuickPane.Explorer
                 Title = "QuickPane",
                 Background = new SolidColorBrush(dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF3, 0xF3, 0xF3)),
                 Content = _sidebar,
-                Left = EdgeIsRight() ? wa.Right - (_autoHide ? 1 : WidthPx()) : wa.Left,
+                Left = EdgeIsRight() ? wa.Right - (_autoHide ? 1 : WidthDip()) : wa.Left, // DIPs, like wa; repositioned in pixels once the handle exists
                 Top = wa.Top,
                 Height = wa.Height,
                 Width = _autoHide ? 1 : WidthDip()
