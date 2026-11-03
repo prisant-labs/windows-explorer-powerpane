@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- The Settings page for SSH connections is now called Remote drives, which names what you get (a remote folder that shows up as a drive letter) rather than the protocol behind it. A search for "ssh" still finds it.
+
 ## [3.11.0.1] - Unreleased
 
 The first published release of the redesigned Settings window. 3.11.0.0 was built as a draft and never published, because a desktop test found the defects fixed below, so this release also carries everything listed under 3.11.0.0.

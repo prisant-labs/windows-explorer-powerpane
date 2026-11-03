@@ -258,7 +258,7 @@ namespace QuickPane.Tests
             using (var f = new Fixture())
             {
                 var body = f.Page("ssh", sshInstalled: false).Build(f.Context());
-                Assert.That(Texts(body), Has.Some.EqualTo("SSH drives need two free components"));
+                Assert.That(Texts(body), Has.Some.EqualTo("Remote drives need two free components"));
                 Assert.That(UnnamedControls(body), Is.Empty, "controls with no accessible name on the SSH setup cards");
             }
         }

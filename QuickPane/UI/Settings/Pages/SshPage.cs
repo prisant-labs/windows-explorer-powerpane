@@ -65,12 +65,12 @@ namespace QuickPane.UI.Settings.Pages
         private SettingsPageContext _lastCtx;
 
         public override string Id => "ssh";
-        public override string Title => "SSH drives";
+        public override string Title => "Remote drives";
         public override string Glyph => PageGlyph;
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
-            get { yield return new SettingsSearchEntry(Id, null, Title, "Mount a remote folder over SSH as a drive letter.", "sshfs", "winfsp", "mount", "connection"); }
+            get { yield return new SettingsSearchEntry(Id, null, Title, "Mount a remote folder over SSH as a drive letter.", "ssh", "sshfs", "winfsp", "mount", "connection"); }
         }
 
         public override UIElement Build(SettingsPageContext ctx)
@@ -84,7 +84,7 @@ namespace QuickPane.UI.Settings.Pages
             if (_installChecked && !_installed)
             {
                 root.Children.Add(ctx.Cards.InfoBar(
-                    "SSH drives need two free components",
+                    "Remote drives need two free components",
                     "Install WinFsp and SSHFS-Win, then reopen Settings.",
                     InfoBarSeverity.Warning));
                 root.Children.Add(BuildComponentCard(ctx, "ssh-setup-winfsp", "WinFsp",

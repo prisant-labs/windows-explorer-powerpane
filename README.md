@@ -261,8 +261,8 @@ QuickPane makes one network request of its own, an update check:
 
 Two other features reach the network only when you use them:
 
-- **Links**: the About page's links and the SSH drives page's download buttons open in your default browser when you click them.
-- **SSH drives**: `sshfs` connects to the servers you enter, when you connect a drive.
+- **Links**: the About page's links and the Remote drives page's download buttons open in your default browser when you click them.
+- **Remote drives (SSH)**: `sshfs` connects to the servers you enter, when you connect a drive.
 
 ### settings.json format
 
