@@ -73,6 +73,16 @@ namespace QuickPane.UI.Settings
 
         public const double CardPadding = 16;
 
+        /// <summary>A single-line card's total height, in the range Windows 11 Settings uses for a
+        /// row with no description (see <see cref="CompactCard"/>), versus <see cref="CardMinHeight"/>'s
+        /// two-line 68.</summary>
+        public const double CompactCardMinHeight = 48;
+
+        /// <summary>A compact card's top/bottom padding -- less than <see cref="CardPadding"/> so a
+        /// single line of content plus this padding lands on <see cref="CompactCardMinHeight"/>
+        /// instead of <see cref="CardMinHeight"/>.</summary>
+        internal const double CompactCardVerticalPadding = 8;
+
         /// <summary>Below this card width, the control moves under the title instead of beside it.
         /// Exposed so <see cref="Card"/>'s own reflow and a unit test agree on the same number.</summary>
         public const double WrapBelowWidth = 476;
@@ -147,9 +157,26 @@ namespace QuickPane.UI.Settings
         public Border Card(string cardId, string glyph, string title, string description, FrameworkElement control,
             string accessibleName = null)
         {
+            return CardCore(cardId, glyph, title, description, control, accessibleName, compact: false);
+        }
+
+        /// <summary>A single-line variant of <see cref="Card"/> for a row with nothing to say in a
+        /// description, e.g. a Pane sections row, whose On/Off switch already says what a "Shown in
+        /// the pane" / "Hidden from the pane" line used to repeat (#154). <see cref="CompactCardMinHeight"/>
+        /// replaces <see cref="CardMinHeight"/>, and the icon centres on the title instead of pinning
+        /// to the top, since there is no second line to leave room for.</summary>
+        public Border CompactCard(string cardId, string glyph, string title, FrameworkElement control,
+            string accessibleName = null)
+        {
+            return CardCore(cardId, glyph, title, null, control, accessibleName, compact: true);
+        }
+
+        private Border CardCore(string cardId, string glyph, string title, string description,
+            FrameworkElement control, string accessibleName, bool compact)
+        {
             TextBlock titleBlock;
-            var body = CardBody(glyph, title, description, control, out titleBlock);
-            var border = CardShell(body, hoverable: true);
+            var body = CardBody(glyph, title, description, control, out titleBlock, compact);
+            var border = CardShell(body, hoverable: true, compact);
             RegisterAndName(cardId, control, accessibleName, title);
 
             if (control != null)
@@ -171,13 +198,16 @@ namespace QuickPane.UI.Settings
         /// column is simply left empty. <paramref name="titleBlock"/> hands back the title so an
         /// expander can rename itself in place (<see cref="ExpanderCard.Title"/>).</summary>
         private static Grid CardBody(string glyph, string title, string description, FrameworkElement control,
-            out TextBlock titleBlock)
+            out TextBlock titleBlock, bool compact = false)
         {
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { MinHeight = CardMinHeight - 2 * CardPadding });
+            double rowMinHeight = compact
+                ? CompactCardMinHeight - 2 * CompactCardVerticalPadding
+                : CardMinHeight - 2 * CardPadding;
+            grid.RowDefinitions.Add(new RowDefinition { MinHeight = rowMinHeight });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var icon = Glyph(glyph, 20);
@@ -185,7 +215,9 @@ namespace QuickPane.UI.Settings
             // theme foreground, so it fell back to WPF's black and vanished on a dark card (#149).
             icon.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
             icon.Margin = new Thickness(0, 0, 20, 0);
-            icon.VerticalAlignment = VerticalAlignment.Top;
+            // Top-aligned so it lines up with a two-line title+description; a compact row has only
+            // one line, so the icon centres on it instead (#154).
+            icon.VerticalAlignment = compact ? VerticalAlignment.Center : VerticalAlignment.Top;
             Grid.SetColumn(icon, 0);
             Grid.SetRow(icon, 0);
             Grid.SetRowSpan(icon, 2);
@@ -617,12 +649,14 @@ namespace QuickPane.UI.Settings
         /// <summary>Internal, not private: a page with free-form content under its card-style
         /// title (e.g. About's Licence or Third-party notices body) wraps it in exactly this shell
         /// rather than copying the card's padding, corner radius, and brush keys by hand.</summary>
-        internal Border CardShell(UIElement content, bool hoverable)
+        internal Border CardShell(UIElement content, bool hoverable, bool compact = false)
         {
             var border = new Border
             {
-                MinHeight = hoverable ? CardMinHeight : 0,
-                Padding = new Thickness(CardPadding),
+                MinHeight = hoverable ? (compact ? CompactCardMinHeight : CardMinHeight) : 0,
+                Padding = compact
+                    ? new Thickness(CardPadding, CompactCardVerticalPadding, CardPadding, CompactCardVerticalPadding)
+                    : new Thickness(CardPadding),
                 CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 0, 4),
