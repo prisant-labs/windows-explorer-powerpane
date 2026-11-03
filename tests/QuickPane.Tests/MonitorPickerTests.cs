@@ -104,7 +104,7 @@ namespace QuickPane.Tests
         [Test]
         public void BuildDisplayOptions_AlwaysLeadsWithPrimaryDisplay()
         {
-            var options = MonitorPicker.BuildDisplayOptions(new List<MonitorDescriptor> { Monitor("A", true, Rect(0, 0, 1920, 1080)) });
+            var options = MonitorPicker.BuildDisplayOptions(new List<MonitorDescriptor> { Monitor("A", true, Rect(0, 0, 1920, 1080)) }, null);
             Assert.That(options[0].Key, Is.EqualTo(MonitorPicker.PrimaryDisplayId));
             Assert.That(options[0].Value, Is.EqualTo("Primary display"));
         }
@@ -117,7 +117,7 @@ namespace QuickPane.Tests
                 Monitor("A", true, Rect(0, 0, 1920, 1080), "Display 1 (primary) - 1920 x 1080"),
                 Monitor("B", false, Rect(1920, 0, 3840, 1080), "Display 2 - 1920 x 1080"),
             };
-            var options = MonitorPicker.BuildDisplayOptions(monitors);
+            var options = MonitorPicker.BuildDisplayOptions(monitors, null);
             Assert.That(options.Select(o => o.Key), Is.EqualTo(new[] { MonitorPicker.PrimaryDisplayId, "A", "B" }));
             Assert.That(options[1].Value, Is.EqualTo("Display 1 (primary) - 1920 x 1080"));
             Assert.That(options[2].Value, Is.EqualTo("Display 2 - 1920 x 1080"));
@@ -126,7 +126,7 @@ namespace QuickPane.Tests
         [Test]
         public void BuildDisplayOptions_NoMonitors_ListsOnlyPrimaryDisplay()
         {
-            var options = MonitorPicker.BuildDisplayOptions(new List<MonitorDescriptor>());
+            var options = MonitorPicker.BuildDisplayOptions(new List<MonitorDescriptor>(), null);
             Assert.That(options, Has.Count.EqualTo(1));
         }
 
@@ -136,8 +136,55 @@ namespace QuickPane.Tests
             // DescribeMonitors never emits one of these (szDevice always falls back as the id), but
             // the builder should not offer an entry a settings save could never target back.
             var monitors = new List<MonitorDescriptor> { Monitor(null, true, Rect(0, 0, 1920, 1080)) };
-            var options = MonitorPicker.BuildDisplayOptions(monitors);
+            var options = MonitorPicker.BuildDisplayOptions(monitors, null);
             Assert.That(options, Has.Count.EqualTo(1));
+        }
+
+        // ---- BuildDisplayOptions: saved display not connected (#162) -----------
+
+        [Test]
+        public void BuildDisplayOptions_StoredIdConnected_NoExtraEntry()
+        {
+            // The saved monitor is still plugged in, so it is already one of the connected entries;
+            // adding a second one for it would offer the same monitor twice.
+            var monitors = new List<MonitorDescriptor>
+            {
+                Monitor("A", true, Rect(0, 0, 1920, 1080)),
+                Monitor("B", false, Rect(1920, 0, 3840, 1080)),
+            };
+            var options = MonitorPicker.BuildDisplayOptions(monitors, "B");
+            Assert.That(options.Select(o => o.Key), Is.EqualTo(new[] { MonitorPicker.PrimaryDisplayId, "A", "B" }));
+        }
+
+        [Test]
+        public void BuildDisplayOptions_StoredIdDisconnected_AddsASelectableTrailingEntry()
+        {
+            // The saved monitor is not among the connected ones (it was unplugged); without a
+            // trailing entry for it, the combo would show "Primary display" already selected, so
+            // picking "Primary display" again would fire no SelectionChanged and never save (#162).
+            var monitors = new List<MonitorDescriptor>
+            {
+                Monitor("A", true, Rect(0, 0, 1920, 1080)),
+                Monitor("B", false, Rect(1920, 0, 3840, 1080)),
+            };
+            var options = MonitorPicker.BuildDisplayOptions(monitors, "disconnected-monitor-id");
+            Assert.That(options.Select(o => o.Key),
+                Is.EqualTo(new[] { MonitorPicker.PrimaryDisplayId, "A", "B", "disconnected-monitor-id" }));
+            // "Primary display" is still present and is a real, distinct choice from the
+            // disconnected entry -- not pre-selected the way it was before #162.
+            Assert.That(options[0].Key, Is.EqualTo(MonitorPicker.PrimaryDisplayId));
+            Assert.That(options[0].Key, Is.Not.EqualTo(options[3].Key));
+            Assert.That(options[3].Value, Does.Not.Contain("Contoso").And.Not.Contain("DISPLAY"));
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        public void BuildDisplayOptions_BlankStoredId_MeansPrimary_NoExtraEntry(string storedId)
+        {
+            var monitors = new List<MonitorDescriptor> { Monitor("A", true, Rect(0, 0, 1920, 1080)) };
+            var options = MonitorPicker.BuildDisplayOptions(monitors, storedId);
+            Assert.That(options, Has.Count.EqualTo(2));
+            Assert.That(options.Select(o => o.Key), Is.EqualTo(new[] { MonitorPicker.PrimaryDisplayId, "A" }));
         }
 
         // ---- BuildLabel ---------------------------------------------------------

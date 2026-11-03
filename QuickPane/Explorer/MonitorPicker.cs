@@ -59,18 +59,36 @@ namespace QuickPane.Explorer
 
         /// <summary>The Display combo's entries: "Primary display" first, storing
         /// <see cref="PrimaryDisplayId"/> (null/empty) so it always tracks the OS primary live, then
-        /// one entry per connected monitor with its own stable id and label.</summary>
-        internal static List<KeyValuePair<string, string>> BuildDisplayOptions(List<MonitorDescriptor> monitors)
+        /// one entry per connected monitor with its own stable id and label, then -- only when
+        /// <paramref name="storedId"/> names a monitor not among them -- one more entry for it. Without
+        /// that trailing entry, a disconnected choice silently showed as "Primary display" already
+        /// selected, so picking "Primary display" again fired no <c>SelectionChanged</c> and the
+        /// stale id never got saved over; reconnecting the old monitor then moved the dock back to it
+        /// with no warning (#162).</summary>
+        internal static List<KeyValuePair<string, string>> BuildDisplayOptions(List<MonitorDescriptor> monitors, string storedId)
         {
             var options = new List<KeyValuePair<string, string>>
             {
                 new KeyValuePair<string, string>(PrimaryDisplayId, "Primary display"),
             };
+            bool storedIsConnected = false;
             if (monitors != null)
             {
                 foreach (var m in monitors)
-                    if (!string.IsNullOrEmpty(m.Id))
-                        options.Add(new KeyValuePair<string, string>(m.Id, m.Label));
+                {
+                    if (string.IsNullOrEmpty(m.Id)) continue;
+                    options.Add(new KeyValuePair<string, string>(m.Id, m.Label));
+                    // Ordinal, matching ResolveMonitor's own comparison -- not Combo's
+                    // OrdinalIgnoreCase, which only decides which entry a combo selects.
+                    if (!string.IsNullOrEmpty(storedId) && string.Equals(m.Id, storedId, StringComparison.Ordinal))
+                        storedIsConnected = true;
+                }
+            }
+            if (!string.IsNullOrEmpty(storedId) && !storedIsConnected)
+            {
+                // No real monitor model name here -- just enough for the person to recognize this is
+                // their old choice and pick something else, or reconnect it.
+                options.Add(new KeyValuePair<string, string>(storedId, "Saved display (not connected)"));
             }
             return options;
         }

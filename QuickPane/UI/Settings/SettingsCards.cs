@@ -136,6 +136,12 @@ namespace QuickPane.UI.Settings
 
         private static FrameworkElement Unwrap(FrameworkElement el) => el.Tag as FrameworkElement ?? el;
 
+        /// <summary>Whether <paramref name="cardId"/> has a registered focus target, with no window
+        /// needed -- <see cref="FocusTarget"/> itself calls <c>Focus()</c>/<c>MoveFocus</c>, which
+        /// need a live window, so a test that only wants to check registration (e.g. that every
+        /// search-index id for a page has a control, #164) uses this instead.</summary>
+        internal bool HasFocusTarget(string cardId) => cardId != null && _focusTargets.ContainsKey(cardId);
+
         // AutomationProperties.Name rejects null ("'' is not a valid value for property 'Name'"), but
         // a builder's name is optional: a toggle passed to Card() or ChildRow() is named there, after
         // it is built. Setting null threw on every build of the Pane page, whose toggles are unnamed.

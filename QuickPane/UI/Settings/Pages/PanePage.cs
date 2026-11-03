@@ -96,7 +96,12 @@ namespace QuickPane.UI.Settings.Pages
             // plus "Primary display", which keeps the row's presence (and search entry) the same on
             // every machine rather than making the Pane page's layout depend on how many displays
             // happen to be connected right now (#146).
-            var displayRow = cards.ChildRow("Display", BuildDisplayCombo(ctx, s), "Which display the desktop dock sits on");
+            var displayCombo = BuildDisplayCombo(ctx, s);
+            var displayRow = cards.ChildRow("Display", displayCombo, "Which display the desktop dock sits on");
+            // ChildRow (unlike Card/Expander) takes no cardId and so never registers on its own; the
+            // search box could open this page but never land focus on the combo (#164). Same pattern
+            // as paneColor's manual Register below.
+            cards.Register("desktopDockDisplay", displayCombo);
             dockExpander.AddChild(autoHideRow);
             dockExpander.AddChild(allDesktopsRow);
             dockExpander.AddChild(displayRow);
@@ -124,16 +129,17 @@ namespace QuickPane.UI.Settings.Pages
         // ---- Display picker (#146) ------------------------------------------
 
         /// <summary>The Desktop dock's Display row: "Primary display" (tracks whichever monitor
-        /// Windows currently calls primary, live) plus one entry per connected monitor, built by the
-        /// same pure <see cref="MonitorPicker.BuildDisplayOptions"/> AppBarHost's own tests exercise
-        /// with an invented list. Stores an empty value back as null, matching
+        /// Windows currently calls primary, live) plus one entry per connected monitor, plus -- when
+        /// the saved choice is not among them -- a trailing entry for it (#162), built by the same
+        /// pure <see cref="MonitorPicker.BuildDisplayOptions"/> AppBarHost's own tests exercise with
+        /// an invented list. Stores an empty value back as null, matching
         /// <see cref="MonitorPicker.PrimaryDisplayId"/> and <see cref="AppSettings.DesktopDockDisplay"/>'s
         /// own "null means primary" convention.</summary>
         private static ComboBox BuildDisplayCombo(SettingsPageContext ctx, AppSettings settings)
         {
             var monitors = MonitorPicker.DescribeMonitors();
-            var options = MonitorPicker.BuildDisplayOptions(monitors);
             string current = settings.DesktopDockDisplay ?? MonitorPicker.PrimaryDisplayId;
+            var options = MonitorPicker.BuildDisplayOptions(monitors, settings.DesktopDockDisplay);
             return ctx.Cards.Combo(options, current, v =>
             {
                 settings.DesktopDockDisplay = string.IsNullOrEmpty(v) ? null : v;
