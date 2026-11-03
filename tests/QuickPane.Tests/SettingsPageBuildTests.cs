@@ -9,6 +9,7 @@ using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using NUnit.Framework;
+using QuickPane.Explorer;
 using QuickPane.Models;
 using QuickPane.Services;
 using QuickPane.UI.Settings;
@@ -145,6 +146,30 @@ namespace QuickPane.Tests
                 var body = f.Page(id).Build(f.Context());
                 var unnamed = UnnamedControls(body);
                 Assert.That(unnamed, Is.Empty, "controls with no accessible name on the " + id + " page");
+            }
+        }
+
+        [Test]
+        public void PanePage_DisconnectedSavedDisplay_ComboSelectsItsOwnEntry()
+        {
+            // An invented id no real monitor from MonitorPicker.DescribeMonitors() can ever match,
+            // so this is deterministic regardless of how many displays this machine actually has
+            // (#162) -- unlike a "still connected" case, which would need a real monitor.
+            using (var f = new Fixture())
+            {
+                f.Settings.Current.DesktopDockDisplay = "demo-not-connected-id";
+                var body = f.Page("pane").Build(f.Context());
+                var combo = Descendants(body).OfType<ComboBox>()
+                    .Single(c => AutomationProperties.GetName(c) == "Which display the desktop dock sits on");
+
+                var selected = combo.SelectedItem as ComboBoxItem;
+                Assert.That(selected, Is.Not.Null);
+                Assert.That((string)selected.Tag, Is.EqualTo("demo-not-connected-id"));
+
+                // "Primary display" is still offered, and it is a different (unselected) item --
+                // before #162 it looked already selected, so picking it again saved nothing.
+                var primaryItem = combo.Items.OfType<ComboBoxItem>().Single(i => (string)i.Tag == MonitorPicker.PrimaryDisplayId);
+                Assert.That(primaryItem, Is.Not.SameAs(selected));
             }
         }
 
