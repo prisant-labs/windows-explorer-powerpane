@@ -7,6 +7,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using QuickPane.Explorer;
 using QuickPane.Models;
 using QuickPane.Services;
 
@@ -16,12 +17,12 @@ namespace QuickPane.UI.Settings.Pages
     // 068301b.
 
     /// <summary>Pane mode and File dialogs cards (combo boxes), a Pane color card (swatches, #134),
-    /// a Desktop dock expander (toggle in the header, auto-hide and all-desktops as child rows), and
-    /// a Profile tabs expander (toggle in the header, auto-hide as a child row). Every setting here
-    /// reads and writes the same <see cref="AppSettings"/> field, with the same values and the same
-    /// immediate <c>SettingsStore.Save()</c>, as the matching handler in <c>SettingsPanel.xaml.cs</c>
-    /// at commit 068301b (<c>PaneModeBlock</c>, <c>DialogModeBlock</c>, <c>DockBlock</c>,
-    /// <c>ProfileTabsBlock</c>).</summary>
+    /// a Desktop dock expander (toggle in the header, auto-hide, all-desktops, and which display it
+    /// sits on as child rows, #146), and a Profile tabs expander (toggle in the header, auto-hide as
+    /// a child row). Every setting here reads and writes the same <see cref="AppSettings"/> field,
+    /// with the same values and the same immediate <c>SettingsStore.Save()</c>, as the matching
+    /// handler in <c>SettingsPanel.xaml.cs</c> at commit 068301b (<c>PaneModeBlock</c>,
+    /// <c>DialogModeBlock</c>, <c>DockBlock</c>, <c>ProfileTabsBlock</c>).</summary>
     internal sealed class PanePage : SettingsPage
     {
         public override string Id => "pane";
@@ -36,6 +37,7 @@ namespace QuickPane.UI.Settings.Pages
                 yield return new SettingsSearchEntry(Id, "fileDialogs", "File dialogs", "Where the pane attaches to Open and Save dialogs.", "dialog", "open", "save");
                 yield return new SettingsSearchEntry(Id, "paneColor", "Pane color", "A background tint for the pane.", "color", "colour", "swatch", "theme");
                 yield return new SettingsSearchEntry(Id, "desktopDock", "Desktop dock", "A screen-edge dock independent of the window pane.", "dock", "auto-hide", "virtual desktop");
+                yield return new SettingsSearchEntry(Id, "desktopDockDisplay", "Display", "Which display the desktop dock sits on.", "monitor", "screen", "multi-monitor", "multiple monitors");
                 yield return new SettingsSearchEntry(Id, "profileTabs", "Profile tabs", "The row of profile tabs under the title.", "profile tabs", "tab row");
             }
         }
@@ -88,6 +90,11 @@ namespace QuickPane.UI.Settings.Pages
             dockExpander.AddChild(cards.ChildRow("Show on all virtual desktops",
                 cards.Toggle(s.DesktopDockAllDesktops, on => { s.DesktopDockAllDesktops = on; ctx.Settings.Save(); }),
                 "Show the desktop dock on all virtual desktops"));
+            // Always shown, even with one monitor connected: it then just lists that one monitor
+            // plus "Primary display", which keeps the row's presence (and search entry) the same on
+            // every machine rather than making the Pane page's layout depend on how many displays
+            // happen to be connected right now (#146).
+            dockExpander.AddChild(cards.ChildRow("Display", BuildDisplayCombo(ctx, s), "Which display the desktop dock sits on"));
             panel.Children.Add(dockExpander.Root);
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----
@@ -101,6 +108,26 @@ namespace QuickPane.UI.Settings.Pages
             panel.Children.Add(tabsExpander.Root);
 
             return panel;
+        }
+
+        // ---- Display picker (#146) ------------------------------------------
+
+        /// <summary>The Desktop dock's Display row: "Primary display" (tracks whichever monitor
+        /// Windows currently calls primary, live) plus one entry per connected monitor, built by the
+        /// same pure <see cref="MonitorPicker.BuildDisplayOptions"/> AppBarHost's own tests exercise
+        /// with an invented list. Stores an empty value back as null, matching
+        /// <see cref="MonitorPicker.PrimaryDisplayId"/> and <see cref="AppSettings.DesktopDockDisplay"/>'s
+        /// own "null means primary" convention.</summary>
+        private static ComboBox BuildDisplayCombo(SettingsPageContext ctx, AppSettings settings)
+        {
+            var monitors = MonitorPicker.DescribeMonitors();
+            var options = MonitorPicker.BuildDisplayOptions(monitors);
+            string current = settings.DesktopDockDisplay ?? MonitorPicker.PrimaryDisplayId;
+            return ctx.Cards.Combo(options, current, v =>
+            {
+                settings.DesktopDockDisplay = string.IsNullOrEmpty(v) ? null : v;
+                ctx.Settings.Save();
+            });
         }
 
         // ---- Pane color card (#134) -----------------------------------------

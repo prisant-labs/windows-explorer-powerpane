@@ -71,6 +71,7 @@
     <Compile Include="Explorer\ExplorerWindow.cs" />
     <Compile Include="Explorer\ExplorerFollowerWatcher.cs" />
     <Compile Include="Explorer\AppBarHost.cs" />
+    <Compile Include="Explorer\MonitorPicker.cs" />
     <Compile Include="Explorer\RecentTracker.cs" />
     <Compile Include="Explorer\DialogPaneWatcher.cs" />
     <Compile Include="Explorer\DialogInsidePane.cs" />

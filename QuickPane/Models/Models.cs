@@ -217,6 +217,14 @@ namespace QuickPane.Models
         [DataMember(Name = "desktopDockAllDesktops", Order = 7, EmitDefaultValue = false)]
         public bool DesktopDockAllDesktops { get; set; }
 
+        // Which monitor the desktop dock sits on, stored as MonitorPicker's stable device-interface
+        // id. Null or empty means "Primary display": AppBarHost tracks whichever monitor Windows
+        // currently calls primary, live, rather than pinning to whichever one happened to be primary
+        // when this was chosen. A non-empty id that no longer matches a connected monitor (#146) also
+        // falls back to the primary display -- MonitorPicker.ResolveMonitor is where that happens.
+        [DataMember(Name = "desktopDockDisplay", Order = 15, EmitDefaultValue = false)]
+        public string DesktopDockDisplay { get; set; }
+
         // Profiles: independent workspaces. The active one's folder/recents/width are mirrored into the
         // top-level fields above. Groups, sections, and dock settings stay global across profiles.
         [DataMember(Name = "profiles", Order = 8, EmitDefaultValue = false)]
@@ -341,6 +349,10 @@ namespace QuickPane.Models
             var dm = (DialogMode ?? "").Trim().ToLowerInvariant();
             DialogMode = (dm == "beside") ? "beside" : (dm == "off") ? "off" : "same";
             PaneColor = ThemeService.NormalizePaneColorName(PaneColor);
+            // Blank and whitespace both mean "Primary display" (MonitorPicker.PrimaryDisplayId);
+            // normalizing a stray blank to null keeps the field out of a saved settings.json
+            // (EmitDefaultValue = false above only skips an actual null).
+            if (string.IsNullOrWhiteSpace(DesktopDockDisplay)) DesktopDockDisplay = null;
 
             // Profiles: migrate a pre-profiles settings file into one profile built from the top fields.
             if (Profiles == null) Profiles = new List<Profile>();

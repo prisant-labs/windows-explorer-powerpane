@@ -525,6 +525,57 @@ namespace QuickPane.Interop
             return new RECT { Left = 0, Top = 0, Right = GetSystemMetrics(SM_CXSCREEN), Bottom = GetSystemMetrics(SM_CYSCREEN) };
         }
 
+        // ---- enumerating every monitor (the desktop dock's Display picker, #146) --------------
+        // MonitorRectFor/WorkAreaFor above answer "which monitor is hwnd on"; the dock's Display
+        // setting needs the opposite question, "list every monitor so the user can pick one", which
+        // needs EnumDisplayMonitors plus the extended MONITORINFOEX (its szDevice names the monitor's
+        // adapter, e.g. "\\.\DISPLAY2") rather than the plain MONITORINFO above.
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct MONITORINFOEX
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice;
+        }
+
+        public const uint MONITORINFOF_PRIMARY = 0x1;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
+        public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+        // MONITORINFOEX.szDevice ("\\.\DISPLAY2") is only an adapter name and can renumber across a
+        // reboot or a display change, so it is a label, never a stored identity. Asking
+        // EnumDisplayDevices about that adapter, with EDD_GET_DEVICE_INTERFACE_NAME, gives the
+        // monitor's own device-interface path in DeviceID instead, which is what MonitorPicker
+        // stores. DeviceString on the same call is the monitor's friendly name, for the label.
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct DISPLAY_DEVICE
+        {
+            public int cb;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+            public uint StateFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+        }
+
+        public const uint EDD_GET_DEVICE_INTERFACE_NAME = 0x1;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool EnumDisplayDevices(string lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
+
+        // Sent to every top-level window when a monitor is connected, disconnected, rearranged, or
+        // changes resolution. AppBarHost's WndProc hook re-places the dock on it (#146).
+        public const int WM_DISPLAYCHANGE = 0x007E;
+
         /// <summary>Pixels per inch of the monitor holding hwnd. GetDpiForWindow needs Windows 10, so
         /// older builds fall back to the desktop DC, which reports the system DPI.</summary>
         public static int DpiForWindow(IntPtr hwnd)
