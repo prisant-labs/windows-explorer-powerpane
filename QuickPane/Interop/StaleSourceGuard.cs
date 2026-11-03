@@ -134,6 +134,8 @@ namespace QuickPane.Interop
                 // Loaded can fire again for the same window; removing first keeps one hook per source.
                 source.RemoveHook(OwnWindowHook);
                 source.AddHook(OwnWindowHook);
+                // The one trace that this hook is in place, since no test can show a window.
+                Log.Info("stale source guard watches moves of " + window.GetType().Name + " " + source.Handle.ToString("X"));
             }
             catch (Exception ex) { Log.Error("stale source guard window hook", ex); }
         }
