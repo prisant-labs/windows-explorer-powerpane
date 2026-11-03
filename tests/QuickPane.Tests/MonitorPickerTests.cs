@@ -151,8 +151,8 @@ namespace QuickPane.Tests
         [Test]
         public void BuildLabel_NotPrimary_WithFriendlyName()
         {
-            Assert.That(MonitorPicker.BuildLabel(2, false, 1920, 1080, "Dell U2720Q"),
-                Is.EqualTo("Display 2 - 1920 x 1080 - Dell U2720Q"));
+            Assert.That(MonitorPicker.BuildLabel(2, false, 1920, 1080, "Contoso Display 27"),
+                Is.EqualTo("Display 2 - 1920 x 1080 - Contoso Display 27"));
         }
 
         [Test]
@@ -194,9 +194,9 @@ namespace QuickPane.Tests
             // right now -- MonitorPicker.ResolveMonitor is where the fallback-to-primary happens, so
             // the id is still there (and takes effect again) the next time that monitor reconnects.
             var s = AppSettings.CreateDefault();
-            s.DesktopDockDisplay = @"\\?\DISPLAY#Dell U2720Q#demo-id";
+            s.DesktopDockDisplay = @"\\?\DISPLAY#Contoso Display 27#demo-id";
             s.Normalize();
-            Assert.That(s.DesktopDockDisplay, Is.EqualTo(@"\\?\DISPLAY#Dell U2720Q#demo-id"));
+            Assert.That(s.DesktopDockDisplay, Is.EqualTo(@"\\?\DISPLAY#Contoso Display 27#demo-id"));
         }
 
         [Test]

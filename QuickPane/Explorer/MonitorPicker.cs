@@ -75,7 +75,7 @@ namespace QuickPane.Explorer
             return options;
         }
 
-        /// <summary>A label like "Display 2 (primary) - 2560 x 1440 - Dell U2720Q", built the same
+        /// <summary>A label like "Display 2 (primary) - 2560 x 1440 - Contoso Display 27", built the same
         /// way for the real monitor list and for a test's invented one.</summary>
         internal static string BuildLabel(int displayNumber, bool isPrimary, int widthPx, int heightPx, string friendlyName)
         {
