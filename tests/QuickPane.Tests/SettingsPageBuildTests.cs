@@ -149,6 +149,32 @@ namespace QuickPane.Tests
             }
         }
 
+        // ---- every search entry lands on a real control (#164) --------------
+
+        // Card ids a page's search index legitimately points at with nothing to focus (mirrors the
+        // null-CardId entries already in SearchEntries, e.g. About's "App version and licence" --
+        // those are skipped below without needing an entry here, since their CardId is null). A
+        // genuine miss, a non-null CardId no builder ever registered, gets a one-line Register call
+        // in that page's Build() instead of being added to this set.
+        private static readonly HashSet<string> NoFocusTargetAllowed = new HashSet<string>();
+
+        [TestCaseSource(nameof(PageIds))]
+        public void Page_EverySearchEntryCardId_RegistersAFocusTarget(string id)
+        {
+            using (var f = new Fixture())
+            {
+                var page = f.Page(id);
+                page.Build(f.Context());   // Context() calls Cards.BeginPage() first, as the window does
+
+                var missing = page.SearchEntries
+                    .Where(e => e.CardId != null && !NoFocusTargetAllowed.Contains(e.CardId))
+                    .Select(e => e.CardId)
+                    .Where(cardId => !f.Cards.HasFocusTarget(cardId))
+                    .ToList();
+                Assert.That(missing, Is.Empty, "search entries on the " + id + " page with no registered focus target");
+            }
+        }
+
         [Test]
         public void PanePage_DisconnectedSavedDisplay_ComboSelectsItsOwnEntry()
         {

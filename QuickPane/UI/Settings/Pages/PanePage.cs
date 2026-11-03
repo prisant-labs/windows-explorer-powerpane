@@ -98,6 +98,10 @@ namespace QuickPane.UI.Settings.Pages
             // happen to be connected right now (#146).
             var displayCombo = BuildDisplayCombo(ctx, s);
             var displayRow = cards.ChildRow("Display", displayCombo, "Which display the desktop dock sits on");
+            // ChildRow (unlike Card/Expander) takes no cardId and so never registers on its own; the
+            // search box could open this page but never land focus on the combo (#164). Same pattern
+            // as paneColor's manual Register below.
+            cards.Register("desktopDockDisplay", displayCombo);
             dockExpander.AddChild(autoHideRow);
             dockExpander.AddChild(allDesktopsRow);
             dockExpander.AddChild(displayRow);
