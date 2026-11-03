@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+- The desktop dock can sit on the left or the right edge of its display. A new Edge row under the Desktop dock card on the Pane page picks the side; left stays the default, so existing settings keep today's placement ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177)).
+- On an edge that is shared with another display, auto-hide now waits about 300 ms before opening, so moving the pointer from one display to the other no longer flashes the dock open ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177)).
+
 ### Changed
 - Settings now opens on the Pane page. The navigation order is Pane, Pane sections, Groups & profiles, Quick actions, Recent apps, Keyboard, Remote drives, Backup & restore, and About ([#180](https://github.com/prisant-labs/windows-explorer-quickpane/issues/180)).
 - The Settings page for SSH connections is now called Remote drives, which names what you get (a remote folder that shows up as a drive letter) rather than the protocol behind it. A search for "ssh" still finds it.

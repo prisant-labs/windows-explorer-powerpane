@@ -40,6 +40,7 @@ namespace QuickPane.UI.Settings.Pages
                 yield return new SettingsSearchEntry(Id, "paneColor", "Pane color", "A background tint for the pane.", "color", "colour", "swatch", "theme");
                 yield return new SettingsSearchEntry(Id, "desktopDock", "Desktop dock", "A screen-edge dock independent of the window pane.", "dock", "auto-hide", "virtual desktop");
                 yield return new SettingsSearchEntry(Id, "desktopDockDisplay", "Display", "Which display the desktop dock sits on.", "monitor", "screen", "multi-monitor", "multiple monitors");
+                yield return new SettingsSearchEntry(Id, "desktopDockEdge", "Edge", "Which screen edge the desktop dock sits on, left or right.", "left", "right", "side", "dock");
                 yield return new SettingsSearchEntry(Id, "profileTabs", "Profile tabs", "The row of profile tabs under the title.", "profile tabs", "tab row");
             }
         }
@@ -102,12 +103,25 @@ namespace QuickPane.UI.Settings.Pages
             // search box could open this page but never land focus on the combo (#164). Same pattern
             // as paneColor's manual Register below.
             cards.Register("desktopDockDisplay", displayCombo);
+            // Which side of that display (#177). AppBarHost reads it live, like the display choice.
+            var edgeCombo = cards.Combo(
+                new[]
+                {
+                    new KeyValuePair<string, string>("left", "Left"),
+                    new KeyValuePair<string, string>("right", "Right"),
+                },
+                s.DesktopDockEdge ?? "left",
+                v => { s.DesktopDockEdge = v == "right" ? "right" : null; ctx.Settings.Save(); },
+                minWidth: 120);
+            var edgeRow = cards.ChildRow("Edge", edgeCombo, "Which screen edge the desktop dock sits on");
+            cards.Register("desktopDockEdge", edgeCombo);
             dockExpander.AddChild(autoHideRow);
             dockExpander.AddChild(allDesktopsRow);
             dockExpander.AddChild(displayRow);
+            dockExpander.AddChild(edgeRow);
             // Auto-hide, all-desktops, and which display all do nothing while the dock itself is off
             // (#150); grey them out the way the header toggle's own on/off state already implies.
-            cards.LinkEnabled(dockToggle, autoHideRow, allDesktopsRow, displayRow);
+            cards.LinkEnabled(dockToggle, autoHideRow, allDesktopsRow, displayRow, edgeRow);
             panel.Children.Add(dockExpander.Root);
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----
