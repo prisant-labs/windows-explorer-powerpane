@@ -12,6 +12,25 @@ namespace QuickPane.Tests
     [TestFixture]
     public class AppBarHostTests
     {
+        // ---- #184: the grip and chevron follow the dock's edge ----
+
+        [Test]
+        public void ResizeSign_DraggingAGripOutward_Widens()
+        {
+            // A left grip (right-edge dock, beside pane) widens on a leftward, negative change.
+            Assert.That(QuickPane.UI.SidebarControl.ResizeSign(true) * -10, Is.GreaterThan(0));
+            Assert.That(QuickPane.UI.SidebarControl.ResizeSign(false) * 10, Is.GreaterThan(0));
+        }
+
+        [TestCase(false, false, "\uE76B")]
+        [TestCase(true, false, "\uE76C")]
+        [TestCase(false, true, "\uE76C")]
+        [TestCase(true, true, "\uE76B")]
+        public void ToggleGlyph_MirrorsForTheRightEdge(bool collapsed, bool mirrored, string expected)
+        {
+            Assert.That(QuickPane.UI.SidebarControl.ToggleGlyph(collapsed, mirrored), Is.EqualTo(expected));
+        }
+
         private static NM.RECT Rect(int left, int top, int right, int bottom)
         {
             return new NM.RECT { Left = left, Top = top, Right = right, Bottom = bottom };

@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- The desktop dock can sit on the left or the right edge of its display. A new Edge row under the Desktop dock card on the Pane page picks the side; left stays the default, so existing settings keep today's placement ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177)).
+- The desktop dock can sit on the left or the right edge of its display. A new Edge row under the Desktop dock card on the Pane page picks the side; left stays the default, so existing settings keep today's placement. The width grip and the title chevron follow the edge ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177)).
 - On an edge that is shared with another display, auto-hide now waits about 300 ms before opening, so moving the pointer from one display to the other no longer flashes the dock open ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177)).
 - On the Pane sections and Quick actions Settings pages, drag a row by the dotted handle at its left edge to move it, with a line showing where it will land. Press Escape to cancel a drag. Move up and Move down stay for keyboard use ([#178](https://github.com/prisant-labs/windows-explorer-quickpane/issues/178)).
 - Both pages now have a Reset to default button, after a confirmation, that restores the default order and the on/off state of every row. Section names you renamed are kept ([#178](https://github.com/prisant-labs/windows-explorer-quickpane/issues/178)).
