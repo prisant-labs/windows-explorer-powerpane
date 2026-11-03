@@ -481,7 +481,19 @@ namespace QuickPane.UI.Settings
             pill.SetResourceReference(Border.BackgroundProperty, "AccentFillColorDefaultBrush");
             _navPills[page.Id] = pill;
 
-            var icon = new TextBlock { Text = page.Glyph, FontFamily = NavIconFont, FontSize = 16, Width = 16, TextAlignment = TextAlignment.Center };
+            var icon = new TextBlock
+            {
+                Text = page.Glyph,
+                FontFamily = NavIconFont,
+                FontSize = 16,
+                Width = 16,
+                TextAlignment = TextAlignment.Center,
+                // Without this the icon (no VerticalAlignment of its own) stretched to the row's
+                // full height and drew at the top of that box, while the 14 px label beside it
+                // centred in a box sized to its own text -- so the label sat visibly lower than
+                // the icon (#154). Matches QuickActionsSection.BuildRow's icon+label row.
+                VerticalAlignment = VerticalAlignment.Center,
+            };
             icon.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
 
             var label = new TextBlock

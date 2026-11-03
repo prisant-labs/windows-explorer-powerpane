@@ -17,6 +17,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 - About now sits as the last item in the navigation pane's own list, directly under Backup & restore, instead of pinned below it behind a divider ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
 
 ### Fixed
+- A navigation pane item's icon sat slightly above its label instead of centred on the same line ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
 - Turning on the desktop dock with auto-hide off no longer walks the dock across the screen and squeezes every maximized window into a narrow strip at the far edge. The dock now reserves one strip at the monitor's left edge and keeps it through settings changes and taskbar changes ([#145](https://github.com/prisant-labs/windows-explorer-quickpane/issues/145)).
 - The icon at the left of each Settings card is now drawn in the theme's text color. In dark mode it was near-black on a dark card and almost invisible ([#149](https://github.com/prisant-labs/windows-explorer-quickpane/issues/149)).
 
