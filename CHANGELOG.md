@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Settings now opens on the Pane page. The navigation order is Pane, Pane sections, Groups & profiles, Quick actions, Recent apps, Keyboard, Remote drives, Backup & restore, and About ([#180](https://github.com/prisant-labs/windows-explorer-quickpane/issues/180)).
 - The Settings page for SSH connections is now called Remote drives, which names what you get (a remote folder that shows up as a drive letter) rather than the protocol behind it. A search for "ssh" still finds it.
 
 ## [3.11.0.1] - Unreleased
