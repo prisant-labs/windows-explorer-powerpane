@@ -1,8 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [3.11.0.1] - Unreleased
 
-On `main` after 3.11.0.0; these ship in the next release.
+The first published release of the redesigned Settings window. 3.11.0.0 was built as a draft and never published, because a desktop test found the defects fixed below, so this release also carries everything listed under 3.11.0.0.
 
 ### Added
 - A Quick actions section in the pane, off by default: one click to copy the current folder's path (plain, quoted, forward-slash, WSL, or a Markdown link), add a new text file, Markdown file, or dated folder, or open the folder in Windows Terminal (falling back to PowerShell) or Visual Studio Code. Turn it on from the new Quick actions Settings page, which also enables, disables, and reorders each action; a pinned folder's right-click menu offers the same actions against that folder. Inside a file dialog, or on the desktop dock, the section stays hidden, since neither has a current folder the way an Explorer window does.
@@ -16,6 +16,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 - Renaming, moving, merging, adding, and deleting groups, tabs, and pins from the pane now happens in the background, so a groups folder on a slow or network disk no longer freezes Explorer during an edit. An edit started just before a profile switch is dropped instead of landing in the other profile, and checking whether a drop on the pane holds folders gives up after a short wait instead of the network timeout ([#75](https://github.com/prisant-labs/windows-explorer-quickpane/issues/75)).
 - Each row on the Pane sections page is now a compact, single-line card instead of a full two-line one, since the On/Off switch already says whether the section shows ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
 - About now sits as the last item in the navigation pane's own list, directly under Backup & restore, instead of pinned below it behind a divider ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
+- Settings changes are now written to `settings.json` in the background, so a slow or redirected AppData folder no longer freezes the Settings window or stalls Explorer. QuickPane waits for the last write before it exits and before it makes a backup, and a backup now reports "Backup failed" if the settings could not be written, instead of saving an older copy ([#163](https://github.com/prisant-labs/windows-explorer-quickpane/issues/163)).
 
 ### Fixed
 - A beside pane (a "Beside Explorer window" pane, or a dialog's pane after it was moved or forced beside) no longer trails behind the window it follows while that window is dragged. It now hides for the length of the drag and reappears in place once the drag ends ([#147](https://github.com/prisant-labs/windows-explorer-quickpane/issues/147)).
@@ -27,8 +28,15 @@ On `main` after 3.11.0.0; these ship in the next release.
 - The Settings Pane page shows its icons again, in the navigation pane and on the Pane mode, File dialogs, Desktop dock, and Profile tabs cards. An edit made for the pane color card had emptied them ([#134](https://github.com/prisant-labs/windows-explorer-quickpane/issues/134)).
 - QuickPane now guards against a crash that could end it after Explorer restarts. When a window it draws into loses the window above it, QuickPane releases that window's content before Windows text input can trip over the dead handle ([#148](https://github.com/prisant-labs/windows-explorer-quickpane/issues/148)).
 - Opening Settings no longer logs a "Specified index is already in use" crash, and each profile on the Groups page now shows its group count instead of staying at "Loading groups…" ([#143](https://github.com/prisant-labs/windows-explorer-quickpane/issues/143)).
+- The guard against the crash after an Explorer restart now also checks whenever any window closes, and whenever one of QuickPane's own windows starts to move, so a pane whose host window vanished is released sooner. The once-a-second check also keeps running while QuickPane is busy, which it is during an Explorer restart ([#159](https://github.com/prisant-labs/windows-explorer-quickpane/issues/159), [#148](https://github.com/prisant-labs/windows-explorer-quickpane/issues/148)).
+- A beside pane stays hidden for the whole of a keyboard move of the window it follows (Alt+Space, Move, then the arrow keys) and of a drag with the mouse buttons swapped, instead of reappearing after 4 seconds in the middle of the move ([#161](https://github.com/prisant-labs/windows-explorer-quickpane/issues/161)).
+- When the display chosen for the desktop dock is disconnected, the Display row now shows "Saved display (not connected)" instead of pretending "Primary display" is chosen, so picking "Primary display" really switches the dock to it ([#162](https://github.com/prisant-labs/windows-explorer-quickpane/issues/162)).
+- Choosing the Display result in Settings search now moves keyboard focus to the Display box, as every other result does ([#164](https://github.com/prisant-labs/windows-explorer-quickpane/issues/164)).
+- In a high-contrast theme, a switch that is On but greyed out, such as Auto-hide while Desktop dock is off, keeps its outline instead of fading into the card behind it ([#165](https://github.com/prisant-labs/windows-explorer-quickpane/issues/165)).
 
-## [3.11.0.0] - Unreleased
+## [3.11.0.0] - 2026-10-30
+
+Never published as a release. A desktop test of its draft found defects, and its changes first ship in 3.11.0.1.
 
 Settings is now a Windows 11 Settings-style window, with its own navigation pane, search box, and cards, in place of the old tabbed panel.
 
