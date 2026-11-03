@@ -420,6 +420,30 @@ namespace QuickPane.UI.Settings
             return panel;
         }
 
+        // ---- dependent rows ----------------------------------------------
+
+        /// <summary>Greys each row in <paramref name="rows"/> while <paramref name="parentToggle"/>
+        /// (the value <see cref="Toggle"/> returned for the card's own on/off switch) is off, and
+        /// un-greys them when it is on, leaving the rows' stored values untouched either way --
+        /// Windows Settings greys a dependent control the same way while its parent switch is off
+        /// (#150). Safe to call with any <see cref="FrameworkElement"/> that stashes its real
+        /// <c>ToggleButton</c> in <c>Tag</c> the way <see cref="Toggle"/> does; does nothing if it
+        /// does not.</summary>
+        public void LinkEnabled(FrameworkElement parentToggle, params UIElement[] rows)
+        {
+            var button = parentToggle?.Tag as ToggleButton ?? parentToggle as ToggleButton;
+            if (button == null || rows == null) return;
+            Action sync = () =>
+            {
+                bool on = button.IsChecked == true;
+                foreach (var row in rows)
+                    if (row != null) row.IsEnabled = on;
+            };
+            button.Checked += (s, e) => sync();
+            button.Unchecked += (s, e) => sync();
+            sync();
+        }
+
         // ---- number box -------------------------------------------------
 
         /// <summary>A text box with stacked up/down chevrons, clamped to [<paramref name="min"/>,

@@ -22,7 +22,9 @@ namespace QuickPane.UI.Settings.Pages
     /// a child row). Every setting here reads and writes the same <see cref="AppSettings"/> field,
     /// with the same values and the same immediate <c>SettingsStore.Save()</c>, as the matching
     /// handler in <c>SettingsPanel.xaml.cs</c> at commit 068301b (<c>PaneModeBlock</c>,
-    /// <c>DialogModeBlock</c>, <c>DockBlock</c>, <c>ProfileTabsBlock</c>).</summary>
+    /// <c>DialogModeBlock</c>, <c>DockBlock</c>, <c>ProfileTabsBlock</c>). Each expander's dependent
+    /// child rows grey out while its own header toggle is off, via <c>SettingsCards.LinkEnabled</c>,
+    /// matching how Windows Settings treats a dependent control (#150).</summary>
     internal sealed class PanePage : SettingsPage
     {
         public override string Id => "pane";
@@ -84,17 +86,23 @@ namespace QuickPane.UI.Settings.Pages
             var dockToggle = cards.Toggle(s.DesktopDock, on => { s.DesktopDock = on; ctx.Settings.Save(); });
             var dockExpander = cards.Expander("desktopDock", "", "Desktop dock",
                 "Pin a small dock to a screen edge", dockToggle, accessibleName: "Show desktop dock");
-            dockExpander.AddChild(cards.ChildRow("Auto-hide (slide out on hover)",
+            var autoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
                 cards.Toggle(s.DesktopDockAutoHide, on => { s.DesktopDockAutoHide = on; ctx.Settings.Save(); }),
-                "Auto-hide the desktop dock"));
-            dockExpander.AddChild(cards.ChildRow("Show on all virtual desktops",
+                "Auto-hide the desktop dock");
+            var allDesktopsRow = cards.ChildRow("Show on all virtual desktops",
                 cards.Toggle(s.DesktopDockAllDesktops, on => { s.DesktopDockAllDesktops = on; ctx.Settings.Save(); }),
-                "Show the desktop dock on all virtual desktops"));
+                "Show the desktop dock on all virtual desktops");
             // Always shown, even with one monitor connected: it then just lists that one monitor
             // plus "Primary display", which keeps the row's presence (and search entry) the same on
             // every machine rather than making the Pane page's layout depend on how many displays
             // happen to be connected right now (#146).
-            dockExpander.AddChild(cards.ChildRow("Display", BuildDisplayCombo(ctx, s), "Which display the desktop dock sits on"));
+            var displayRow = cards.ChildRow("Display", BuildDisplayCombo(ctx, s), "Which display the desktop dock sits on");
+            dockExpander.AddChild(autoHideRow);
+            dockExpander.AddChild(allDesktopsRow);
+            dockExpander.AddChild(displayRow);
+            // Auto-hide, all-desktops, and which display all do nothing while the dock itself is off
+            // (#150); grey them out the way the header toggle's own on/off state already implies.
+            cards.LinkEnabled(dockToggle, autoHideRow, allDesktopsRow, displayRow);
             panel.Children.Add(dockExpander.Root);
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----
@@ -102,9 +110,12 @@ namespace QuickPane.UI.Settings.Pages
             var tabsExpander = cards.Expander("profileTabs", "", "Profile tabs",
                 "The row appears once there are two or more profiles.", tabsToggle,
                 accessibleName: "Show profiles tab row");
-            tabsExpander.AddChild(cards.ChildRow("Auto-hide (slide out on hover)",
+            var tabsAutoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
                 cards.Toggle(s.ProfileTabsAutoHide, on => { s.ProfileTabsAutoHide = on; ctx.Settings.Save(); }),
-                "Auto-hide the profiles tab row"));
+                "Auto-hide the profiles tab row");
+            tabsExpander.AddChild(tabsAutoHideRow);
+            // Auto-hide does nothing while the tab row itself is off (#150).
+            cards.LinkEnabled(tabsToggle, tabsAutoHideRow);
             panel.Children.Add(tabsExpander.Root);
 
             return panel;
