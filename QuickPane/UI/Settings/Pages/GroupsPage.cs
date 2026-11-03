@@ -75,11 +75,7 @@ namespace QuickPane.UI.Settings.Pages
                 panel.Children.Add(placeholder);
                 int rowSlot = panel.Children.Count - 1;
 
-                LoadGroups(ctx, root, groups =>
-                {
-                    if (rowSlot >= panel.Children.Count) return;
-                    panel.Children[rowSlot] = ProfileCard(ctx, index, p, groups.Count);
-                });
+                LoadGroups(ctx, root, groups => ReplaceChild(panel, rowSlot, ProfileCard(ctx, index, p, groups.Count)));
             }
 
             var addButton = new Button { Content = "Add profile" };
@@ -93,6 +89,18 @@ namespace QuickPane.UI.Settings.Pages
                 "Start another independent workspace with its own groups.", addButton, "Add profile"));
 
             return panel;
+        }
+
+        /// <summary>Puts <paramref name="element"/> in place of the child at <paramref name="slot"/>,
+        /// or does nothing when the slot is gone. Assigning through <c>Children[slot]</c> throws
+        /// "Specified index is already in use" whenever the slot is occupied, which it always is
+        /// here, so every Settings open logged a crash and left each profile at "Loading groups…"
+        /// (#143). Removing first frees the slot.</summary>
+        internal static void ReplaceChild(Panel panel, int slot, UIElement element)
+        {
+            if (slot < 0 || slot >= panel.Children.Count) return;
+            panel.Children.RemoveAt(slot);
+            panel.Children.Insert(slot, element);
         }
 
         /// <summary>One profile's row on the top-level page. <paramref name="groupCount"/> is null

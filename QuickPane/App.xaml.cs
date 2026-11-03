@@ -5,6 +5,7 @@ using System.Windows;
 using WinForms = System.Windows.Forms;
 using Drawing = System.Drawing;
 using QuickPane.Explorer;
+using QuickPane.Interop;
 using QuickPane.Models;
 using QuickPane.Services;
 using QuickPane.UI;
@@ -32,6 +33,7 @@ namespace QuickPane
         private AppBarHost _appbar;
         private RecentTracker _recentTracker;
         private DialogPaneWatcher _dialogPanes;
+        private StaleSourceGuard _staleSources;
         private Window _settingsWindow;
 
         // Process-wide services. Set once during normal startup.
@@ -189,6 +191,11 @@ namespace QuickPane
 
             _recentTracker = new RecentTracker();
             _recentTracker.Start();   // records the folder of whichever Explorer window is browsed
+
+            // Before any pane exists, so no window of ours is ever left where a dead parent can
+            // crash WPF's text-input hook (#148).
+            _staleSources = new StaleSourceGuard();
+            _staleSources.Start();
 
             _dialogPanes = new DialogPaneWatcher();
             _dialogPanes.Start();     // adds a pane beside file Open/Save dialogs, in every pane mode
@@ -454,6 +461,7 @@ namespace QuickPane
             try { Recents?.Dispose(); } catch (Exception ex) { Log.Error("recents dispose", ex); }
             try { Groups?.Dispose(); } catch (Exception ex) { Log.Error("groups dispose", ex); }
             try { Theme?.Dispose(); } catch (Exception ex) { Log.Error("theme dispose", ex); }
+            try { _staleSources?.Dispose(); } catch (Exception ex) { Log.Error("stale source guard dispose", ex); }
 
             if (_tray != null)
             {
