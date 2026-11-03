@@ -87,6 +87,13 @@ namespace QuickPane.Interop
         public const int WM_KEYUP = 0x0101;
         public const int WM_CHAR = 0x0102;
         public const int VK_RETURN = 0x0D;
+        public const int VK_LBUTTON = 0x01;
+
+        // Whether the left mouse button is down right now, independent of any window's message
+        // queue. The drag-safety sweep uses this to tell a drag still in progress from one whose
+        // MOVESIZEEND never arrived (#147).
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(int vKey);
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
