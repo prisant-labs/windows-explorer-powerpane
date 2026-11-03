@@ -19,7 +19,7 @@ namespace QuickPane.UI.Settings.Pages
 
     /// <summary>App header, an Updates card (status, "Check for updates", Download when an update
     /// exists), a Links card (source, release notes, report an issue), a Licence card, and a
-    /// Third-party notices card. Pinned to the bottom of the navigation pane.</summary>
+    /// Third-party notices card. Last item in the navigation pane.</summary>
     internal sealed class AboutPage : SettingsPage
     {
         public override string Id => "about";
