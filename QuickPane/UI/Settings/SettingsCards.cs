@@ -403,6 +403,51 @@ namespace QuickPane.UI.Settings
 
         // ---- toggle switch --------------------------------------------------
 
+        /// <summary>The track's fill brush key, border brush key, and border thickness that
+        /// <see cref="Toggle"/> paints for a given on/off and enabled state. Pulled out of its paint
+        /// lambda so the key choice is unit-testable on its own (see
+        /// <c>tests/QuickPane.Tests/DependentRowDisabledLookTests.cs</c>): WPF brush *resolution*
+        /// still needs a live visual tree, which that test fakes with substitute brushes, but this
+        /// method's job is only to pick the keys.
+        ///
+        /// The disabled-On track gets a border it did not have before (#165): without one, its fill
+        /// (<c>AccentFillColorDisabledBrush</c>) is <c>HC.xaml</c>'s window colour in the
+        /// high-contrast theme, the same colour as the card behind it, so the whole track vanished
+        /// and only the grey thumb was left. The border uses <c>ControlStrongStrokeColorDisabledBrush</c>
+        /// - the same key the disabled-Off track already borders with - rather than a new key,
+        /// because in the Light and Dark themes that key happens to resolve to the exact colour the
+        /// On track's own disabled fill does, so the border is invisible there: AC.2 ("light and
+        /// dark look the same as before") holds without a per-theme branch. Only high contrast, where
+        /// the two keys diverge (<c>ControlStrongStrokeColorDisabledBrush</c> is the button-text
+        /// colour there, not the window colour), gets a visible outline. A <c>null</c> key means "no
+        /// resource reference for this slot" - the Off track has no fill, and the enabled-On track
+        /// has no border (<see cref="BorderThickness"/> zero makes the brush moot either way).</summary>
+        internal struct ToggleTrackLook
+        {
+            public string FillKey;
+            public string BorderKey;
+            public Thickness BorderThickness;
+        }
+
+        internal static ToggleTrackLook TrackLook(bool isOn, bool isEnabled)
+        {
+            if (!isOn)
+            {
+                return new ToggleTrackLook
+                {
+                    FillKey = null,
+                    BorderKey = isEnabled ? "ControlStrongStrokeColorDefaultBrush" : "ControlStrongStrokeColorDisabledBrush",
+                    BorderThickness = new Thickness(1)
+                };
+            }
+            return new ToggleTrackLook
+            {
+                FillKey = isEnabled ? "AccentFillColorDefaultBrush" : "AccentFillColorDisabledBrush",
+                BorderKey = isEnabled ? null : "ControlStrongStrokeColorDisabledBrush",
+                BorderThickness = isEnabled ? new Thickness(0) : new Thickness(1)
+            };
+        }
+
         /// <summary>A 40x20 pill toggle switch with "On"/"Off" text to its left, as the Settings app
         /// draws it. Pass the result as a card's or child row's <c>control</c>.</summary>
         public FrameworkElement Toggle(bool isOn, Action<bool> onChanged, string accessibleName = null)
@@ -427,28 +472,30 @@ namespace QuickPane.UI.Settings
 
             // Painted in code, so the disabled look has to be too: a switch greyed by LinkEnabled
             // (#150) otherwise stayed accent-blue and read as active. The keys are the ones WinUI's
-            // ToggleSwitch uses for its Disabled state.
+            // ToggleSwitch uses for its Disabled state (see TrackLook for the On track's border,
+            // added for #165).
             Action paint = () =>
             {
                 bool on = button.IsChecked == true;
                 bool enabled = button.IsEnabled;
                 label.Text = on ? "On" : "Off";
                 label.SetResourceReference(TextBlock.ForegroundProperty, enabled ? "TextFillColorSecondaryBrush" : "TextFillColorDisabledBrush");
+
+                var look = TrackLook(on, enabled);
+                track.BorderThickness = look.BorderThickness;
+                if (look.FillKey != null) track.SetResourceReference(Border.BackgroundProperty, look.FillKey);
+                else track.Background = Brushes.Transparent;
+                if (look.BorderKey != null) track.SetResourceReference(Border.BorderBrushProperty, look.BorderKey);
+
                 if (on)
                 {
-                    track.SetResourceReference(Border.BackgroundProperty, enabled ? "AccentFillColorDefaultBrush" : "AccentFillColorDisabledBrush");
-                    track.BorderThickness = new Thickness(0);
                     thumb.SetResourceReference(Shape.FillProperty, enabled ? "TextOnAccentFillColorPrimaryBrush" : "TextOnAccentFillColorDisabledBrush");
                     thumb.HorizontalAlignment = HorizontalAlignment.Right;
                     thumb.Margin = new Thickness(0, 0, 3, 0);
                 }
                 else
                 {
-                    track.Background = Brushes.Transparent;
-                    track.BorderThickness = new Thickness(1);
-                    string stroke = enabled ? "ControlStrongStrokeColorDefaultBrush" : "ControlStrongStrokeColorDisabledBrush";
-                    track.SetResourceReference(Border.BorderBrushProperty, stroke);
-                    thumb.SetResourceReference(Shape.FillProperty, stroke);
+                    thumb.SetResourceReference(Shape.FillProperty, look.BorderKey);
                     thumb.HorizontalAlignment = HorizontalAlignment.Left;
                     thumb.Margin = new Thickness(3, 0, 0, 0);
                 }
