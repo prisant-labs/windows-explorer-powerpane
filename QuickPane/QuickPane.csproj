@@ -308,6 +308,7 @@
     </Compile>
     <Compile Include="UI\Settings\SettingsWindow.cs" />
     <Compile Include="UI\Settings\SettingsCards.cs" />
+    <Compile Include="UI\Settings\ReorderDrag.cs" />
     <Compile Include="UI\Settings\SettingsSearch.cs" />
     <Compile Include="UI\Settings\Pages\GroupsPage.cs" />
     <Compile Include="UI\Settings\Pages\PanePage.cs" />

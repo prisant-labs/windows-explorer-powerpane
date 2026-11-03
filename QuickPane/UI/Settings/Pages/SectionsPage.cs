@@ -57,6 +57,7 @@ namespace QuickPane.UI.Settings.Pages
             var ordered = OrderedSections(ctx.Settings.Current);
             Button refocusUp = null, refocusDown = null;
             Control refocusToggle = null;
+            var rowWrappers = new List<FrameworkElement>();   // one per row, read by each grip while dragging (#178)
 
             var note = new TextBlock
             {
@@ -118,8 +119,33 @@ namespace QuickPane.UI.Settings.Pages
 
                 // No description: the On/Off switch already says whether the section shows, so
                 // CompactCard's single-line row replaces Card's two-line one (#154).
-                panel.Children.Add(cards.CompactCard("section-" + sec.Type, "\uE8FD", friendly, controls));
+                var card = cards.CompactCard("section-" + sec.Type, "\uE8FD", friendly, controls);
+
+                // Drag grip at the row's left edge (#178). The grip lives in a wrapper beside the card,
+                // so the card itself stays the one registered for search focus.
+                var grip = ReorderDrag.CreateGrip("Drag to reorder " + friendly, rowWrappers, panel, index, (fromIndex, toIndex) =>
+                {
+                    if (MoveSectionTo(ordered, fromIndex, toIndex))
+                    {
+                        ctx.Settings.Save();
+                        // direction 0 lands focus on the moved row's toggle: the grip is not a tab stop.
+                        Populate(panel, ctx, sec.Type, 0);
+                    }
+                });
+                var wrapper = new Grid();
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grip.Margin = new Thickness(0, 0, 4, 4);   // bottom 4 matches the card's own bottom margin
+                grip.VerticalAlignment = VerticalAlignment.Stretch;
+                Grid.SetColumn(grip, 0);
+                Grid.SetColumn(card, 1);
+                wrapper.Children.Add(grip);
+                wrapper.Children.Add(card);
+                rowWrappers.Add(wrapper);
+                panel.Children.Add(wrapper);
             }
+
+            panel.Children.Add(BuildResetRow(panel, ctx));
 
             Control refocusButton = refocusDirection == 0
                 ? refocusToggle
@@ -136,6 +162,72 @@ namespace QuickPane.UI.Settings.Pages
                     Keyboard.Focus(target);
                 }));
             }
+        }
+
+        // ---- reset to default (#178) ----
+
+        /// <summary>The Reset to default button and the inline confirmation slot under it. Confirmation
+        /// is inline (<see cref="SettingsCards.ConfirmRow"/>), never a MessageBox, like Groups and SSH.</summary>
+        private FrameworkElement BuildResetRow(StackPanel panel, SettingsPageContext ctx)
+        {
+            var host = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+            var slot = new StackPanel();
+            var reset = new Button { Content = "Reset to default", HorizontalAlignment = HorizontalAlignment.Left };
+            SettingsCards.SetAccessibleName(reset, "Reset pane sections to default");
+            reset.Click += (s, e) =>
+            {
+                slot.Children.Clear();
+                slot.Children.Add(ctx.Cards.ConfirmRow(
+                    "Restore the default order and on/off state of every pane section? Section names you renamed are kept.",
+                    "Reset",
+                    onConfirm: () =>
+                    {
+                        var current = ctx.Settings.Current;
+                        current.Sections = ResetSections(current.Sections);
+                        ctx.Settings.Save();
+                        Populate(panel, ctx, null, 0);
+                    },
+                    onCancel: () => slot.Children.Clear()));
+            };
+            host.Children.Add(reset);
+            host.Children.Add(slot);
+            return host;
+        }
+
+        /// <summary>The list <paramref name="current"/> becomes after Reset to default: every section
+        /// the app seeds (<see cref="AppSettings.CreateDefault"/>, the same list a fresh install starts
+        /// from, so a section added in a later version resets correctly) gets its default Order and
+        /// Visible, and keeps its existing <see cref="SectionSetting.Title"/> if the user renamed it.
+        /// A section type the defaults do not know (an entry from a newer version, after a downgrade) is
+        /// left untouched and placed after the defaults rather than dropped. Returns a new list sorted
+        /// by Order; the input list is not changed except for an unknown entry's Order.</summary>
+        internal static List<SectionSetting> ResetSections(List<SectionSetting> current)
+        {
+            var defaults = AppSettings.CreateDefault().Sections;
+            var result = new List<SectionSetting>();
+            var seen = new HashSet<string>(System.StringComparer.Ordinal);
+            foreach (var def in defaults)
+            {
+                var existing = current == null ? null : current.FirstOrDefault(x => x != null && x.Type == def.Type);
+                seen.Add(def.Type);
+                result.Add(new SectionSetting
+                {
+                    Type = def.Type,
+                    Visible = def.Visible,
+                    Order = def.Order,
+                    Title = existing != null ? existing.Title : null,
+                });
+            }
+            if (current != null)
+            {
+                int next = defaults.Max(d => d.Order) + 1;
+                foreach (var extra in current.Where(x => x != null && x.Type != null && !seen.Contains(x.Type)).OrderBy(x => x.Order).ToList())
+                {
+                    if (!seen.Add(extra.Type)) continue;
+                    result.Add(new SectionSetting { Type = extra.Type, Visible = extra.Visible, Order = next++, Title = extra.Title });
+                }
+            }
+            return result.OrderBy(x => x.Order).ToList();
         }
 
         // ---- reorder logic (unit-tested since it moved out of the UI) ----
@@ -164,14 +256,24 @@ namespace QuickPane.UI.Settings.Pages
         /// unit-testable with no <c>SettingsStore</c> at all.</summary>
         internal static bool MoveSection(List<SectionSetting> ordered, int index, int direction)
         {
-            if (ordered == null) return false;
-            int target = index + direction;
-            if (index < 0 || index >= ordered.Count) return false;
-            if (target < 0 || target >= ordered.Count) return false;
+            return MoveSectionTo(ordered, index, index + direction);
+        }
 
-            var moved = ordered[index];
-            ordered.RemoveAt(index);
-            ordered.Insert(target, moved);
+        /// <summary>The one place a section changes position, shared by Move up/down (to = from +/- 1)
+        /// and a drag-drop (any to, #178): takes <paramref name="ordered"/>[<paramref name="from"/>] out
+        /// and puts it at index <paramref name="to"/>, then renumbers every Order 0..n-1 as described on
+        /// <see cref="MoveSection"/>. Returns false, changing nothing, when either index is out of range
+        /// or they are equal (nothing to move).</summary>
+        internal static bool MoveSectionTo(List<SectionSetting> ordered, int from, int to)
+        {
+            if (ordered == null) return false;
+            if (from < 0 || from >= ordered.Count) return false;
+            if (to < 0 || to >= ordered.Count) return false;
+            if (from == to) return false;
+
+            var moved = ordered[from];
+            ordered.RemoveAt(from);
+            ordered.Insert(to, moved);
 
             for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
             return true;

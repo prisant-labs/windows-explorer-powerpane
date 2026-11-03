@@ -64,8 +64,52 @@ namespace QuickPane.UI.Settings.Pages
             var rows = new StackPanel();
             panel.Children.Add(rows);
             Populate(rows, ctx, null, 0);
+            panel.Children.Add(BuildResetRow(rows, ctx));
 
             return panel;
+        }
+
+        // ---- reset to default (#178) ----
+
+        /// <summary>The Reset to default button and its inline confirmation slot, under the action
+        /// rows. It lives in the page panel, not <paramref name="rows"/>, so an in-place Populate does
+        /// not wipe an open confirmation.</summary>
+        private FrameworkElement BuildResetRow(StackPanel rows, SettingsPageContext ctx)
+        {
+            var host = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
+            var slot = new StackPanel();
+            var reset = new Button { Content = "Reset to default", HorizontalAlignment = HorizontalAlignment.Left };
+            SettingsCards.SetAccessibleName(reset, "Reset quick actions to default");
+            reset.Click += (s, e) =>
+            {
+                slot.Children.Clear();
+                slot.Children.Add(ctx.Cards.ConfirmRow(
+                    "Restore the default order and on/off state of every quick action? The Show Quick actions switch is not changed.",
+                    "Reset",
+                    onConfirm: () =>
+                    {
+                        ctx.Settings.Current.QuickActions = ResetActions();
+                        ctx.Settings.Save();
+                        slot.Children.Clear();
+                        Populate(rows, ctx, null, 0);
+                    },
+                    onCancel: () => slot.Children.Clear()));
+            };
+            host.Children.Add(reset);
+            host.Children.Add(slot);
+            return host;
+        }
+
+        /// <summary>The list Reset to default produces: every built-in action in
+        /// <see cref="QuickActionLibrary.All"/>'s own order, all enabled -- the same source and the same
+        /// defaults <c>AppSettings.Normalize</c> uses to seed a missing action, so an action added in a
+        /// later version resets correctly. Takes no input: an action has no user-edited field (its name
+        /// lives in the library) to carry over.</summary>
+        internal static List<QuickActionSetting> ResetActions()
+        {
+            return QuickActionLibrary.All
+                .Select(d => new QuickActionSetting { Id = d.Id, Enabled = true })
+                .ToList();
         }
 
         /// <summary>(Re)builds every action row into <paramref name="panel"/>, same reasoning as
@@ -80,6 +124,7 @@ namespace QuickPane.UI.Settings.Pages
             var list = ActionList(ctx.Settings.Current);
             Button refocusUp = null, refocusDown = null;
             Control refocusToggle = null;
+            var rowWrappers = new List<FrameworkElement>();   // one per row, read by each grip while dragging (#178)
 
             for (int i = 0; i < list.Count; i++)
             {
@@ -132,7 +177,29 @@ namespace QuickPane.UI.Settings.Pages
                 controls.Children.Add(up);
                 controls.Children.Add(down);
 
-                panel.Children.Add(cards.Card("action-" + setting.Id, "", name, description, controls));
+                var card = cards.Card("action-" + setting.Id, "", name, description, controls);
+
+                // Drag grip at the row's left edge (#178); see SectionsPage.Populate. Moves by id, not
+                // by captured index, for the staleness reason on FindActionById.
+                var grip = ReorderDrag.CreateGrip("Drag to reorder " + name, rowWrappers, panel, index, (fromIndex, toIndex) =>
+                {
+                    if (MoveActionByIdTo(ctx.Settings.Current, id, toIndex))
+                    {
+                        ctx.Settings.Save();
+                        Populate(panel, ctx, id, 0);   // 0 lands focus on the moved row's toggle
+                    }
+                });
+                var wrapper = new Grid();
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grip.Margin = new Thickness(0, 0, 4, 4);   // bottom 4 matches the card's own bottom margin
+                grip.VerticalAlignment = VerticalAlignment.Stretch;
+                Grid.SetColumn(grip, 0);
+                Grid.SetColumn(card, 1);
+                wrapper.Children.Add(grip);
+                wrapper.Children.Add(card);
+                rowWrappers.Add(wrapper);
+                panel.Children.Add(wrapper);
             }
 
             Control refocusButton = refocusDirection == 0
@@ -186,20 +253,38 @@ namespace QuickPane.UI.Settings.Pages
             return index >= 0 && MoveAction(list, index, direction);
         }
 
+        /// <summary>A drag-drop's version of <see cref="MoveActionById"/>: moves the action with
+        /// <paramref name="id"/> to index <paramref name="to"/> of the live list (#178).</summary>
+        internal static bool MoveActionByIdTo(AppSettings settings, string id, int to)
+        {
+            var list = ActionList(settings);
+            int index = list.FindIndex(a => string.Equals(a.Id, id, System.StringComparison.Ordinal));
+            return index >= 0 && MoveActionTo(list, index, to);
+        }
+
         /// <summary>Moves <paramref name="list"/>[<paramref name="index"/>] one slot in
         /// <paramref name="direction"/> (-1 for Move up, +1 for Move down). Returns false, changing
         /// nothing, when <paramref name="index"/> or its neighbour is out of range -- the first row
         /// has no "up" and the last has no "down".</summary>
         internal static bool MoveAction(List<QuickActionSetting> list, int index, int direction)
         {
-            if (list == null) return false;
-            int target = index + direction;
-            if (index < 0 || index >= list.Count) return false;
-            if (target < 0 || target >= list.Count) return false;
+            return MoveActionTo(list, index, index + direction);
+        }
 
-            var moved = list[index];
-            list.RemoveAt(index);
-            list.Insert(target, moved);
+        /// <summary>The one place an action changes position, shared by Move up/down (to = from +/- 1)
+        /// and a drag-drop (any to, #178): removes <paramref name="list"/>[<paramref name="fromIndex"/>]
+        /// and inserts it at <paramref name="toIndex"/>. Returns false, changing nothing, when either
+        /// index is out of range or they are equal.</summary>
+        internal static bool MoveActionTo(List<QuickActionSetting> list, int fromIndex, int toIndex)
+        {
+            if (list == null) return false;
+            if (fromIndex < 0 || fromIndex >= list.Count) return false;
+            if (toIndex < 0 || toIndex >= list.Count) return false;
+            if (fromIndex == toIndex) return false;
+
+            var moved = list[fromIndex];
+            list.RemoveAt(fromIndex);
+            list.Insert(toIndex, moved);
             return true;
         }
     }
