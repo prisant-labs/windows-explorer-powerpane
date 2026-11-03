@@ -541,7 +541,7 @@ namespace QuickPane.Explorer
             catch (Exception ex) { Log.Error("DialogInsidePane restore", ex); }
             try { Repaint(); } catch { }
             try { _sidebar?.Detach(); } catch (Exception ex) { Log.Error("sidebar detach", ex); }
-            try { _host?.Dispose(); } catch { }
+            try { _host?.Dispose(); } catch (Exception ex) { Log.Error("dialog pane host dispose", ex); }
             _host = null; _sidebar = null;
             Log.Activity("idle");
         }
