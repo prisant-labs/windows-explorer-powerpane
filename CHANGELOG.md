@@ -17,6 +17,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 - About now sits as the last item in the navigation pane's own list, directly under Backup & restore, instead of pinned below it behind a divider ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
 
 ### Fixed
+- A beside pane (a "Beside Explorer window" pane, or a dialog's pane after it was moved or forced beside) no longer trails behind the window it follows while that window is dragged. It now hides for the length of the drag and reappears in place once the drag ends ([#147](https://github.com/prisant-labs/windows-explorer-quickpane/issues/147)).
 - A navigation pane item's icon sat slightly above its label instead of centred on the same line ([#154](https://github.com/prisant-labs/windows-explorer-quickpane/issues/154)).
 - Keyboard focus on a navigation pane item drew thin lines above and below it, across the full width of the column, instead of a ring around the item's own rounded highlight ([#150](https://github.com/prisant-labs/windows-explorer-quickpane/issues/150)).
 - Turning on the desktop dock with auto-hide off no longer walks the dock across the screen and squeezes every maximized window into a narrow strip at the far edge. The dock now reserves one strip at the monitor's left edge and keeps it through settings changes and taskbar changes ([#145](https://github.com/prisant-labs/windows-explorer-quickpane/issues/145)).
