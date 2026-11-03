@@ -27,8 +27,8 @@ namespace QuickPane.UI.Settings.Pages
     /// inventory, and an "Add a connection" card.</summary>
     internal sealed class SshPage : SettingsPage
     {
-        private const string PageGlyph = "";   // Globe
-        private const string DeleteGlyph = ""; // Delete (trash can)
+        private const string PageGlyph = "\uE968";   // Globe
+        private const string DeleteGlyph = "\uE74D"; // Delete (trash can)
 
         // Instance state survives across Build() calls because SettingsWindow keeps one SshPage
         // for the window's lifetime (see BuildPages()) and calls Build() again on every open,

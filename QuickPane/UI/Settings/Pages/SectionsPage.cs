@@ -25,7 +25,7 @@ namespace QuickPane.UI.Settings.Pages
     {
         public override string Id => "sections";
         public override string Title => "Pane sections";
-        public override string Glyph => "";   // Segoe Fluent Icons Bulleted list
+        public override string Glyph => "\uE8FD";   // Segoe Fluent Icons Bulleted list
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
@@ -83,7 +83,7 @@ namespace QuickPane.UI.Settings.Pages
                     Populate(panel, ctx, sec.Type, 0);
                 }, "Show " + friendly + " in the pane");
 
-                var up = cards.IconButton("", "Move " + friendly + " up", () =>
+                var up = cards.IconButton("\uE971", "Move " + friendly + " up", () =>
                 {
                     if (MoveSection(ordered, index, -1))
                     {
@@ -91,7 +91,7 @@ namespace QuickPane.UI.Settings.Pages
                         Populate(panel, ctx, sec.Type, -1);
                     }
                 });
-                var down = cards.IconButton("", "Move " + friendly + " down", () =>
+                var down = cards.IconButton("\uE972", "Move " + friendly + " down", () =>
                 {
                     if (MoveSection(ordered, index, 1))
                     {
@@ -118,7 +118,7 @@ namespace QuickPane.UI.Settings.Pages
 
                 // No description: the On/Off switch already says whether the section shows, so
                 // CompactCard's single-line row replaces Card's two-line one (#154).
-                panel.Children.Add(cards.CompactCard("section-" + sec.Type, "", friendly, controls));
+                panel.Children.Add(cards.CompactCard("section-" + sec.Type, "\uE8FD", friendly, controls));
             }
 
             Control refocusButton = refocusDirection == 0

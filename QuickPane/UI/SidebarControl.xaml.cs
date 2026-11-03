@@ -671,8 +671,8 @@ namespace QuickPane.UI
                 Grid.SetColumnSpan(TitleToggleButton, collapsed ? 2 : 1);
                 TitleToggleButton.HorizontalAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             }
-            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = collapsed ? "" : ""; // expand / collapse
-            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = collapsed ? "" : ""; // ChevronRight / ChevronLeft
+            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = collapsed ? "\uE76C" : "\uE76B"; // expand / collapse
+            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = collapsed ? "\uE76C" : "\uE76B"; // ChevronRight / ChevronLeft
             if (TitleToggleButton != null)
             {
                 TitleToggleButton.ToolTip = collapsed ? "Expand" : "Collapse";
@@ -775,7 +775,7 @@ namespace QuickPane.UI
             chevron = new RotateTransform(0);
             var glyph = new TextBlock
             {
-                Text = "", // Segoe MDL2 ChevronRight, rotates to point down when expanded
+                Text = "\uE76C", // Segoe MDL2 ChevronRight, rotates to point down when expanded
                 FontFamily = UiHelpers.IconFont(),
                 FontSize = 10,
                 Opacity = 1,   // always shown, so a section reads as collapsible before it is hovered

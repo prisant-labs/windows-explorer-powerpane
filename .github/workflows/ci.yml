@@ -14,6 +14,12 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
+      # The AGENTS.md rules that compile and pass tests when broken, such as a .cs file missing from
+      # the legacy csproj or an icon glyph written as a raw private-use character. First, because it
+      # takes seconds and needs no build.
+      - name: Check repository rules
+        shell: pwsh
+        run: ./scripts/check-rules.ps1
       # The same scripts a developer runs locally, so CI and local builds cannot drift apart.
       - name: Build the app
         shell: pwsh

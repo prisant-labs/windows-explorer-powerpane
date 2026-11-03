@@ -39,13 +39,13 @@ namespace QuickPane.UI.Settings.Pages
         public override string Title => "Groups & profiles";
 
         // Segoe Fluent Icons People
-        public override string Glyph => "";
+        public override string Glyph => "\uE716";
 
-        private const string GlyphProfile = "";      // People
-        private const string GlyphFolder = "";        // Folder
-        private const string GlyphRecents = "";       // Recent (clock-ish)
-        private const string GlyphWidth = "";         // Width/column
-        private const string GlyphAdd = "";           // Add
+        private const string GlyphProfile = "\uE716";      // People
+        private const string GlyphFolder = "\uE8B7";        // Folder
+        private const string GlyphRecents = "\uE823";       // Recent (clock-ish)
+        private const string GlyphWidth = "\uE740";         // Width/column
+        private const string GlyphAdd = "\uE710";           // Add
         private const string AddProfileCardId = "add-profile";
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
@@ -197,7 +197,7 @@ namespace QuickPane.UI.Settings.Pages
                 actions.Children.Add(activate);
             }
 
-            var rename = ctx.Cards.IconButton("", "Rename profile " + p.Name, () =>
+            var rename = ctx.Cards.IconButton("\uE70F", "Rename profile " + p.Name, () =>
             {
                 removeSlot.Children.Clear();
                 renameSlot.Children.Clear();
@@ -208,7 +208,7 @@ namespace QuickPane.UI.Settings.Pages
 
             if ((ctx.Settings.Current.Profiles ?? new List<Profile>()).Count > 1)
             {
-                var remove = ctx.Cards.IconButton("", "Remove profile " + p.Name, () =>
+                var remove = ctx.Cards.IconButton("\uE74D", "Remove profile " + p.Name, () =>
                 {
                     renameSlot.Children.Clear();
                     removeSlot.Children.Clear();
@@ -339,7 +339,7 @@ namespace QuickPane.UI.Settings.Pages
 
             var actions = new StackPanel { Orientation = Orientation.Horizontal };
 
-            var up = ctx.Cards.IconButton("", "Move " + name + " up", () =>
+            var up = ctx.Cards.IconButton("\uE70E", "Move " + name + " up", () =>
             {
                 var order = Reordered(groups.Select(g => g.Item1).ToList(), groupIndex, -1);
                 CommitReorder(ctx, profileIndex, p, root, order);
@@ -347,7 +347,7 @@ namespace QuickPane.UI.Settings.Pages
             up.IsEnabled = groupIndex > 0;
             actions.Children.Add(up);
 
-            var down = ctx.Cards.IconButton("", "Move " + name + " down", () =>
+            var down = ctx.Cards.IconButton("\uE70D", "Move " + name + " down", () =>
             {
                 var order = Reordered(groups.Select(g => g.Item1).ToList(), groupIndex, 1);
                 CommitReorder(ctx, profileIndex, p, root, order);
@@ -358,7 +358,7 @@ namespace QuickPane.UI.Settings.Pages
 
             var others = (ctx.Settings.Current.Profiles ?? new List<Profile>())
                 .Select((prof, i) => Tuple.Create(prof, i)).Where(x => x.Item2 != profileIndex).ToList();
-            var move = ctx.Cards.IconButton("", "Move group " + name + " to another profile", () =>
+            var move = ctx.Cards.IconButton("\uE8AB", "Move group " + name + " to another profile", () =>
             {
                 slot.Children.Clear();
                 if (others.Count == 0) return; // nowhere to move to; mirrors the old window having no other column to drop on
@@ -368,7 +368,7 @@ namespace QuickPane.UI.Settings.Pages
             move.Margin = new Thickness(4, 0, 0, 0);
             actions.Children.Add(move);
 
-            var del = ctx.Cards.IconButton("", "Delete group " + name, () =>
+            var del = ctx.Cards.IconButton("\uE74D", "Delete group " + name, () =>
             {
                 slot.Children.Clear();
                 slot.Children.Add(ctx.Cards.ConfirmRow("Delete group \"" + name + "\"?", "Delete",

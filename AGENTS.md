@@ -13,8 +13,9 @@ QuickPane is a Windows tray app in C# 7.3, .NET Framework 4.8, and WPF, built fo
 | Build | `pwsh -File scripts/build.ps1` |
 | Build and test | `pwsh -File scripts/test.ps1` |
 | Test only | `pwsh -File scripts/test.ps1 -NoBuild` |
+| Rules check only | `pwsh -File scripts/check-rules.ps1` |
 
-A change is not done until the build succeeds with no errors and every test passes.
+A change is not done until the build succeeds with no errors and every test passes. `scripts/test.ps1` runs `scripts/check-rules.ps1` first, which fails on the rules below that a compiler cannot see: a `.cs` file missing from the csproj, a direct `SetWinEventHook` call, a raw private-use icon character, and `SettingsStore`'s default constructor in a test.
 
 ## Hard rules
 
@@ -24,6 +25,7 @@ A change is not done until the build succeeds with no errors and every test pass
 - **Hook window events through `WinEventHook`.** Never call `SetWinEventHook` directly, because `WinEventHook` shares one native hook per event range. Cap any cache keyed by path with `LruCache`, and write logs only through `Log`.
 - **The pane and Settings follow different rules.** The pane matches Explorer's own navigation pane and takes no third-party UI code. Settings may follow the Windows 11 Settings app, including the ported Fluent styles under `QuickPane/Themes/Fluent/`, which stay in the Settings window's own resources and must never reach `Application.Current.Resources`. The pane matches Explorer's own background color by default; a pane color other than Default, picked from the Pane page's swatches, is the user's own opt-in, never a default a theme, profile, or release chooses for them.
 - **Register new files.** `QuickPane/QuickPane.csproj` is a legacy project that lists every file. A new `.cs` file needs a `<Compile Include="..." />` line.
+- **Write icon glyphs as escapes.** Segoe icon glyphs are private-use characters, which some tools drop without a trace. Write `""` in C# and `&#xE713;` in XAML, never the raw character.
 - **Keep the test project out of `QuickPane.sln`.** Visual Studio 2019's MSBuild cannot load it.
 - **Tests touch only their own temporary directory.** Never use `SettingsStore`'s default constructor, never call `GroupStore.Recycle` or `DeleteTab` on real folders, never show a window, and pass an `onError` handler to `WorkLane` or `WinEventHub` when a test makes one fail, so the failure stays out of the log in the system temp folder.
 - **No personal data** in code, comments, tests, commit messages, issues, or pull requests. Use invented examples such as `C:\Demo\Projects`. Never commit screenshots of a real desktop.

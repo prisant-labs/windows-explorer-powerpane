@@ -259,7 +259,7 @@ namespace QuickPane.UI.Settings
         public Button ClickableCard(string cardId, string glyph, string title, string description, Action onClick,
             string accessibleName = null)
         {
-            var chevron = Glyph("", 13);   // Segoe Fluent Icons ChevronRight
+            var chevron = Glyph("\uE76C", 13);   // Segoe Fluent Icons ChevronRight
             chevron.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
             chevron.VerticalAlignment = VerticalAlignment.Center;
             chevron.Focusable = false;
@@ -313,7 +313,7 @@ namespace QuickPane.UI.Settings
                 Focusable = true,
                 Cursor = Cursors.Hand,
                 Template = BareTemplate(),
-                Content = Glyph("", 13),   // Segoe Fluent Icons ChevronDown
+                Content = Glyph("\uE972", 13),   // Segoe Fluent Icons ChevronDown
             };
             AutomationProperties.SetName(chevron, (accessibleName ?? title) + " section");
 
@@ -582,8 +582,8 @@ namespace QuickPane.UI.Settings
                 commit(v);
             };
 
-            var up = new RepeatButton { Content = Glyph("", 8), Height = 10, Width = 18, Padding = new Thickness(0) };
-            var down = new RepeatButton { Content = Glyph("", 8), Height = 10, Width = 18, Padding = new Thickness(0) };
+            var up = new RepeatButton { Content = Glyph("\uE971", 8), Height = 10, Width = 18, Padding = new Thickness(0) };
+            var down = new RepeatButton { Content = Glyph("\uE972", 8), Height = 10, Width = 18, Padding = new Thickness(0) };
             SetAccessibleName(up, increaseName);
             SetAccessibleName(down, decreaseName);
             up.Click += (s, e) => commit(current + step);
@@ -637,10 +637,10 @@ namespace QuickPane.UI.Settings
             string bgKey, iconKey, glyph;
             switch (severity)
             {
-                case InfoBarSeverity.Success: bgKey = "InfoBarSuccessSeverityBackgroundBrush"; iconKey = "InfoBarSuccessSeverityIconBackground"; glyph = ""; break;
-                case InfoBarSeverity.Warning: bgKey = "InfoBarWarningSeverityBackgroundBrush"; iconKey = "InfoBarWarningSeverityIconBackground"; glyph = ""; break;
-                case InfoBarSeverity.Error: bgKey = "InfoBarErrorSeverityBackgroundBrush"; iconKey = "InfoBarErrorSeverityIconBackground"; glyph = ""; break;
-                default: bgKey = "InfoBarInformationalSeverityBackgroundBrush"; iconKey = "InfoBarInformationalSeverityIconBackground"; glyph = ""; break;
+                case InfoBarSeverity.Success: bgKey = "InfoBarSuccessSeverityBackgroundBrush"; iconKey = "InfoBarSuccessSeverityIconBackground"; glyph = "\uE73E"; break;
+                case InfoBarSeverity.Warning: bgKey = "InfoBarWarningSeverityBackgroundBrush"; iconKey = "InfoBarWarningSeverityIconBackground"; glyph = "\uE7BA"; break;
+                case InfoBarSeverity.Error: bgKey = "InfoBarErrorSeverityBackgroundBrush"; iconKey = "InfoBarErrorSeverityIconBackground"; glyph = "\uEA39"; break;
+                default: bgKey = "InfoBarInformationalSeverityBackgroundBrush"; iconKey = "InfoBarInformationalSeverityIconBackground"; glyph = "\uE946"; break;
             }
 
             var icon = Glyph(glyph, 16);

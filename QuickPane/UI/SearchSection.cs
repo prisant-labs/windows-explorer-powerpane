@@ -44,7 +44,7 @@ namespace QuickPane.UI
 
             var glyph = new TextBlock
             {
-                Text = "",                       // Segoe MDL2 search
+                Text = "\uE721",                       // Segoe MDL2 search
                 FontFamily = UiHelpers.IconFont(),
                 FontSize = 11,
                 Opacity = 0.6,

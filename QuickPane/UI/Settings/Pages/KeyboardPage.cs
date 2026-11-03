@@ -24,7 +24,7 @@ namespace QuickPane.UI.Settings.Pages
 
         public override string Id => "keyboard";
         public override string Title => "Keyboard";
-        public override string Glyph => "";   // Segoe Fluent Icons KeyboardClassic
+        public override string Glyph => "\uE765";   // Segoe Fluent Icons KeyboardClassic
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {

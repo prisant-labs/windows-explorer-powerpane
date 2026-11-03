@@ -24,17 +24,17 @@ namespace QuickPane.UI.Settings.Pages
     {
         public override string Id => "about";
         public override string Title => "About";
-        public override string Glyph => "";   // Info
+        public override string Glyph => "\uE946";   // Info
 
         // ---- glyphs -----------------------------------------------------
         //
         // Segoe Fluent Icons code points for the cards below.
-        private const string GlyphInfo = "";      // Info (shared with the nav item above)
-        private const string GlyphSync = "";      // Sync
-        private const string GlyphLink = "";       // Link
-        private const string GlyphExternal = "";   // OpenInNewWindow
-        private const string GlyphDocument = "";   // Document (licence)
-        private const string GlyphCertificate = ""; // Certificate-ish (third-party notices)
+        private const string GlyphInfo = "\uE946";      // Info (shared with the nav item above)
+        private const string GlyphSync = "\uE895";      // Sync
+        private const string GlyphLink = "\uE71B";       // Link
+        private const string GlyphExternal = "\uE8A7";   // OpenInNewWindow
+        private const string GlyphDocument = "\uE8A5";   // Document (licence)
+        private const string GlyphCertificate = "\uE8EF"; // Certificate-ish (third-party notices)
 
         // The fork's own repository, matching UpdateService's own repo (not upstream's: offering
         // upstream's release notes or issue tracker to someone running a fork build would point them

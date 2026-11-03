@@ -78,7 +78,7 @@ namespace QuickPane.UI
             _chevron = new RotateTransform(0);
             _chevGlyph = new TextBlock
             {
-                Text = "", // Segoe MDL2 ChevronRight, same glyph and size as the group caret
+                Text = "\uE76C", // Segoe MDL2 ChevronRight, same glyph and size as the group caret
                 FontFamily = UiHelpers.IconFont(),
                 FontSize = 10,
                 Foreground = UiHelpers.AppBrush("ChevronColor"),

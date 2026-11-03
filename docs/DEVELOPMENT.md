@@ -43,7 +43,16 @@ The tests live in `tests/QuickPane.Tests`, an SDK-style `net48` NUnit project. I
 
 ## CI
 
-`.github/workflows/ci.yml` runs on every push to `main` and on every pull request. It calls the same scripts on `windows-latest`: build, test, and `scripts/package.ps1`, which makes the installer, the release zip, `SHA256SUMS.txt`, and the release notes. It keeps that packaged output as a workflow artifact. Packaging runs on every build so that a broken release step fails a pull request rather than a tag. It also fails when the version in `AssemblyInfo.cs` has no release document and no changelog section yet. CI cannot exercise the app itself: Explorer windows, window hooks, and file dialogs need a real desktop.
+`.github/workflows/ci.yml` runs on every push to `main` and on every pull request. It calls the same scripts on `windows-latest`: the rules check, build, test, and `scripts/package.ps1`, which makes the installer, the release zip, `SHA256SUMS.txt`, and the release notes. It keeps that packaged output as a workflow artifact. Packaging runs on every build so that a broken release step fails a pull request rather than a tag. It also fails when the version in `AssemblyInfo.cs` has no release document and no changelog section yet. CI cannot exercise the app itself: Explorer windows, window hooks, and file dialogs need a real desktop.
+
+`scripts/check-rules.ps1` runs first, in CI and at the start of `scripts/test.ps1`. It checks the rules that still compile and pass every test when broken:
+
+- Every `.cs` file under `QuickPane/` is listed in `QuickPane/QuickPane.csproj`.
+- No file other than `WinEventHook.cs` and `NativeMethods.cs` calls `SetWinEventHook`.
+- No `.cs` or `.xaml` file holds a raw private-use character (U+E000 to U+F8FF). Icon glyphs are written as `` in C# and `&#xE713;` in XAML, because some editors and tools drop the raw characters without a trace. One such edit once emptied every icon on the Settings Pane page.
+- No test uses `SettingsStore`'s default constructor.
+
+A failure lists every file and line that breaks a rule.
 
 `.github/workflows/release.yml` runs when a `v*` tag is pushed. It is described under [Releasing the fork](#releasing-the-fork).
 

@@ -252,7 +252,7 @@ namespace QuickPane.UI
             chevron = new RotateTransform(0);
             var glyph = new TextBlock
             {
-                Text = "",
+                Text = "\uE76C",
                 FontFamily = UiHelpers.IconFont(),
                 FontSize = 10,
                 Foreground = UiHelpers.AppBrush("ChevronColor"),
