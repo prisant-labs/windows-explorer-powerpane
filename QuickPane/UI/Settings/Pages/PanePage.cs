@@ -29,7 +29,7 @@ namespace QuickPane.UI.Settings.Pages
     {
         public override string Id => "pane";
         public override string Title => "Pane";
-        public override string Glyph => "";   // Segoe Fluent Icons Dock panel
+        public override string Glyph => "\uE90C";   // Segoe Fluent Icons Dock panel; escaped, since an edit once dropped the literal character
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {
@@ -61,7 +61,7 @@ namespace QuickPane.UI.Settings.Pages
                 },
                 mode,
                 v => { s.Mode = v; ctx.Settings.Save(); });
-            panel.Children.Add(cards.Card("paneMode", "", "Pane mode",
+            panel.Children.Add(cards.Card("paneMode", "\uE7C4", "Pane mode",
                 "Where the pane attaches to an Explorer window", modeCombo, "Pane mode"));
 
             // ---- File dialogs (old: DialogModeBlock, lines 393-412) ----
@@ -75,7 +75,7 @@ namespace QuickPane.UI.Settings.Pages
                 },
                 dialogMode,
                 v => { s.DialogMode = v; ctx.Settings.Save(); });
-            panel.Children.Add(cards.Card("fileDialogs", "", "File dialogs",
+            panel.Children.Add(cards.Card("fileDialogs", "\uE8B7", "File dialogs",
                 "Off also hides App Folders and \"Always start here\", which only appear in dialog panes.",
                 dialogCombo, "File dialogs"));
 
@@ -84,7 +84,7 @@ namespace QuickPane.UI.Settings.Pages
 
             // ---- Desktop dock (old: DockBlock, lines 414-424) ----
             var dockToggle = cards.Toggle(s.DesktopDock, on => { s.DesktopDock = on; ctx.Settings.Save(); });
-            var dockExpander = cards.Expander("desktopDock", "", "Desktop dock",
+            var dockExpander = cards.Expander("desktopDock", "\uE90C", "Desktop dock",
                 "Pin a small dock to a screen edge", dockToggle, accessibleName: "Show desktop dock");
             var autoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
                 cards.Toggle(s.DesktopDockAutoHide, on => { s.DesktopDockAutoHide = on; ctx.Settings.Save(); }),
@@ -107,7 +107,7 @@ namespace QuickPane.UI.Settings.Pages
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----
             var tabsToggle = cards.Toggle(s.ShowProfileTabs, on => { s.ShowProfileTabs = on; ctx.Settings.Save(); });
-            var tabsExpander = cards.Expander("profileTabs", "", "Profile tabs",
+            var tabsExpander = cards.Expander("profileTabs", "\uE8AB", "Profile tabs",
                 "The row appears once there are two or more profiles.", tabsToggle,
                 accessibleName: "Show profiles tab row");
             var tabsAutoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
@@ -264,7 +264,7 @@ namespace QuickPane.UI.Settings.Pages
                 new Binding("BorderBrush") { RelativeSource = RelativeSource.TemplatedParent });
 
             var check = new FrameworkElementFactory(typeof(TextBlock), "Check");
-            check.SetValue(TextBlock.TextProperty, "");   // Segoe Fluent Icons CheckMark, same glyph as CheckBoxCheckedGlyph
+            check.SetValue(TextBlock.TextProperty, "\uE73E");   // Segoe Fluent Icons CheckMark, same glyph as CheckBoxCheckedGlyph
             check.SetValue(TextBlock.FontFamilyProperty, FluentIconFont);
             check.SetValue(TextBlock.FontSizeProperty, 14.0);
             check.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);

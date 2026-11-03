@@ -19,6 +19,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 - Turning on the desktop dock with auto-hide off no longer walks the dock across the screen and squeezes every maximized window into a narrow strip at the far edge. The dock now reserves one strip at the monitor's left edge and keeps it through settings changes and taskbar changes ([#145](https://github.com/prisant-labs/windows-explorer-quickpane/issues/145)).
 - The icon at the left of each Settings card is now drawn in the theme's text color. In dark mode it was near-black on a dark card and almost invisible ([#149](https://github.com/prisant-labs/windows-explorer-quickpane/issues/149)).
 - Auto-hide and Show on all virtual desktops, under the Desktop dock card, and Auto-hide under Profile tabs, now grey out while their own card's switch is off, instead of staying active controls that do nothing until the switch is back on ([#150](https://github.com/prisant-labs/windows-explorer-quickpane/issues/150)).
+- The Settings Pane page shows its icons again, in the navigation pane and on the Pane mode, File dialogs, Desktop dock, and Profile tabs cards. An edit made for the pane color card had emptied them ([#134](https://github.com/prisant-labs/windows-explorer-quickpane/issues/134)).
 
 ## [3.11.0.0] - Unreleased
 
