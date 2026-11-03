@@ -18,6 +18,7 @@ On `main` after 3.11.0.0; these ship in the next release.
 - A beside pane (a "Beside Explorer window" pane, or a dialog's pane after it was moved or forced beside) no longer trails behind the window it follows while that window is dragged. It now hides for the length of the drag and reappears in place once the drag ends ([#147](https://github.com/prisant-labs/windows-explorer-quickpane/issues/147)).
 - Turning on the desktop dock with auto-hide off no longer walks the dock across the screen and squeezes every maximized window into a narrow strip at the far edge. The dock now reserves one strip at the monitor's left edge and keeps it through settings changes and taskbar changes ([#145](https://github.com/prisant-labs/windows-explorer-quickpane/issues/145)).
 - The icon at the left of each Settings card is now drawn in the theme's text color. In dark mode it was near-black on a dark card and almost invisible ([#149](https://github.com/prisant-labs/windows-explorer-quickpane/issues/149)).
+- QuickPane now guards against a crash that could end it after Explorer restarts. When a window it draws into loses the window above it, QuickPane releases that window's content before Windows text input can trip over the dead handle ([#148](https://github.com/prisant-labs/windows-explorer-quickpane/issues/148)).
 
 ## [3.11.0.0] - Unreleased
 
