@@ -30,7 +30,8 @@ namespace QuickPane.UI.Settings.Pages
             {
                 yield return new SettingsSearchEntry(Id, "quickActionsSwitch", Title,
                     "A Quick actions section in the pane: copy a path, create a new file or folder, or open a terminal or editor.",
-                    "quick actions", "copy path", "terminal", "visual studio code", "markdown", "new folder");
+                    "quick actions", "copy path", "terminal", "visual studio code", "markdown", "new folder",
+                    "folder name", "file url", "powershell", "wsl", "readme", "gitignore", "pin");
             }
         }
 
@@ -101,14 +102,14 @@ namespace QuickPane.UI.Settings.Pages
         }
 
         /// <summary>The list Reset to default produces: every built-in action in
-        /// <see cref="QuickActionLibrary.All"/>'s own order, all enabled -- the same source and the same
-        /// defaults <c>AppSettings.Normalize</c> uses to seed a missing action, so an action added in a
-        /// later version resets correctly. Takes no input: an action has no user-edited field (its name
-        /// lives in the library) to carry over.</summary>
+        /// <see cref="QuickActionLibrary.All"/>'s own order and its own default state -- the same source
+        /// and the same defaults <c>AppSettings.Normalize</c> uses to seed a missing action, so an action
+        /// added in a later version resets correctly. Takes no input: an action has no user-edited field
+        /// (its name lives in the library) to carry over.</summary>
         internal static List<QuickActionSetting> ResetActions()
         {
             return QuickActionLibrary.All
-                .Select(d => new QuickActionSetting { Id = d.Id, Enabled = true })
+                .Select(d => new QuickActionSetting { Id = d.Id, Enabled = d.DefaultEnabled })
                 .ToList();
         }
 

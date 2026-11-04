@@ -902,13 +902,8 @@ namespace QuickPane.UI
             {
                 if (!setting.Enabled) continue;
                 var def = QuickActionLibrary.Find(setting.Id);
-                if (def == null) continue;
-
-                if (def.Id == "open-vscode")
-                {
-                    QuickActionLibrary.BeginCodeCheck();
-                    if (QuickActionLibrary.CodeCheckDone && !QuickActionLibrary.CodeOnPath) continue;
-                }
+                if (def == null || !QuickActionLibrary.AppliesToPinnedRow(def)) continue;
+                if (!QuickActionsSection.IsAvailable(def)) continue;
 
                 var id = def.Id;
                 var folder = targetPath;

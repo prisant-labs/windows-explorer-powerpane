@@ -61,6 +61,10 @@ namespace QuickPane.Services
                 case "copy-path-forward": return QuickActionLibrary.ToForwardSlashes(folder);
                 case "copy-path-wsl": return QuickActionLibrary.ToWslPath(folder);
                 case "copy-markdown-link": return QuickActionLibrary.ToMarkdownLink(folder);
+                case "copy-folder-name": return QuickActionLibrary.Leaf(folder);
+                case "copy-parent-path": return QuickActionLibrary.ParentPath(folder);
+                case "copy-file-url": return QuickActionLibrary.ToFileUrl(folder);
+                case "copy-cd-powershell": return QuickActionLibrary.ToPowerShellChangeDirectory(folder);
                 default: return null;
             }
         }
@@ -81,8 +85,16 @@ namespace QuickPane.Services
                 case "new-text-file": NewTextFile(folder); break;
                 case "new-markdown-file": NewMarkdownFile(folder); break;
                 case "new-dated-folder": NewDatedFolder(folder); break;
+                case "new-powershell-script": NewFile(actionId, folder, "script", ".ps1", QuickActionLibrary.PowerShellScriptContent()); break;
+                case "new-readme": NewFile(actionId, folder, "README", ".md", QuickActionLibrary.ReadmeContent(folder)); break;
+                // The whole name goes in baseName, so a second copy reads ".gitignore (2)" and never
+                // " (2).gitignore", which Git would not recognize either way but which reads worse.
+                case "new-gitignore": NewFile(actionId, folder, ".gitignore", string.Empty, QuickActionLibrary.GitignoreContent()); break;
                 case "open-terminal": OpenTerminal(folder); break;
                 case "open-vscode": OpenVsCode(folder); break;
+                case "open-powershell": OpenPowerShell(folder); break;
+                case "open-wsl": OpenWsl(folder); break;
+                case "pin-folder": PinFolder(folder); break;
                 default: Log.Info("quick action: unknown id '" + actionId + "'."); break;
             }
         }
@@ -120,6 +132,19 @@ namespace QuickPane.Services
                     Log.Error("quick action 'new-markdown-file': could not find a free name in '" + folder + "'.");
             }
             catch (Exception ex) { Log.Error("quick action 'new-markdown-file'", ex); }
+        }
+
+        private static void NewFile(string actionId, string folder, string baseName, string extension, string content)
+        {
+            try
+            {
+                string path;
+                if (TryCreateUniqueFile(folder, baseName, extension, content, out path))
+                    Log.Info("quick action '" + actionId + "': created '" + path + "'.");
+                else
+                    Log.Error("quick action '" + actionId + "': could not find a free name in '" + folder + "'.");
+            }
+            catch (Exception ex) { Log.Error("quick action '" + actionId + "'", ex); }
         }
 
         /// <summary>Creates a file holding <paramref name="content"/> under a name
@@ -228,6 +253,61 @@ namespace QuickPane.Services
                 Log.Info("quick action 'open-terminal': wt.exe not on PATH; started PowerShell in '" + folder + "'.");
             }
             catch (Exception ex) { Log.Error("quick action 'open-terminal'", ex); }
+        }
+
+        /// <summary>PowerShell 7 when it is on PATH, or else Windows PowerShell. Same rule as
+        /// <see cref="OpenTerminal"/>: only the working directory carries the folder.</summary>
+        private static void OpenPowerShell(string folder)
+        {
+            string program = QuickActionLibrary.FindOnPath("pwsh.exe") ?? "powershell.exe";
+            try
+            {
+                Process.Start(new ProcessStartInfo(program)
+                {
+                    Arguments = QuickActionLibrary.TerminalArguments(haveWt: false),
+                    WorkingDirectory = folder,
+                    UseShellExecute = false
+                });
+                Log.Info("quick action 'open-powershell': started '" + program + "' in '" + folder + "'.");
+            }
+            catch (Exception ex) { Log.Error("quick action 'open-powershell'", ex); }
+        }
+
+        /// <summary>wsl.exe with no arguments opens the default distribution's shell in the current
+        /// directory, which it translates itself, so no folder name reaches an argument here either.</summary>
+        private static void OpenWsl(string folder)
+        {
+            string wsl = QuickActionLibrary.FindOnPath("wsl.exe");
+            if (wsl == null)
+            {
+                Log.Info("quick action 'open-wsl': wsl.exe is not on PATH.");
+                return;
+            }
+            try
+            {
+                Process.Start(new ProcessStartInfo(wsl) { WorkingDirectory = folder, UseShellExecute = false });
+                Log.Info("quick action 'open-wsl': started WSL in '" + folder + "'.");
+            }
+            catch (Exception ex) { Log.Error("quick action 'open-wsl'", ex); }
+        }
+
+        /// <summary>Starts a second copy of QuickPane in its existing pin mode, the same flow as the
+        /// Explorer right-click command. That mode runs before the single-instance check and exits when
+        /// its picker closes, and the running copy's folder watcher picks up the new pin. Running the
+        /// picker in its own process also keeps it off this process's UI thread, which in inside mode
+        /// shares Explorer's input queue while a modal choice is open.</summary>
+        private static void PinFolder(string folder)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(Log.ExePath())
+                {
+                    Arguments = QuickActionLibrary.PinArguments(folder),
+                    UseShellExecute = false
+                });
+                Log.Info("quick action 'pin-folder': opened the group picker for '" + folder + "'.");
+            }
+            catch (Exception ex) { Log.Error("quick action 'pin-folder'", ex); }
         }
 
         private static void OpenVsCode(string folder)

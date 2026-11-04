@@ -177,8 +177,8 @@ namespace QuickPane.Models
         // Quick actions (quick actions, first version): the master switch is the "quickactions" section's
         // own Visible flag above, so turning it on from this list or from the Pane sections page is
         // the same setting. This is only which built-in actions show and in what order; Normalize
-        // seeds it with every built-in, enabled, in QuickActionLibrary's own default order, the first
-        // time it sees a null list.
+        // seeds it with every built-in, in QuickActionLibrary's own default order and default state,
+        // the first time it sees a null list.
         [DataMember(Name = "quickActions", Order = 43, EmitDefaultValue = false)]
         public List<QuickActionSetting> QuickActions { get; set; }
 
@@ -405,9 +405,10 @@ namespace QuickPane.Models
 
         /// <summary>Drops an id with no matching built-in (e.g. a removed action after a downgrade),
         /// keeps only the first occurrence of a duplicate id, then appends every built-in missing from
-        /// the list so far -- enabled, at the end, in QuickActionLibrary's own order -- which is how a
-        /// later release can add a new built-in action and have it show up for everyone already on an
-        /// older settings.json (quick actions, first version).</summary>
+        /// the list so far -- at the end, in QuickActionLibrary's own order, and in the state its
+        /// definition asks for -- which is how a later release can add a new built-in action to the
+        /// Settings page of everyone already on an older settings.json, without adding it to their
+        /// pane.</summary>
         private void NormalizeQuickActions()
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -423,7 +424,7 @@ namespace QuickPane.Models
                 }
             }
             foreach (var def in QuickActionLibrary.All)
-                if (seen.Add(def.Id)) cleaned.Add(new QuickActionSetting { Id = def.Id, Enabled = true });
+                if (seen.Add(def.Id)) cleaned.Add(new QuickActionSetting { Id = def.Id, Enabled = def.DefaultEnabled });
             QuickActions = cleaned;
         }
     }

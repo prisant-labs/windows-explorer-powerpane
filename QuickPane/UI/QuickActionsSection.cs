@@ -94,11 +94,7 @@ namespace QuickPane.UI
                 var def = QuickActionLibrary.Find(setting.Id);
                 if (def == null) continue;
 
-                if (def.Id == "open-vscode")
-                {
-                    QuickActionLibrary.BeginCodeCheck();
-                    if (QuickActionLibrary.CodeCheckDone && !QuickActionLibrary.CodeOnPath) continue;
-                }
+                if (!IsAvailable(def)) continue;
 
                 items.Children.Add(BuildRow(def));
                 any = true;
@@ -110,6 +106,19 @@ namespace QuickPane.UI
 
             _root.Children.Add(header);
             _root.Children.Add(items);
+        }
+
+        /// <summary>False for an action whose tool is missing from this machine, so its row never
+        /// appears only to do nothing when clicked. Shared with a pinned row's submenu.</summary>
+        internal static bool IsAvailable(QuickActionDefinition def)
+        {
+            if (def.Id == "open-vscode")
+            {
+                QuickActionLibrary.BeginCodeCheck();
+                return !QuickActionLibrary.CodeCheckDone || QuickActionLibrary.CodeOnPath;
+            }
+            if (def.Id == "open-wsl") return ShellRootSection.WslPresent();
+            return true;
         }
 
         private FrameworkElement BuildRow(QuickActionDefinition def)
@@ -172,7 +181,7 @@ namespace QuickPane.UI
             return row;
         }
 
-        // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow.
+        // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow, Pin.
         private static string Glyph(QuickActionKind kind)
         {
             switch (kind)
@@ -180,6 +189,7 @@ namespace QuickPane.UI
                 case QuickActionKind.CopyPath: return "\uE8C8";
                 case QuickActionKind.NewItem: return "\uE710";
                 case QuickActionKind.OpenTool: return "\uE8A7";
+                case QuickActionKind.FolderAction: return "\uE718";
                 default: return "\uE8C8";
             }
         }
