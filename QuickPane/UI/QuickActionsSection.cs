@@ -205,7 +205,7 @@ namespace QuickPane.UI
         }
 
         // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow, Pin, SelectAll, CommandPrompt.
-        private static string Glyph(QuickActionKind kind)
+        internal static string Glyph(QuickActionKind kind)
         {
             switch (kind)
             {

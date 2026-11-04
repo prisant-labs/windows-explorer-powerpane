@@ -319,6 +319,15 @@ namespace QuickPane.UI.Settings.Pages
             return list;
         }
 
+        /// <summary>The icon a row shows here: the same one its row shows in the pane, so the two are
+        /// easy to match up. A card reserves the icon's width whether or not it has a glyph, so an
+        /// empty glyph left a blank gap before every label (#202). <paramref name="def"/> is null for
+        /// an action this version does not know, which still gets an icon so its row lines up.</summary>
+        internal static string RowGlyph(QuickActionDefinition def)
+        {
+            return QuickActionsSection.Glyph(def != null ? def.Kind : QuickActionKind.CopyPath);
+        }
+
         /// <summary>(Re)builds every action row into <paramref name="panel"/>, same reasoning as
         /// SectionsPage.Populate: rebuilding only this panel keeps the page's scroll position, and
         /// <paramref name="refocusId"/> (the moved action's Id, or null on first build) plus
@@ -389,7 +398,7 @@ namespace QuickPane.UI.Settings.Pages
                     controls.Children.Add(cards.IconButton("\uE74D", "Delete " + name, () => _confirmDeleteCustomCommand(id, name)));
                 }
 
-                var card = cards.Card("action-" + setting.Id, "", name, description, controls);
+                var card = cards.Card("action-" + setting.Id, RowGlyph(def), name, description, controls);
 
                 // Drag grip at the row's left edge (#178); see SectionsPage.Populate. Moves by id, not
                 // by captured index, for the staleness reason on FindActionById.
