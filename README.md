@@ -40,6 +40,9 @@
 > - **Quick actions:** an optional pane section that copies the current folder's path in several formats, creates a new file or dated folder, or opens the folder in Windows Terminal or Visual Studio Code. [3.11.0.2](docs/releases/3.11.0.2.md) ([#144](https://github.com/prisant-labs/windows-explorer-quickpane/pull/144))
 > - **Pane color and dock display:** a row of background swatches for the pane, with Explorer's own color as the default, and a choice of monitor and screen edge for the desktop dock. [3.11.0.2](docs/releases/3.11.0.2.md) ([#134](https://github.com/prisant-labs/windows-explorer-quickpane/issues/134), [#146](https://github.com/prisant-labs/windows-explorer-quickpane/issues/146), [#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177))
 > - **Less waiting on the disk:** icons, pane edits, and Settings changes load or save in the background, so a slow or network disk no longer stalls Explorer. [3.11.0.2](docs/releases/3.11.0.2.md) ([#75](https://github.com/prisant-labs/windows-explorer-quickpane/issues/75), [#76](https://github.com/prisant-labs/windows-explorer-quickpane/issues/76), [#163](https://github.com/prisant-labs/windows-explorer-quickpane/issues/163))
+> - **Update notice:** QuickPane tells you when a new version exists, at most once a day and once per version, and it never downloads anything. You can turn the daily check off on the About page. [3.12.0.0](docs/releases/3.12.0.0.md) ([#176](https://github.com/prisant-labs/windows-explorer-quickpane/issues/176))
+> - **Quick actions you can extend:** ten more built-in actions, your own custom commands from a template such as `code {path}`, and eight actions on the files selected in Explorer. All of them start off. [3.12.0.0](docs/releases/3.12.0.0.md) ([#189](https://github.com/prisant-labs/windows-explorer-quickpane/issues/189), [#190](https://github.com/prisant-labs/windows-explorer-quickpane/issues/190), [#191](https://github.com/prisant-labs/windows-explorer-quickpane/issues/191))
+> - **Dock grip with a maximized window:** the width grip of a reserved desktop dock can be dragged while a window is maximized. [3.12.0.0](docs/releases/3.12.0.0.md) ([#185](https://github.com/prisant-labs/windows-explorer-quickpane/issues/185))
 
 A folder sidebar for Windows File Explorer. QuickPane embeds a pinned-folders pane inside every Explorer window, so your groups, recent locations, drives, network shares, and WSL distros travel with the window you are already using. Pin it inside the window, float it beside the window, or run it as a slim screen-edge dock. Everything runs locally as a single tray app, no code is ever injected into Explorer, and all data stays in plain files under your user profile.
 
@@ -58,6 +61,7 @@ QuickPane puts your folders one click away inside Explorer itself, with:
 - 💾 **Open and Save dialog support**: the pane attaches to file dialogs and navigates them too
 - 🔎 **Search box**: filters every folder in the pane as you type
 - 🚀 **Recent Apps**: the programs you have been using, where a row opens its app and browser rows open out into their profiles
+- ⚡ **Quick actions**: copy a path in several formats, create a starter file, open a terminal, run your own commands, and act on the files selected in Explorer
 - 🎯 **Per-app folders**: set a folder as an app's starting point and its Save and Open dialogs land there
 - 👤 **Profiles**: independent workspaces, each with its own groups, recents count, and width
 - 🎨 **Native feel**: dark and light themes that blend into the Windows shell
@@ -216,6 +220,25 @@ QuickPane sits alongside Windows' built-in navigation pane rather than replacing
 - Drag a tab into empty space to split it into a new group
 - Right-click a group or section header to rename it
 
+### Quick actions and custom commands
+
+Turn on the **Quick actions** section under **Pane sections** in Settings. Then choose its rows on the **Quick actions** page, where you can also reorder them and reset them to their defaults.
+
+A row acts on the folder on screen, unless its name says "selected". Those rows act on the files selected in Explorer, and say "Nothing selected" when there are none.
+
+To add your own row, give a command a name and a template on the same page. These are invented examples:
+
+| Template | What the row does |
+|---|---|
+| `code {path}` | Opens the selected item in Visual Studio Code, or the folder when nothing is selected |
+| `"C:\Program Files\Git\git-bash.exe" --cd={dir}` | Opens Git Bash in the folder on screen |
+| `pwsh -File C:\Demo\tidy.ps1 {paths}` | Runs your script with each selected item as its own argument |
+| `C:\Demo\stamp.exe --label={name}` | Runs your program with the selected item's name inside one argument |
+
+The placeholders are `{path}`, `{paths}`, `{dir}`, and `{name}`. Write `{{` and `}}` for literal braces. QuickPane quotes each value, so a folder named `R&D notes` stays one argument.
+
+A placeholder is refused for a program that would read a folder name as code: `cmd`, `wsl`, `wt`, a batch file, PowerShell without `-File`, or `bash -c`. Those programs still work with no placeholder. Quoting cannot make every program safe, so use a placeholder only where the program treats it as a file name, and not after something like `python -c`. Commands in a restored backup arrive turned off.
+
 ### Choosing a mode
 
 - Open Settings and pick **Inside**, **Beside**, or **Off** under Pane mode
@@ -229,9 +252,9 @@ QuickPane sits alongside Windows' built-in navigation pane rather than replacing
 ### Settings
 
 - Open Settings from the tray icon or the gear in the pane
-- Grouped into tabs: Groups, Pane, Hotkeys, Connections and Backup
+- A navigation pane lists the pages, and a search box jumps to a setting
 - Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, which apps Recent Apps lists, the keyboard shortcut, and profiles
-- A footer shows the running version and offers a download when a newer release is published
+- The About page shows the running version and offers a download when a newer release is published
 - Changes apply live
 
 ## Settings and data
@@ -374,6 +397,11 @@ QuickPane/
     │   ├── FileDropOps.cs     # Shell move/copy/shortcut drops
     │   ├── ThemeService.cs    # Dark / light theming
     │   ├── FluentThemeService.cs # Ported Fluent theme, scoped to the Settings window
+    │   ├── QuickActionLibrary.cs # The built-in quick actions and their defaults
+    │   ├── QuickActionRunner.cs  # Runs a quick action
+    │   ├── CustomCommandTemplate.cs # Custom command templates: placeholders, quoting, refusals
+    │   ├── UpdateService.cs   # Asks GitHub for the latest release
+    │   ├── UpdateNotifier.cs  # The daily check and the one-time notice
     │   └── Log.cs
     ├── Themes/Fluent/         # Ported Microsoft WPF Fluent theme (see NOTICE.md below)
     └── UI/
