@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [3.11.0.2] - 2026-11-03
+
+The first published release of the redesigned Settings window. 3.11.0.0 and 3.11.0.1 were built as drafts and never published, so this release also carries everything listed under both.
 
 ### Added
 - The desktop dock can sit on the left or the right edge of its display. A new Edge row under the Desktop dock card on the Pane page picks the side; left stays the default, so existing settings keep today's placement. The width grip and the title chevron follow the edge ([#177](https://github.com/prisant-labs/windows-explorer-quickpane/issues/177)).
@@ -10,11 +12,14 @@
 
 ### Changed
 - Settings now opens on the Pane page. The navigation order is Pane, Pane sections, Groups & profiles, Quick actions, Recent apps, Keyboard, Remote drives, Backup & restore, and About ([#180](https://github.com/prisant-labs/windows-explorer-quickpane/issues/180)).
-- The Settings page for SSH connections is now called Remote drives, which names what you get (a remote folder that shows up as a drive letter) rather than the protocol behind it. A search for "ssh" still finds it.
+- The Settings page for SSH connections is now called Remote drives, which names what you get (a remote folder that shows up as a drive letter) rather than the protocol behind it. A search for "ssh" still finds it ([#175](https://github.com/prisant-labs/windows-explorer-quickpane/issues/175)).
 
-## [3.11.0.1] - Unreleased
+### Fixed
+- A long inline confirmation in Settings wraps its message and scrolls into view, so its buttons stay inside the window.
 
-The first published release of the redesigned Settings window. 3.11.0.0 was built as a draft and never published, because a desktop test found the defects fixed below, so this release also carries everything listed under 3.11.0.0.
+## [3.11.0.1] - 2026-11-02
+
+Never published as a release. Its changes first ship in 3.11.0.2. 3.11.0.0 was built as a draft and never published, because a desktop test found the defects fixed below, so this version also carries everything listed under 3.11.0.0.
 
 ### Added
 - A Quick actions section in the pane, off by default: one click to copy the current folder's path (plain, quoted, forward-slash, WSL, or a Markdown link), add a new text file, Markdown file, or dated folder, or open the folder in Windows Terminal (falling back to PowerShell) or Visual Studio Code. Turn it on from the new Quick actions Settings page, which also enables, disables, and reorders each action; a pinned folder's right-click menu offers the same actions against that folder. Inside a file dialog, or on the desktop dock, the section stays hidden, since neither has a current folder the way an Explorer window does.
@@ -48,7 +53,7 @@ The first published release of the redesigned Settings window. 3.11.0.0 was buil
 
 ## [3.11.0.0] - 2026-10-30
 
-Never published as a release. A desktop test of its draft found defects, and its changes first ship in 3.11.0.1.
+Never published as a release. A desktop test of its draft found defects, and its changes first ship in 3.11.0.2.
 
 Settings is now a Windows 11 Settings-style window, with its own navigation pane, search box, and cards, in place of the old tabbed panel.
 
