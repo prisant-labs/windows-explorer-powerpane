@@ -26,8 +26,89 @@ namespace QuickPane.Services
         {
             if (def == null) return null;
             if (def.Kind == QuickActionKind.Custom) return RunCustom(def, folder, selection);
+            if (def.Kind == QuickActionKind.Selection) return RunOnSelection(def, folder, selection);
             Run(def.Id, folder);
             return null;
+        }
+
+        internal const string NothingSelected = "Nothing selected";
+
+        /// <summary>The message for a selection past ExplorerNavigator.MaxSelectedItems.</summary>
+        internal static string TooManySelected(int limit)
+        {
+            return "Too many selected (limit " + limit + ")";
+        }
+
+        /// <summary>Runs a selection action (#191). Saying "Nothing selected" is the point of the
+        /// message path here: the row cannot grey itself out ahead of time, because nothing tells the
+        /// pane when a selection changes.</summary>
+        private static string RunOnSelection(QuickActionDefinition def, string folder, IList<string> selection)
+        {
+            if (selection == null || selection.Count == 0) return NothingSelected;
+            if (def.Id == "open-selected-vscode") return OpenSelectionInVsCode(folder, selection);
+
+            string text = SelectionTextFor(def.Id, selection);
+            if (text == null)
+            {
+                Log.Info("quick action '" + def.Id + "': nothing to copy for this selection.");
+                return "Nothing to copy";
+            }
+            WorkQueue.PostUI(() => CopyToClipboard(text));
+            return null;
+        }
+
+        /// <summary>The clipboard text for a selection: each item in the matching folder format, one per
+        /// line. An item with no such form, such as a network path asked for as a WSL path, is skipped,
+        /// and null means no item had one.</summary>
+        internal static string SelectionTextFor(string actionId, IList<string> items)
+        {
+            string format;
+            switch (actionId)
+            {
+                case "copy-selected-names": format = "copy-folder-name"; break;
+                case "copy-selected-paths": format = "copy-path"; break;
+                case "copy-selected-quoted": format = "copy-path-quoted"; break;
+                case "copy-selected-forward": format = "copy-path-forward"; break;
+                case "copy-selected-wsl": format = "copy-path-wsl"; break;
+                case "copy-selected-urls": format = "copy-file-url"; break;
+                case "copy-selected-markdown": format = "copy-markdown-link"; break;
+                default: return null;
+            }
+            var lines = new List<string>();
+            foreach (var item in items)
+            {
+                string line = ClipboardTextFor(format, item);
+                if (line != null) lines.Add(line);
+            }
+            return lines.Count > 0 ? string.Join(Environment.NewLine, lines) : null;
+        }
+
+        private static string OpenSelectionInVsCode(string folder, IList<string> selection)
+        {
+            string codeExe = QuickActionLibrary.FindCodeExe();
+            if (codeExe == null)
+            {
+                Log.Info("quick action 'open-selected-vscode': 'code' is not on PATH.");
+                return "Visual Studio Code not found";
+            }
+            var arguments = new List<string>();
+            foreach (var item in selection) arguments.Add(QuickActionLibrary.QuoteArgument(item));
+            string joined = string.Join(" ", arguments);
+            if (joined.Length > CustomCommandTemplate.MaxCommandLineLength) return "Too many items for one command.";
+            try
+            {
+                var start = new ProcessStartInfo(codeExe) { Arguments = joined, UseShellExecute = false };
+                // A search-results window has no folder of its own, and its selection is still usable.
+                if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder)) start.WorkingDirectory = folder;
+                Process.Start(start);
+                Log.Info("quick action 'open-selected-vscode': opened " + selection.Count + " item(s).");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("quick action 'open-selected-vscode'", ex);
+                return "Could not start Visual Studio Code";
+            }
         }
 
         /// <summary>Starts a custom command (#190): directly, as the user, in the folder, with the
