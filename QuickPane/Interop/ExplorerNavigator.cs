@@ -7,6 +7,9 @@ using NM = QuickPane.Interop.NativeMethods;
 
 namespace QuickPane.Interop
 {
+    /// <summary>How reading an Explorer selection went. Ok with no paths means nothing is selected.</summary>
+    internal enum SelectionReadStatus { Ok, TooMany, Failed }
+
     /// <summary>
     /// Drives a specific Explorer window from outside its process. It uses the Shell.Application
     /// automation object to find the ShellBrowserWindow whose top-level HWND matches the window the
@@ -143,31 +146,33 @@ namespace QuickPane.Interop
         /// cross-process calls, and a quietly shortened list would act on the wrong set of files.</summary>
         internal const int MaxSelectedItems = 1000;
 
-        /// <summary>The paths of the items selected in the active tab of this Explorer window, in the
-        /// view's order (#191). Empty when nothing is selected or the window cannot be read. Sets
-        /// <paramref name="tooMany"/>, and returns nothing, past <see cref="MaxSelectedItems"/>.
-        /// Cross-process COM, so a caller is already off the UI thread. It runs only when a row is
-        /// clicked, never to keep the pane up to date: watching a selection cheaply is unsolved, and
-        /// polling would undo the performance work.</summary>
-        public static List<string> GetSelectedPaths(IntPtr topLevelHwnd, out bool tooMany)
+        /// <summary>Reads the items selected in the active tab of this Explorer window into
+        /// <paramref name="paths"/>, in the view's order (#191). Cross-process COM, so a caller is
+        /// already off the UI thread. It runs only when a row is clicked, never to keep the pane up to
+        /// date: watching a selection cheaply is unsolved, and polling would undo the performance work.
+        ///
+        /// A failed read is its own answer, and never an empty list. A custom command falls back to the
+        /// folder when nothing is selected, so reading a failure as "nothing selected" would point a
+        /// command meant for one file at the whole folder. A selected item with no place on disk fails
+        /// the read for the same reason: acting on the rest would be a set the user did not choose.</summary>
+        public static SelectionReadStatus GetSelectedPaths(IntPtr topLevelHwnd, out List<string> paths)
         {
-            tooMany = false;
-            var paths = new List<string>();
+            paths = new List<string>();
             object shell = null, windows = null, w = null, doc = null, items = null;
             try
             {
                 var shellType = Type.GetTypeFromProgID("Shell.Application");
-                if (shellType == null) return paths;
+                if (shellType == null) return SelectionReadStatus.Failed;
                 shell = Activator.CreateInstance(shellType);
                 windows = Call(shell, "Windows");
-                if (windows == null) return paths;
+                if (windows == null) return SelectionReadStatus.Failed;
                 w = FindActiveTab(windows, topLevelHwnd);
                 doc = Get(w, "Document");
                 items = Call(doc, "SelectedItems");
-                if (items == null) return paths;
+                if (items == null) return SelectionReadStatus.Failed;
 
                 int count = ToInt(Get(items, "Count"));
-                if (count > MaxSelectedItems) { tooMany = true; return paths; }
+                if (count > MaxSelectedItems) return SelectionReadStatus.TooMany;
                 for (int i = 0; i < count; i++)
                 {
                     object item = null;
@@ -175,12 +180,23 @@ namespace QuickPane.Interop
                     {
                         item = Call(items, "Item", i);
                         var p = Get(item, "Path") as string;
-                        if (IsFileSystemPath(p)) paths.Add(p);
+                        if (!IsFileSystemPath(p))
+                        {
+                            paths.Clear();
+                            return SelectionReadStatus.Failed;
+                        }
+                        paths.Add(p);
                     }
                     finally { Release(item); }
                 }
+                return SelectionReadStatus.Ok;
             }
-            catch (Exception ex) { Log.Error("GetSelectedPaths failed", ex); paths.Clear(); }
+            catch (Exception ex)
+            {
+                Log.Error("GetSelectedPaths failed", ex);
+                paths.Clear();
+                return SelectionReadStatus.Failed;
+            }
             finally
             {
                 Release(items);
@@ -189,7 +205,6 @@ namespace QuickPane.Interop
                 Release(windows);
                 Release(shell);
             }
-            return paths;
         }
 
         /// <summary>False for a shell item with no place on disk, such as a Control Panel entry, whose

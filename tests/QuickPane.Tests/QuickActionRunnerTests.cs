@@ -40,6 +40,14 @@ namespace QuickPane.Tests
             Assert.That(QuickActionRunner.SelectionTextFor("copy-selected-wsl", new[] { @"\\server\share\a" }), Is.Null);
         }
 
+        [Test]
+        public void SelectionProblem_OnlyAReadThatWorkedLetsAnActionRun()
+        {
+            Assert.That(QuickActionRunner.SelectionProblem(QuickPane.Interop.SelectionReadStatus.Ok), Is.Null);
+            Assert.That(QuickActionRunner.SelectionProblem(QuickPane.Interop.SelectionReadStatus.TooMany), Does.Contain("Too many"));
+            Assert.That(QuickActionRunner.SelectionProblem(QuickPane.Interop.SelectionReadStatus.Failed), Does.Contain("Could not read"));
+        }
+
         [TestCase(null)]
         [TestCase("empty")]
         public void Run_SelectionActionWithNothingSelected_SaysSo(string selection)

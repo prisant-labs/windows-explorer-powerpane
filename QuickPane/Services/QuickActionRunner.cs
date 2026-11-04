@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
+using QuickPane.Interop;
 
 namespace QuickPane.Services
 {
@@ -33,10 +34,17 @@ namespace QuickPane.Services
 
         internal const string NothingSelected = "Nothing selected";
 
-        /// <summary>The message for a selection past ExplorerNavigator.MaxSelectedItems.</summary>
-        internal static string TooManySelected(int limit)
+        /// <summary>The row's message when the selection could not be used, or null when it could. An
+        /// action stops on either problem and never falls back to the folder, which is not what someone
+        /// with files selected asked for.</summary>
+        internal static string SelectionProblem(SelectionReadStatus status)
         {
-            return "Too many selected (limit " + limit + ")";
+            switch (status)
+            {
+                case SelectionReadStatus.TooMany: return "Too many selected (limit " + ExplorerNavigator.MaxSelectedItems + ")";
+                case SelectionReadStatus.Failed: return "Could not read the selection";
+                default: return null;
+            }
         }
 
         /// <summary>Runs a selection action (#191). Saying "Nothing selected" is the point of the
