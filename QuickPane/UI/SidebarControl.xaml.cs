@@ -693,6 +693,19 @@ namespace QuickPane.UI
                 ResizeThumb.HorizontalAlignment = fromLeft ? HorizontalAlignment.Left : HorizontalAlignment.Right;
         }
 
+        /// <summary>The width grip on a reserved desktop dock, in DIPs. A maximized window's rectangle
+        /// reaches past the work area by an invisible frame, and a reserved dock is not topmost, so the
+        /// frame lies over the dock and takes its clicks (#185). Windows reports that frame as at most
+        /// 8 DIP at every display scale, so 14 leaves the 6 DIP that every other pane's grip has.</summary>
+        internal const double ReservedDockGripWidth = 14;
+
+        /// <summary>Set the width grip's width. Only a reserved dock changes it, because no other pane
+        /// has a window's frame lying over its edge.</summary>
+        public void SetResizeGripWidth(double width)
+        {
+            if (ResizeThumb != null) ResizeThumb.Width = width;
+        }
+
         /// <summary>How a horizontal drag of the grip changes the width: dragging a left grip outward
         /// (left, a negative change) widens the pane, and dragging a right grip outward (right)
         /// widens it.</summary>

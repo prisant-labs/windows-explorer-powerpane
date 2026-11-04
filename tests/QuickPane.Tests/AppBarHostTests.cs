@@ -31,6 +31,26 @@ namespace QuickPane.Tests
             Assert.That(QuickPane.UI.SidebarControl.ToggleGlyph(collapsed, mirrored), Is.EqualTo(expected));
         }
 
+        // ---- #185: a maximized window's frame must not cover the whole grip ----
+
+        // Each frame is GetSystemMetricsForDpi(SM_CXSIZEFRAME) + (SM_CXPADDEDBORDER) at that scale, as
+        // measured on Windows 11. Whatever the frame covers, a reserved dock must keep the 6 DIP that
+        // every other pane's grip has.
+        [TestCase(100, 8)]
+        [TestCase(125, 9)]
+        [TestCase(150, 11)]
+        [TestCase(175, 12)]
+        [TestCase(200, 13)]
+        [TestCase(225, 14)]
+        [TestCase(250, 16)]
+        [TestCase(300, 18)]
+        [TestCase(350, 21)]
+        public void ReservedDockGrip_KeepsAUsableWidthBesideAMaximizedFrame(int scalePercent, int framePx)
+        {
+            double frameDip = framePx * 100.0 / scalePercent;
+            Assert.That(QuickPane.UI.SidebarControl.ReservedDockGripWidth - frameDip, Is.GreaterThanOrEqualTo(6));
+        }
+
         private static NM.RECT Rect(int left, int top, int right, int bottom)
         {
             return new NM.RECT { Left = left, Top = top, Right = right, Bottom = bottom };
