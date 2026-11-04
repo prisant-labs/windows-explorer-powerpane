@@ -269,6 +269,7 @@ namespace QuickPane.Services
                 if (loaded == null) return false;
                 Current = loaded;
                 Current.Normalize();
+                Current.TurnOffCustomCommands();   // a restored file may not be the user's own (#190)
                 Current.LoadActiveToTop();
                 // No Flush first. This Save bumps the generation and replaces the pending bytes, so a
                 // write still queued from an older save writes the restored settings instead, and a

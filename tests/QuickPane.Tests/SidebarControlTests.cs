@@ -160,7 +160,7 @@ namespace QuickPane.Tests
         {
             "Sections", "RecentAppsSource", "SshProfiles", "Profiles", "ActiveProfileIndex",
             "ShowProfileTabs", "ProfileTabsAutoHide", "GroupsPath", "KeyboardNav", "Mode", "DialogMode",
-            "QuickActions"
+            "QuickActions", "CustomCommands"
         };
 
         private static readonly string[] AppSettingsNotRendered =
@@ -233,6 +233,29 @@ namespace QuickPane.Tests
         public void PaneShapeKey_QuickActionSettingProperties_AreAllAccountedFor()
         {
             AssertEveryPropertyIsAccountedFor(typeof(QuickActionSetting), QuickActionSettingKeyFields, QuickActionSettingNotRendered);
+        }
+
+        [Test]
+        public void EveryCustomCommandPropertyIsAccountedFor()
+        {
+            AssertEveryPropertyIsAccountedFor(typeof(CustomCommand), new[] { "Id", "Name", "Template" }, new string[0]);
+        }
+
+        [Test]
+        public void PaneShapeKey_ChangesWhenACustomCommandChanges()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            s.Sections.Single(x => x.Type == "quickactions").Visible = true;
+            string id = QuickPane.UI.Settings.Pages.QuickActionsPage.AddCustomCommand(s, "Demo", "demo {path}");
+            string before = SidebarControl.PaneShapeKey(s);
+
+            QuickPane.UI.Settings.Pages.QuickActionsPage.UpdateCustomCommand(s, id, "Demo", "demo {dir}");
+            Assert.That(SidebarControl.PaneShapeKey(s), Is.Not.EqualTo(before));
+
+            string afterTemplate = SidebarControl.PaneShapeKey(s);
+            QuickPane.UI.Settings.Pages.QuickActionsPage.UpdateCustomCommand(s, id, "Renamed", "demo {dir}");
+            Assert.That(SidebarControl.PaneShapeKey(s), Is.Not.EqualTo(afterTemplate));
         }
 
         // ---- PaneShapeKey: the Quick actions list itself (quick actions, first version) --------------

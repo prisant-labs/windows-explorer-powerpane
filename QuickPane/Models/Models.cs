@@ -84,6 +84,22 @@ namespace QuickPane.Models
         public bool Enabled { get; set; } = true;
     }
 
+    /// <summary>A quick action the user wrote (#190): a name and a command template. It appears in
+    /// AppSettings.QuickActions under the same <see cref="Id"/>, which carries its on/off state and its
+    /// place in the order, the same as a built-in action. CustomCommandTemplate reads the template.</summary>
+    [DataContract]
+    public sealed class CustomCommand
+    {
+        [DataMember(Name = "id", Order = 0)]
+        public string Id { get; set; }
+
+        [DataMember(Name = "name", Order = 1)]
+        public string Name { get; set; }
+
+        [DataMember(Name = "template", Order = 2)]
+        public string Template { get; set; }
+    }
+
     /// <summary>One profile: an independent workspace with its own groups folder and pane settings.
     /// The active profile's values are mirrored into the top-level AppSettings fields so the rest of the
     /// app keeps reading GroupsPath / RecentsMaxCount / SidebarWidthPx unchanged.</summary>
@@ -181,6 +197,10 @@ namespace QuickPane.Models
         // the first time it sees a null list.
         [DataMember(Name = "quickActions", Order = 43, EmitDefaultValue = false)]
         public List<QuickActionSetting> QuickActions { get; set; }
+
+        // Commands the user added on the Quick actions page (#190).
+        [DataMember(Name = "customCommands", Order = 50, EmitDefaultValue = false)]
+        public List<CustomCommand> CustomCommands { get; set; }
 
         // The automatic update check (#176). Stored as "off" rather than "on", so a settings file
         // from before this setting existed reads as the default without an OnDeserializing hook.
@@ -411,6 +431,8 @@ namespace QuickPane.Models
         /// pane.</summary>
         private void NormalizeQuickActions()
         {
+            NormalizeCustomCommands();
+
             var seen = new HashSet<string>(StringComparer.Ordinal);
             var cleaned = new List<QuickActionSetting>();
             if (QuickActions != null)
@@ -418,14 +440,49 @@ namespace QuickPane.Models
                 foreach (var a in QuickActions)
                 {
                     if (a == null || string.IsNullOrEmpty(a.Id)) continue;
-                    if (QuickActionLibrary.Find(a.Id) == null) continue;
+                    if (QuickActionLibrary.Resolve(this, a.Id) == null) continue;
                     if (!seen.Add(a.Id)) continue;
                     cleaned.Add(a);
                 }
             }
             foreach (var def in QuickActionLibrary.All)
                 if (seen.Add(def.Id)) cleaned.Add(new QuickActionSetting { Id = def.Id, Enabled = def.DefaultEnabled });
+
+            // A command with no entry came from outside the Settings page, which always adds one. Off
+            // is the safe reading of that: nothing should start running because a file said so.
+            foreach (var command in CustomCommands)
+                if (seen.Add(command.Id)) cleaned.Add(new QuickActionSetting { Id = command.Id, Enabled = false });
             QuickActions = cleaned;
+        }
+
+        /// <summary>Drops entries that could never run or be found again: a missing or foreign id, a
+        /// repeated id, or a blank template. A blank name falls back to the template, so the row is
+        /// never empty.</summary>
+        private void NormalizeCustomCommands()
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var cleaned = new List<CustomCommand>();
+            if (CustomCommands != null)
+            {
+                foreach (var c in CustomCommands)
+                {
+                    if (c == null || !CustomCommandTemplate.IsCustomId(c.Id)) continue;
+                    if (string.IsNullOrWhiteSpace(c.Template) || !seen.Add(c.Id)) continue;
+                    if (string.IsNullOrWhiteSpace(c.Name)) c.Name = c.Template;
+                    cleaned.Add(c);
+                }
+            }
+            CustomCommands = cleaned;
+        }
+
+        /// <summary>Turns every custom command off. A restored backup calls this, because a settings
+        /// file can come from someone else, and its commands should not run until the user has read
+        /// them on the Quick actions page.</summary>
+        public void TurnOffCustomCommands()
+        {
+            if (QuickActions == null) return;
+            foreach (var a in QuickActions)
+                if (CustomCommandTemplate.IsCustomId(a.Id)) a.Enabled = false;
         }
     }
 }

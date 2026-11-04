@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -32,6 +33,9 @@ namespace QuickPane.UI.Settings.Pages
                     "A Quick actions section in the pane: copy a path, create a new file or folder, or open a terminal or editor.",
                     "quick actions", "copy path", "terminal", "visual studio code", "markdown", "new folder",
                     "folder name", "file url", "powershell", "wsl", "readme", "gitignore", "pin");
+                yield return new SettingsSearchEntry(Id, CustomCommandsCardId, "Custom commands",
+                    "Add a quick action that runs a program of your choice in the folder.",
+                    "custom", "command", "template", "run program", "script");
             }
         }
 
@@ -66,8 +70,200 @@ namespace QuickPane.UI.Settings.Pages
             panel.Children.Add(rows);
             Populate(rows, ctx, null, 0);
             panel.Children.Add(BuildResetRow(rows, ctx));
+            panel.Children.Add(cards.Subheader("Custom commands"));
+            panel.Children.Add(BuildCustomCommandEditor(rows, ctx));
 
             return panel;
+        }
+
+        // ---- custom commands (#190) ----
+
+        private const string CustomCommandsCardId = "customCommands";
+        private const string SampleFolder = @"C:\Demo\Projects\Apollo";
+
+        internal const string CustomCommandHelp =
+            "Runs a program in the folder, as you and never elevated. Use a full path, or a program on PATH. " +
+            "{path} and {paths} are the folder, {dir} is the folder, and {name} is its name. " +
+            "QuickPane quotes each value for you, so names with spaces or symbols are safe.";
+
+        // Set by BuildCustomCommandEditor, for the Edit and Delete buttons Populate builds.
+        private System.Action<string> _editCustomCommand;
+        private System.Action<string, string> _confirmDeleteCustomCommand;
+
+        /// <summary>The form that adds a custom command, or edits the one chosen with a row's Edit
+        /// button. It lives in the page panel beside <paramref name="rows"/>, so a Populate does not
+        /// wipe what is being typed. The preview and any error update on every keystroke, and only the
+        /// check that reads PATH waits until the field loses focus, because that one touches the disk.</summary>
+        private FrameworkElement BuildCustomCommandEditor(StackPanel rows, SettingsPageContext ctx)
+        {
+            string editingId = null;
+
+            var help = new TextBlock { Text = CustomCommandHelp, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12) };
+            help.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+            var nameBox = new TextBox { MinWidth = 200, Margin = new Thickness(0, 2, 0, 8) };
+            AutomationProperties.SetName(nameBox, "Custom command name");
+            var templateBox = new TextBox
+            {
+                MinWidth = 200,
+                Margin = new Thickness(0, 2, 0, 8),
+                FontFamily = new System.Windows.Media.FontFamily("Consolas, Cascadia Mono, Courier New"),
+            };
+            AutomationProperties.SetName(templateBox, "Custom command template");
+
+            var status = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+            status.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            AutomationProperties.SetLiveSetting(status, AutomationLiveSetting.Polite);
+
+            var save = new Button { Content = "Add command", IsEnabled = false };
+            SettingsCards.SetAccessibleName(save, "Add custom command");
+            var cancel = new Button { Content = "Cancel", Margin = new Thickness(8, 0, 0, 0), Visibility = Visibility.Collapsed };
+            SettingsCards.SetAccessibleName(cancel, "Cancel editing the custom command");
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+            buttons.Children.Add(save);
+            buttons.Children.Add(cancel);
+
+            var slot = new StackPanel();
+
+            System.Action refresh = () =>
+            {
+                string error = CustomCommandTemplate.Validate(templateBox.Text);
+                bool blank = string.IsNullOrWhiteSpace(templateBox.Text);
+                status.Text = blank
+                    ? "Example: code {path}"
+                    : error ?? "Preview: " + CustomCommandTemplate.Preview(templateBox.Text, new[] { SampleFolder }, SampleFolder);
+                save.IsEnabled = !blank && error == null && !string.IsNullOrWhiteSpace(nameBox.Text);
+            };
+
+            System.Action clear = () =>
+            {
+                editingId = null;
+                nameBox.Text = string.Empty;
+                templateBox.Text = string.Empty;
+                save.Content = "Add command";
+                SettingsCards.SetAccessibleName(save, "Add custom command");
+                cancel.Visibility = Visibility.Collapsed;
+                refresh();
+            };
+
+            nameBox.TextChanged += (s, e) => refresh();
+            templateBox.TextChanged += (s, e) => refresh();
+
+            // Tells the user now, rather than at the first click, that this machine cannot run the
+            // command. A warning only: the program may be installed later.
+            templateBox.LostKeyboardFocus += (s, e) =>
+            {
+                string template = templateBox.Text;
+                if (string.IsNullOrWhiteSpace(template) || CustomCommandTemplate.Validate(template) != null) return;
+                WorkQueue.Post(() =>
+                {
+                    string warning = CustomCommandTemplate.ProgramWarning(template, QuickActionLibrary.FindOnPath);
+                    if (warning == null) return;
+                    WorkQueue.PostUI(() =>
+                    {
+                        if (ctx.IsCurrent && templateBox.Text == template) status.Text = warning;
+                    });
+                });
+            };
+
+            save.Click += (s, e) =>
+            {
+                var settings = ctx.Settings.Current;
+                string id = editingId;
+                if (id != null) UpdateCustomCommand(settings, id, nameBox.Text, templateBox.Text);
+                else id = AddCustomCommand(settings, nameBox.Text, templateBox.Text);
+                ctx.Settings.Save();
+                clear();
+                Populate(rows, ctx, id, 0);
+            };
+            cancel.Click += (s, e) => clear();
+
+            _editCustomCommand = id =>
+            {
+                var command = FindCustomCommand(ctx.Settings.Current, id);
+                if (command == null) return;
+                editingId = id;
+                nameBox.Text = command.Name;
+                templateBox.Text = command.Template;
+                save.Content = "Save changes";
+                SettingsCards.SetAccessibleName(save, "Save changes to the custom command");
+                cancel.Visibility = Visibility.Visible;
+                refresh();
+                nameBox.BringIntoView();
+                nameBox.Focus();
+            };
+
+            _confirmDeleteCustomCommand = (id, name) =>
+            {
+                slot.Children.Clear();
+                slot.Children.Add(ctx.Cards.ConfirmRow(
+                    "Delete the custom command \"" + name + "\"?",
+                    "Delete",
+                    onConfirm: () =>
+                    {
+                        DeleteCustomCommand(ctx.Settings.Current, id);
+                        ctx.Settings.Save();
+                        slot.Children.Clear();
+                        if (editingId == id) clear();
+                        Populate(rows, ctx, null, 0);
+                    },
+                    onCancel: () => slot.Children.Clear()));
+                slot.BringIntoView();
+            };
+
+            refresh();
+
+            var nameLabel = new TextBlock { Text = "Name" };
+            var templateLabel = new TextBlock { Text = "Command" };
+            var body = new StackPanel();
+            body.Children.Add(help);
+            body.Children.Add(nameLabel);
+            body.Children.Add(nameBox);
+            body.Children.Add(templateLabel);
+            body.Children.Add(templateBox);
+            body.Children.Add(status);
+            body.Children.Add(buttons);
+            body.Children.Add(slot);
+
+            var shell = ctx.Cards.CardShell(body, hoverable: false);
+            ctx.Cards.Register(CustomCommandsCardId, nameBox);
+            return shell;
+        }
+
+        internal static CustomCommand FindCustomCommand(AppSettings settings, string id)
+        {
+            return settings.CustomCommands != null
+                ? settings.CustomCommands.FirstOrDefault(c => string.Equals(c.Id, id, System.StringComparison.Ordinal))
+                : null;
+        }
+
+        /// <summary>Adds a command, switched on and at the end of the order, and returns its new id.</summary>
+        internal static string AddCustomCommand(AppSettings settings, string name, string template)
+        {
+            string id = CustomCommandTemplate.IdPrefix + System.Guid.NewGuid().ToString("N");
+            if (settings.CustomCommands == null) settings.CustomCommands = new List<CustomCommand>();
+            settings.CustomCommands.Add(new CustomCommand { Id = id, Name = name.Trim(), Template = template.Trim() });
+            if (settings.QuickActions == null) settings.QuickActions = new List<QuickActionSetting>();
+            settings.QuickActions.Add(new QuickActionSetting { Id = id, Enabled = true });
+            return id;
+        }
+
+        internal static bool UpdateCustomCommand(AppSettings settings, string id, string name, string template)
+        {
+            var command = FindCustomCommand(settings, id);
+            if (command == null) return false;
+            command.Name = name.Trim();
+            command.Template = template.Trim();
+            return true;
+        }
+
+        internal static bool DeleteCustomCommand(AppSettings settings, string id)
+        {
+            var command = FindCustomCommand(settings, id);
+            if (command == null) return false;
+            settings.CustomCommands.Remove(command);
+            ActionList(settings).RemoveAll(a => string.Equals(a.Id, id, System.StringComparison.Ordinal));
+            return true;
         }
 
         // ---- reset to default (#178) ----
@@ -85,11 +281,11 @@ namespace QuickPane.UI.Settings.Pages
             {
                 slot.Children.Clear();
                 slot.Children.Add(ctx.Cards.ConfirmRow(
-                    "Restore the default order and on/off state of every quick action? The Show Quick actions switch is not changed.",
+                    "Restore the default order and on/off state of every built-in quick action? Custom commands are kept, after them. The Show Quick actions switch is not changed.",
                     "Reset",
                     onConfirm: () =>
                     {
-                        ctx.Settings.Current.QuickActions = ResetActions();
+                        ctx.Settings.Current.QuickActions = ResetActions(ctx.Settings.Current);
                         ctx.Settings.Save();
                         slot.Children.Clear();
                         Populate(rows, ctx, null, 0);
@@ -113,6 +309,15 @@ namespace QuickPane.UI.Settings.Pages
                 .ToList();
         }
 
+        /// <summary><see cref="ResetActions()"/> for a real settings object: reset is about what QuickPane
+        /// shipped, so the user's own commands stay, in their order and state, after the built-ins.</summary>
+        internal static List<QuickActionSetting> ResetActions(AppSettings settings)
+        {
+            var list = ResetActions();
+            list.AddRange(ActionList(settings).Where(a => CustomCommandTemplate.IsCustomId(a.Id)));
+            return list;
+        }
+
         /// <summary>(Re)builds every action row into <paramref name="panel"/>, same reasoning as
         /// SectionsPage.Populate: rebuilding only this panel keeps the page's scroll position, and
         /// <paramref name="refocusId"/> (the moved action's Id, or null on first build) plus
@@ -130,7 +335,7 @@ namespace QuickPane.UI.Settings.Pages
             for (int i = 0; i < list.Count; i++)
             {
                 var setting = list[i];
-                var def = QuickActionLibrary.Find(setting.Id);
+                var def = QuickActionLibrary.Resolve(ctx.Settings.Current, setting.Id);
                 string name = def != null ? def.Name : setting.Id;
                 string description = def != null ? def.Description : "";
                 int index = i;
@@ -177,6 +382,11 @@ namespace QuickPane.UI.Settings.Pages
                 controls.Children.Add(toggle);
                 controls.Children.Add(up);
                 controls.Children.Add(down);
+                if (def != null && def.Kind == QuickActionKind.Custom)
+                {
+                    controls.Children.Add(cards.IconButton("\uE70F", "Edit " + name, () => _editCustomCommand(id)));
+                    controls.Children.Add(cards.IconButton("\uE74D", "Delete " + name, () => _confirmDeleteCustomCommand(id, name)));
+                }
 
                 var card = cards.Card("action-" + setting.Id, "", name, description, controls);
 

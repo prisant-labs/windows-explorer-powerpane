@@ -901,13 +901,12 @@ namespace QuickPane.UI
             foreach (var setting in settings.QuickActions)
             {
                 if (!setting.Enabled) continue;
-                var def = QuickActionLibrary.Find(setting.Id);
+                var def = QuickActionLibrary.Resolve(settings, setting.Id);
                 if (def == null || !QuickActionLibrary.AppliesToPinnedRow(def)) continue;
                 if (!QuickActionsSection.IsAvailable(def)) continue;
 
-                var id = def.Id;
                 var folder = targetPath;
-                menu.Items.Add(Item(def.Name, () => WorkQueue.Post(() => QuickActionRunner.Run(id, folder))));
+                menu.Items.Add(Item(def.Name, () => WorkQueue.Post(() => QuickActionRunner.Run(def, folder, null))));
             }
             return menu.Items.Count > 0 ? menu : null;
         }

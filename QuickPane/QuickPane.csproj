@@ -102,6 +102,7 @@
     <Compile Include="Services\DriveService.cs" />
     <Compile Include="Services\ThemeService.cs" />
     <Compile Include="Services\FluentThemeService.cs" />
+    <Compile Include="Services\CustomCommandTemplate.cs" />
     <Compile Include="Services\QuickActionLibrary.cs" />
     <Compile Include="Services\QuickActionRunner.cs" />
     <Compile Include="Themes\Fluent\Controls\AnimationFactorToValueConverter.cs" />

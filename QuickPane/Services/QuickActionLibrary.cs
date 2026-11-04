@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text;
+using QuickPane.Models;
 
 namespace QuickPane.Services
 {
@@ -9,8 +10,8 @@ namespace QuickPane.Services
     /// copies some form of its path to the clipboard, adds something new inside it, or starts an
     /// external program there. Only picks the pane row's icon glyph; QuickActionRunner is what
     /// actually runs an action, keyed on its Id. FolderAction is anything else done to the folder
-    /// itself, today only pinning it.</summary>
-    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction }
+    /// itself, today only pinning it. Custom is a command the user wrote (#190).</summary>
+    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction, Custom }
 
     /// <summary>One built-in quick action: a stable <see cref="Id"/> that settings.json stores
     /// (QuickActionSetting carries only this), and the display <see cref="Name"/> and one-line
@@ -26,6 +27,10 @@ namespace QuickPane.Services
         public string Description { get; private set; }
         public QuickActionKind Kind { get; private set; }
         public bool DefaultEnabled { get; private set; }
+
+        /// <summary>A custom command's template, which is also what its row's tooltip shows. Null for a
+        /// built-in action.</summary>
+        public string Template { get { return Kind == QuickActionKind.Custom ? Description : null; } }
 
         public QuickActionDefinition(string id, string name, string description, QuickActionKind kind, bool defaultEnabled)
         {
@@ -93,6 +98,19 @@ namespace QuickPane.Services
             if (string.IsNullOrEmpty(id)) return null;
             foreach (var d in All)
                 if (string.Equals(d.Id, id, StringComparison.Ordinal)) return d;
+            return null;
+        }
+
+        /// <summary><see cref="Find"/>, plus the custom commands in <paramref name="settings"/>. Anything
+        /// that reads AppSettings.QuickActions uses this one, because an entry there can be either.</summary>
+        public static QuickActionDefinition Resolve(AppSettings settings, string id)
+        {
+            var builtIn = Find(id);
+            if (builtIn != null || !CustomCommandTemplate.IsCustomId(id) || settings == null || settings.CustomCommands == null)
+                return builtIn;
+            foreach (var c in settings.CustomCommands)
+                if (string.Equals(c.Id, id, StringComparison.Ordinal))
+                    return new QuickActionDefinition(c.Id, c.Name, c.Template, QuickActionKind.Custom, false);
             return null;
         }
 
