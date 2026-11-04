@@ -764,6 +764,7 @@ namespace QuickPane.UI.Settings
             }
 
             _headerHost.Content = BuildHeader(page.Title, _subPage?.Item1);
+            PinToTop(body);
             _bodyScroller.Content = body;
             SelectNav(page.Id);
 
@@ -782,6 +783,16 @@ namespace QuickPane.UI.Settings
                     Log.Info(FormatPageSwitchTiming(page.Id, switchStopwatch.ElapsedMilliseconds));
                 }));
             }
+        }
+
+        /// <summary>Keeps a page body at its own height. A ScrollViewer arranges its content at the
+        /// full viewport height, so a body with the default Stretch alignment fills the page. A body
+        /// that is one card, such as Backup &amp; restore or the error bar for a failed page, then drew
+        /// as a page-sized card with its icon at the top and its text in the middle (#201).</summary>
+        internal static void PinToTop(UIElement body)
+        {
+            var element = body as FrameworkElement;
+            if (element != null) element.VerticalAlignment = VerticalAlignment.Top;
         }
 
         /// <summary>The "Settings opened in N ms" log line, against the 500 ms open-time budget.

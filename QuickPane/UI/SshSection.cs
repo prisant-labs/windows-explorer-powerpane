@@ -14,6 +14,10 @@ namespace QuickPane.UI
     /// </summary>
     internal sealed class SshSection : UserControl
     {
+        /// <summary>The section's name until someone renames it. It matches the Settings page, which
+        /// #175 named for what a person gets rather than the protocol behind it (#204).</summary>
+        internal const string DefaultTitle = "Remote drives";
+
         private readonly StackPanel _root = new StackPanel();
         private bool _expanded = true;
 
@@ -35,11 +39,11 @@ namespace QuickPane.UI
             TextBlock label;
             _expanded = UiState.GetExpanded("section:ssh");
             var header = UiHelpers.BuildHeader(
-                RecentsSection.SectionTitle("ssh", "SSH"),
+                RecentsSection.SectionTitle("ssh", DefaultTitle),
                 () => { _expanded = !_expanded; UiState.SetExpanded("section:ssh", _expanded); UiHelpers.ToggleExpand(items, chevron, _expanded); },
-                () => RecentsSection.RenameSectionPrompt("ssh", "SSH"),
+                () => RecentsSection.RenameSectionPrompt("ssh", DefaultTitle),
                 out chevron, out label);
-            header.ContextMenu = RecentsSection.SectionMenu("ssh", "SSH");
+            header.ContextMenu = RecentsSection.SectionMenu("ssh", DefaultTitle);
 
             foreach (var profile in profiles)
                 items.Children.Add(BuildRow(profile, navigate));
@@ -116,7 +120,7 @@ namespace QuickPane.UI
                 }
             };
             menu.Items.Add(item);
-            var settings = new MenuItem { Header = "SSH connection settings..." };
+            var settings = new MenuItem { Header = "Remote drive settings..." };
             settings.Click += (s, e) => App.ShowSettings();
             menu.Items.Add(settings);
             return menu;

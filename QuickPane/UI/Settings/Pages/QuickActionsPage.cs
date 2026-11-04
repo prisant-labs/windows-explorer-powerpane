@@ -319,6 +319,15 @@ namespace QuickPane.UI.Settings.Pages
             return list;
         }
 
+        /// <summary>The icon a row shows here: the same one its row shows in the pane, so the two are
+        /// easy to match up. A card reserves the icon's width whether or not it has a glyph, so an
+        /// empty glyph left a blank gap before every label (#202). <paramref name="def"/> is null for
+        /// an action this version does not know, which still gets an icon so its row lines up.</summary>
+        internal static string RowGlyph(QuickActionDefinition def)
+        {
+            return QuickActionsSection.Glyph(def != null ? def.Kind : QuickActionKind.CopyPath);
+        }
+
         /// <summary>(Re)builds every action row into <paramref name="panel"/>, same reasoning as
         /// SectionsPage.Populate: rebuilding only this panel keeps the page's scroll position, and
         /// <paramref name="refocusId"/> (the moved action's Id, or null on first build) plus
@@ -379,17 +388,19 @@ namespace QuickPane.UI.Settings.Pages
                     refocusToggle = toggle.Tag as Control;   // Toggle() keeps its ToggleButton in Tag
                 }
 
-                var controls = new StackPanel { Orientation = Orientation.Horizontal };
-                controls.Children.Add(toggle);
-                controls.Children.Add(up);
-                controls.Children.Add(down);
+                var controls = cards.ReorderControls(toggle, up, down);
                 if (def != null && def.Kind == QuickActionKind.Custom)
                 {
                     controls.Children.Add(cards.IconButton("\uE70F", "Edit " + name, () => _editCustomCommand(id)));
                     controls.Children.Add(cards.IconButton("\uE74D", "Delete " + name, () => _confirmDeleteCustomCommand(id, name)));
                 }
 
-                var card = cards.Card("action-" + setting.Id, "", name, description, controls);
+                // A built-in row's name says what it does, so its description moves to the info
+                // button and 28 rows take far less height (#205). A custom command's description is
+                // its template, which says what the row will run, so that one stays on screen.
+                var card = def != null && def.Kind == QuickActionKind.Custom
+                    ? cards.Card("action-" + setting.Id, RowGlyph(def), name, description, controls)
+                    : cards.CompactCard("action-" + setting.Id, RowGlyph(def), name, controls, info: description);
 
                 // Drag grip at the row's left edge (#178); see SectionsPage.Populate. Moves by id, not
                 // by captured index, for the staleness reason on FindActionById.

@@ -45,6 +45,22 @@ namespace QuickPane.Tests
             Assert.That(FindIcon(compact).VerticalAlignment, Is.EqualTo(VerticalAlignment.Center));
         }
 
+        // #203: both reorderable pages build their row controls here, so the gap cannot drift apart.
+        [Test]
+        public void ReorderControls_LeavesAGapAfterTheSwitch_InOrder()
+        {
+            var cards = new SettingsCards();
+            var toggle = new Border();
+            var up = new Button();
+            var down = new Button();
+
+            var controls = cards.ReorderControls(toggle, up, down);
+
+            Assert.That(controls.Children.Cast<UIElement>(), Is.EqualTo(new UIElement[] { toggle, up, down }));
+            Assert.That(toggle.Margin.Right, Is.EqualTo(SettingsCards.ToggleToMoveGap));
+            Assert.That(SettingsCards.ToggleToMoveGap, Is.GreaterThan(0));
+        }
+
         [Test]
         public void Card_KeepsItsOwnTallerHeight_WithIconPinnedToTop()
         {

@@ -170,18 +170,90 @@ namespace QuickPane.UI.Settings
         /// description, e.g. a Pane sections row, whose On/Off switch already says what a "Shown in
         /// the pane" / "Hidden from the pane" line used to repeat (#154). <see cref="CompactCardMinHeight"/>
         /// replaces <see cref="CardMinHeight"/>, and the icon centres on the title instead of pinning
-        /// to the top, since there is no second line to leave room for.</summary>
+        /// to the top, since there is no second line to leave room for. <paramref name="info"/>, when
+        /// given, adds an <see cref="InfoButton"/> beside the title.</summary>
         public Border CompactCard(string cardId, string glyph, string title, FrameworkElement control,
-            string accessibleName = null)
+            string accessibleName = null, string info = null)
         {
-            return CardCore(cardId, glyph, title, null, control, accessibleName, compact: true);
+            return CardCore(cardId, glyph, title, null, control, accessibleName, compact: true, info: info);
+        }
+
+        /// <summary>An "i" button whose tooltip holds a row's description (#205). Microsoft's guidance
+        /// is that tooltip text must be supplemental, so use this only where the row's name already
+        /// says what it is. A tooltip alone reaches a mouse user only, so this is a real tab stop: it
+        /// also shows on keyboard focus and on a press, which covers touch, and Escape closes it. A
+        /// screen reader gets the same text as the button's help text.</summary>
+        internal static Button InfoButton(string title, string info)
+        {
+            var icon = Glyph("\uE946", 14);   // Segoe Fluent Icons Info
+            icon.HorizontalAlignment = HorizontalAlignment.Center;
+            icon.VerticalAlignment = VerticalAlignment.Center;
+            icon.TextAlignment = TextAlignment.Center;
+            icon.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+            var chrome = new Border { CornerRadius = new CornerRadius(4), Background = Brushes.Transparent, Child = icon };
+            chrome.MouseEnter += (s, e) => chrome.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorSecondaryBrush");
+            chrome.MouseLeave += (s, e) => chrome.Background = Brushes.Transparent;
+
+            var tip = new ToolTip
+            {
+                Content = new TextBlock { Text = info, TextWrapping = TextWrapping.Wrap, MaxWidth = InfoTipMaxWidth },
+                Placement = PlacementMode.Bottom,
+            };
+
+            var button = Invokable(chrome, "About " + title, () => tip.IsOpen = !tip.IsOpen);
+            button.Width = InfoButtonSize;
+            button.Height = InfoButtonSize;
+            button.HorizontalAlignment = HorizontalAlignment.Left;
+            button.VerticalAlignment = VerticalAlignment.Center;
+            button.Margin = new Thickness(4, 0, 0, 0);
+            AutomationProperties.SetHelpText(button, info);
+
+            tip.PlacementTarget = button;
+            button.ToolTip = tip;
+            ToolTipService.SetPlacement(button, PlacementMode.Bottom);
+            ToolTipService.SetInitialShowDelay(button, InfoTipDelayMs);
+            ToolTipService.SetShowDuration(button, InfoTipDurationMs);
+
+            button.GotKeyboardFocus += (s, e) => tip.IsOpen = true;
+            button.LostKeyboardFocus += (s, e) => tip.IsOpen = false;
+            button.MouseLeave += (s, e) => tip.IsOpen = false;
+            button.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key != Key.Escape || !tip.IsOpen) return;
+                tip.IsOpen = false;
+                e.Handled = true;
+            };
+            return button;
+        }
+
+        private const double InfoButtonSize = 28;   // fits the compact row's 32 px line without growing it
+        private const double InfoTipMaxWidth = 320;
+        private const int InfoTipDelayMs = 200;     // quick, because hovering the "i" already asks for it
+        private const int InfoTipDurationMs = 30000;   // long enough to read two sentences
+
+        /// <summary>The gap between a row's on/off switch and its Move buttons. They do different
+        /// things, and with no gap they read as one cluster (#203).</summary>
+        internal const double ToggleToMoveGap = 16;
+
+        /// <summary>The controls at the right of a reorderable row: its switch, then Move up and Move
+        /// down. Pane sections and Quick actions share this, so their rows stay the same. A caller may
+        /// add more buttons after these, as a custom command's Edit and Delete do.</summary>
+        public StackPanel ReorderControls(FrameworkElement toggle, FrameworkElement up, FrameworkElement down)
+        {
+            toggle.Margin = new Thickness(0, 0, ToggleToMoveGap, 0);
+            var controls = new StackPanel { Orientation = Orientation.Horizontal };
+            controls.Children.Add(toggle);
+            controls.Children.Add(up);
+            controls.Children.Add(down);
+            return controls;
         }
 
         private Border CardCore(string cardId, string glyph, string title, string description,
-            FrameworkElement control, string accessibleName, bool compact)
+            FrameworkElement control, string accessibleName, bool compact, string info = null)
         {
             TextBlock titleBlock;
-            var body = CardBody(glyph, title, description, control, out titleBlock, compact);
+            var body = CardBody(glyph, title, description, control, out titleBlock, compact, info);
             var border = CardShell(body, hoverable: true, compact);
             RegisterAndName(cardId, control, accessibleName, title);
 
@@ -204,7 +276,7 @@ namespace QuickPane.UI.Settings
         /// column is simply left empty. <paramref name="titleBlock"/> hands back the title so an
         /// expander can rename itself in place (<see cref="ExpanderCard.Title"/>).</summary>
         private static Grid CardBody(string glyph, string title, string description, FrameworkElement control,
-            out TextBlock titleBlock, bool compact = false)
+            out TextBlock titleBlock, bool compact = false, string info = null)
         {
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -230,7 +302,20 @@ namespace QuickPane.UI.Settings
 
             var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             titleBlock = TitleText(title);
-            text.Children.Add(titleBlock);
+            if (string.IsNullOrEmpty(info))
+            {
+                text.Children.Add(titleBlock);
+            }
+            else
+            {
+                // A WrapPanel keeps the button right after the title rather than at the far edge of
+                // the column, and a title too long for a narrow window still wraps.
+                titleBlock.VerticalAlignment = VerticalAlignment.Center;
+                var titleRow = new WrapPanel { Orientation = Orientation.Horizontal };
+                titleRow.Children.Add(titleBlock);
+                titleRow.Children.Add(InfoButton(title, info));
+                text.Children.Add(titleRow);
+            }
             if (!string.IsNullOrEmpty(description)) text.Children.Add(DescriptionText(description));
             Grid.SetColumn(text, 1);
             Grid.SetRow(text, 0);

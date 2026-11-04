@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Rows on the Pane sections and Quick actions settings pages have an info button beside the label. Its tooltip says what the row is, and for a section, when it does not appear. Built-in quick actions move their description there, so their rows are shorter and more fit on screen. A custom command keeps its template on the row ([#205](https://github.com/prisant-labs/windows-explorer-quickpane/issues/205)).
+- The SSH section is now called Remote drives on the Pane sections page, in the pane's section header, and in its row menu, the same as its Settings page. A header you renamed keeps your name ([#204](https://github.com/prisant-labs/windows-explorer-quickpane/issues/204)).
+
+### Fixed
+- The Backup & restore card in Settings stays at its own height. It stretched to fill the page, with its icon at the top and its buttons in the middle ([#201](https://github.com/prisant-labs/windows-explorer-quickpane/issues/201)).
+- Rows on the Quick actions settings page show the same icon as their row in the pane, instead of a blank gap ([#202](https://github.com/prisant-labs/windows-explorer-quickpane/issues/202)).
+- On the Pane sections and Quick actions settings pages, the on/off switch has more room from the Move buttons ([#203](https://github.com/prisant-labs/windows-explorer-quickpane/issues/203)).
+
 ## [3.12.0.0] - 2026-11-04
 
 Quick actions you can extend: 18 more built-in actions, custom commands, and actions on the files selected in Explorer. QuickPane also tells you when a new version exists. See the [release notes](docs/releases/3.12.0.0.md).
