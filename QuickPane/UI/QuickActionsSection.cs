@@ -22,7 +22,8 @@ namespace QuickPane.UI
     /// A row does not know its folder when it is built: the pane rebuilds only on a theme or settings
     /// change, never on an Explorer navigation, so caching the folder at build time would let a click
     /// act on wherever the window was when the pane last rebuilt rather than where it is now. Instead
-    /// every click resolves the folder fresh, off the UI thread, at the moment it is clicked.</summary>
+    /// every click resolves the folder fresh, off the UI thread, at the moment it is clicked. The
+    /// selection is read the same way, and only for an action that uses it (#191).</summary>
     internal sealed class QuickActionsSection : UserControl
     {
         private readonly StackPanel _root = new StackPanel();
@@ -112,7 +113,7 @@ namespace QuickPane.UI
         /// appears only to do nothing when clicked. Shared with a pinned row's submenu.</summary>
         internal static bool IsAvailable(QuickActionDefinition def)
         {
-            if (def.Id == "open-vscode")
+            if (def.Id == "open-vscode" || def.Id == "open-selected-vscode")
             {
                 QuickActionLibrary.BeginCodeCheck();
                 return !QuickActionLibrary.CodeCheckDone || QuickActionLibrary.CodeOnPath;
@@ -168,7 +169,16 @@ namespace QuickPane.UI
             Action run = () => WorkQueue.Post(() =>
             {
                 var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
-                var message = QuickActionRunner.Run(def, folder, null);
+                string message;
+                bool tooMany = false;
+                var selection = QuickActionLibrary.UsesSelection(def)
+                    ? ExplorerNavigator.GetSelectedPaths(hostWindow, out tooMany)
+                    : null;
+                // Too many items refuses rather than falling back to the folder, which is not what
+                // someone with a thousand files selected asked for.
+                message = tooMany
+                    ? QuickActionRunner.TooManySelected(ExplorerNavigator.MaxSelectedItems)
+                    : QuickActionRunner.Run(def, folder, selection);
                 if (message != null) WorkQueue.PostUI(() => ShowMessage(row, text, def, message));
             });
             row.MouseLeftButtonUp += (s, e) => run();
@@ -198,7 +208,7 @@ namespace QuickPane.UI
             timer.Start();
         }
 
-        // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow, Pin, CommandPrompt.
+        // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow, Pin, SelectAll, CommandPrompt.
         private static string Glyph(QuickActionKind kind)
         {
             switch (kind)
@@ -207,6 +217,7 @@ namespace QuickPane.UI
                 case QuickActionKind.NewItem: return "\uE710";
                 case QuickActionKind.OpenTool: return "\uE8A7";
                 case QuickActionKind.FolderAction: return "\uE718";
+                case QuickActionKind.Selection: return "\uE8B3";
                 case QuickActionKind.Custom: return "\uE756";
                 default: return "\uE8C8";
             }

@@ -139,6 +139,68 @@ namespace QuickPane.Interop
             }
         }
 
+        /// <summary>More items than this is refused rather than read, because each one costs two
+        /// cross-process calls, and a quietly shortened list would act on the wrong set of files.</summary>
+        internal const int MaxSelectedItems = 1000;
+
+        /// <summary>The paths of the items selected in the active tab of this Explorer window, in the
+        /// view's order (#191). Empty when nothing is selected or the window cannot be read. Sets
+        /// <paramref name="tooMany"/>, and returns nothing, past <see cref="MaxSelectedItems"/>.
+        /// Cross-process COM, so a caller is already off the UI thread. It runs only when a row is
+        /// clicked, never to keep the pane up to date: watching a selection cheaply is unsolved, and
+        /// polling would undo the performance work.</summary>
+        public static List<string> GetSelectedPaths(IntPtr topLevelHwnd, out bool tooMany)
+        {
+            tooMany = false;
+            var paths = new List<string>();
+            object shell = null, windows = null, w = null, doc = null, items = null;
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("Shell.Application");
+                if (shellType == null) return paths;
+                shell = Activator.CreateInstance(shellType);
+                windows = Call(shell, "Windows");
+                if (windows == null) return paths;
+                w = FindActiveTab(windows, topLevelHwnd);
+                doc = Get(w, "Document");
+                items = Call(doc, "SelectedItems");
+                if (items == null) return paths;
+
+                int count = ToInt(Get(items, "Count"));
+                if (count > MaxSelectedItems) { tooMany = true; return paths; }
+                for (int i = 0; i < count; i++)
+                {
+                    object item = null;
+                    try
+                    {
+                        item = Call(items, "Item", i);
+                        var p = Get(item, "Path") as string;
+                        if (IsFileSystemPath(p)) paths.Add(p);
+                    }
+                    finally { Release(item); }
+                }
+            }
+            catch (Exception ex) { Log.Error("GetSelectedPaths failed", ex); paths.Clear(); }
+            finally
+            {
+                Release(items);
+                Release(doc);
+                Release(w);
+                Release(windows);
+                Release(shell);
+            }
+            return paths;
+        }
+
+        /// <summary>False for a shell item with no place on disk, such as a Control Panel entry, whose
+        /// "path" is a "::{GUID}" parsing name. No program could do anything with that.</summary>
+        internal static bool IsFileSystemPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            if (path.StartsWith(@"\\", StringComparison.Ordinal)) return true;
+            return path.Length >= 3 && path[1] == ':' && path[2] == '\\' && char.IsLetter(path[0]);
+        }
+
         /// <summary>
         /// The shell window for the tab in front of the Explorer window with this top-level HWND, or
         /// null. The caller releases it.

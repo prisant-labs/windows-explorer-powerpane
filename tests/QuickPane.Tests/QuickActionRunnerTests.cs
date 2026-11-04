@@ -15,6 +15,70 @@ namespace QuickPane.Tests
     [TestFixture]
     public class QuickActionRunnerTests
     {
+        // ---- selection actions (#191) ----------------------------------------------------------
+
+        private static readonly string[] Selected = { @"C:\Demo\My File.txt", @"C:\Demo\Sub" };
+
+        [TestCase("copy-selected-names", "My File.txt|Sub")]
+        [TestCase("copy-selected-paths", @"C:\Demo\My File.txt|C:\Demo\Sub")]
+        [TestCase("copy-selected-quoted", "\"C:\\Demo\\My File.txt\"|\"C:\\Demo\\Sub\"")]
+        [TestCase("copy-selected-forward", "C:/Demo/My File.txt|C:/Demo/Sub")]
+        [TestCase("copy-selected-wsl", "/mnt/c/Demo/My File.txt|/mnt/c/Demo/Sub")]
+        [TestCase("copy-selected-urls", "file:///C:/Demo/My%20File.txt|file:///C:/Demo/Sub")]
+        [TestCase("copy-selected-markdown", "[My File.txt](<C:/Demo/My File.txt>)|[Sub](<C:/Demo/Sub>)")]
+        public void SelectionTextFor_FormatsEachItemOnItsOwnLine(string id, string expected)
+        {
+            Assert.That(QuickActionRunner.SelectionTextFor(id, Selected),
+                Is.EqualTo(expected.Replace("|", System.Environment.NewLine)));
+        }
+
+        [Test]
+        public void SelectionTextFor_SkipsAnItemWithNoSuchForm()
+        {
+            Assert.That(QuickActionRunner.SelectionTextFor("copy-selected-wsl", new[] { @"\\server\share\a", @"C:\Demo\b" }),
+                Is.EqualTo("/mnt/c/Demo/b"));
+            Assert.That(QuickActionRunner.SelectionTextFor("copy-selected-wsl", new[] { @"\\server\share\a" }), Is.Null);
+        }
+
+        [TestCase(null)]
+        [TestCase("empty")]
+        public void Run_SelectionActionWithNothingSelected_SaysSo(string selection)
+        {
+            var def = QuickActionLibrary.Find("copy-selected-paths");
+            Assert.That(QuickActionRunner.Run(def, @"C:\Demo", selection == null ? null : new string[0]),
+                Is.EqualTo(QuickActionRunner.NothingSelected));
+        }
+
+        [TestCase("copy-selected-paths", false)]
+        [TestCase("open-selected-vscode", false)]
+        [TestCase("copy-path", true)]
+        public void AppliesToPinnedRow_ExcludesSelectionActions(string id, bool expected)
+        {
+            Assert.That(QuickActionLibrary.AppliesToPinnedRow(QuickActionLibrary.Find(id)), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void UsesSelection_OnlyForActionsThatReadIt()
+        {
+            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-selected-paths")), Is.True);
+            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-path")), Is.False);
+
+            var usesPath = new QuickActionDefinition("custom:a", "A", "tool {path}", QuickActionKind.Custom, false);
+            var usesDir = new QuickActionDefinition("custom:b", "B", "tool {dir}", QuickActionKind.Custom, false);
+            Assert.That(QuickActionLibrary.UsesSelection(usesPath), Is.True);
+            Assert.That(QuickActionLibrary.UsesSelection(usesDir), Is.False);
+        }
+
+        [TestCase(@"C:\Demo\a.txt", true)]
+        [TestCase(@"\\server\share\a.txt", true)]
+        [TestCase("::{20D04FE0-3AEA-1069-A2D8-08002B30309D}", false)]
+        [TestCase("", false)]
+        [TestCase(null, false)]
+        public void IsFileSystemPath_RejectsShellOnlyItems(string path, bool expected)
+        {
+            Assert.That(QuickPane.Interop.ExplorerNavigator.IsFileSystemPath(path), Is.EqualTo(expected));
+        }
+
         // ---- ClipboardTextFor (pure) ----------------------------------------------------------
 
         [TestCase("copy-folder-name", @"C:\Demo\Apollo", "Apollo")]

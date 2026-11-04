@@ -10,8 +10,9 @@ namespace QuickPane.Services
     /// copies some form of its path to the clipboard, adds something new inside it, or starts an
     /// external program there. Only picks the pane row's icon glyph; QuickActionRunner is what
     /// actually runs an action, keyed on its Id. FolderAction is anything else done to the folder
-    /// itself, today only pinning it. Custom is a command the user wrote (#190).</summary>
-    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction, Custom }
+    /// itself, today only pinning it. Selection acts on what is selected in Explorer (#191), and
+    /// Custom is a command the user wrote (#190).</summary>
+    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction, Selection, Custom }
 
     /// <summary>One built-in quick action: a stable <see cref="Id"/> that settings.json stores
     /// (QuickActionSetting carries only this), and the display <see cref="Name"/> and one-line
@@ -91,6 +92,25 @@ namespace QuickPane.Services
                 "Opens your default WSL distribution in the folder. Hidden when no distribution is installed.", QuickActionKind.OpenTool, false),
             new QuickActionDefinition("pin-folder", "Pin this folder",
                 "Opens the group picker to pin the folder, the same as the Explorer right-click command.", QuickActionKind.FolderAction, false),
+            // Separate rows rather than "Copy path" preferring the selection: Explorer selects the
+            // folder you came from when you go up a level, so that row would quietly copy the wrong
+            // path after an ordinary navigation (#191).
+            new QuickActionDefinition("copy-selected-names", "Copy selected names",
+                "The names of the items selected in Explorer, one per line.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("copy-selected-paths", "Copy selected paths",
+                "The full paths of the selected items, one per line.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("copy-selected-quoted", "Copy selected paths in quotes",
+                "The selected paths in \"double quotes\", one per line.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("copy-selected-forward", "Copy selected paths with forward slashes",
+                "The selected paths with forward slashes, one per line.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("copy-selected-wsl", "Copy selected WSL paths",
+                "The selected paths as WSL would read them, one per line. Skips network paths.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("copy-selected-urls", "Copy selected as file URLs",
+                "The selected paths as file:// URLs, one per line.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("copy-selected-markdown", "Copy selected as Markdown links",
+                "A Markdown link to each selected item, one per line.", QuickActionKind.Selection, false),
+            new QuickActionDefinition("open-selected-vscode", "Open selection in Visual Studio Code",
+                "Opens the selected items in VS Code. Hidden when \"code\" is not on PATH.", QuickActionKind.Selection, false),
         };
 
         public static QuickActionDefinition Find(string id)
@@ -328,10 +348,20 @@ namespace QuickPane.Services
         // ---- where an action may appear -----------------------------------------
 
         /// <summary>Whether an action belongs in a pinned row's Quick actions submenu. "Pin this folder"
-        /// does not: that row is a pin already.</summary>
+        /// does not, because that row is a pin already. A selection action does not either, because a
+        /// pinned row is not looking at any Explorer window's selection.</summary>
         public static bool AppliesToPinnedRow(QuickActionDefinition def)
         {
-            return def != null && def.Id != "pin-folder";
+            return def != null && def.Id != "pin-folder" && def.Kind != QuickActionKind.Selection;
+        }
+
+        /// <summary>Whether running this action needs the Explorer selection read first. A custom command
+        /// that uses only {dir}, or no placeholder, skips the cross-process call.</summary>
+        public static bool UsesSelection(QuickActionDefinition def)
+        {
+            if (def == null) return false;
+            return def.Kind == QuickActionKind.Selection
+                || (def.Kind == QuickActionKind.Custom && CustomCommandTemplate.UsesTargets(def.Template));
         }
 
         // ---- PATH lookup -------------------------------------------------------

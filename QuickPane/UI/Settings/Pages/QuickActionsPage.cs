@@ -32,7 +32,7 @@ namespace QuickPane.UI.Settings.Pages
                 yield return new SettingsSearchEntry(Id, "quickActionsSwitch", Title,
                     "A Quick actions section in the pane: copy a path, create a new file or folder, or open a terminal or editor.",
                     "quick actions", "copy path", "terminal", "visual studio code", "markdown", "new folder",
-                    "folder name", "file url", "powershell", "wsl", "readme", "gitignore", "pin");
+                    "folder name", "file url", "powershell", "wsl", "readme", "gitignore", "pin", "selected", "selection", "files");
                 yield return new SettingsSearchEntry(Id, CustomCommandsCardId, "Custom commands",
                     "Add a quick action that runs a program of your choice in the folder.",
                     "custom", "command", "template", "run program", "script");
@@ -83,7 +83,8 @@ namespace QuickPane.UI.Settings.Pages
 
         internal const string CustomCommandHelp =
             "Runs a program in the folder, as you and never elevated. Use a full path, or a program on PATH. " +
-            "{path} and {paths} are the folder, {dir} is the folder, and {name} is its name. " +
+            "{paths} is every item selected in Explorer, and {path} and {name} are the first one's path and name. " +
+            "With nothing selected, or from a pinned row, those use the folder. {dir} is always the folder. " +
             "QuickPane quotes each value for you, so names with spaces or symbols are safe.";
 
         // Set by BuildCustomCommandEditor, for the Edit and Delete buttons Populate builds.
