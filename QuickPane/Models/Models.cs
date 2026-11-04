@@ -182,6 +182,19 @@ namespace QuickPane.Models
         [DataMember(Name = "quickActions", Order = 43, EmitDefaultValue = false)]
         public List<QuickActionSetting> QuickActions { get; set; }
 
+        // The automatic update check (#176). Stored as "off" rather than "on", so a settings file
+        // from before this setting existed reads as the default without an OnDeserializing hook.
+        [DataMember(Name = "updateCheckOff", Order = 47, EmitDefaultValue = false)]
+        public bool UpdateCheckOff { get; set; }
+
+        // When the automatic check last ran, as UpdateNotifier.FormatTime writes it.
+        [DataMember(Name = "lastUpdateCheckUtc", Order = 48, EmitDefaultValue = false)]
+        public string LastUpdateCheckUtc { get; set; }
+
+        // The newest version the user has been told about, so the notice shows once per version.
+        [DataMember(Name = "updateNoticeVersion", Order = 49, EmitDefaultValue = false)]
+        public string UpdateNoticeVersion { get; set; }
+
         [DataMember(Name = "recentsMaxCount", Order = 2)]
         public int RecentsMaxCount { get; set; } = 15;
 

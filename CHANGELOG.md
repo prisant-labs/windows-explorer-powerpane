@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- QuickPane tells you when a new version exists. At most once a day, it asks GitHub for the latest release. A newer version shows one notice per version, an item in the tray menu, and a dot on About in Settings. Nothing is downloaded or installed, and the notice opens the release page. Turn off "Check for updates automatically" on the About page to stop the daily check ([#176](https://github.com/prisant-labs/windows-explorer-quickpane/issues/176)).
+
 ### Fixed
 - With a window maximized, the width grip of a desktop dock with auto-hide off can be dragged again. The maximized window's invisible frame covered the whole grip, so the grip is now wider on that dock ([#185](https://github.com/prisant-labs/windows-explorer-quickpane/issues/185)).
 

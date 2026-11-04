@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -46,7 +47,7 @@ namespace QuickPane.Services
         // fork build is a downgrade: it replaces the fork's fixes until the fork merges and releases.
         // `releases/latest` skips drafts and pre-releases, so fork releases must be published as full ones.
         private const string LatestReleaseApi = "https://api.github.com/repos/prisant-labs/windows-explorer-quickpane/releases/latest";
-        private const string ReleasesPage = "https://github.com/prisant-labs/windows-explorer-quickpane/releases/latest";
+        internal const string ReleasesPage = "https://github.com/prisant-labs/windows-explorer-quickpane/releases/latest";
 
         /// <summary>The running build's version, from the assembly rather than a constant.</summary>
         public static Version Current
@@ -89,6 +90,18 @@ namespace QuickPane.Services
             {
                 var result = Check();
                 WorkQueue.PostUI(() => done(result));
+            });
+        }
+
+        /// <summary>Opens the latest release's page in the default browser, off the UI thread because
+        /// starting a process goes through the shell. The update notice goes here rather than to the
+        /// installer, so the user reads what changed and starts the download themselves (#176).</summary>
+        public static void OpenReleasePage()
+        {
+            WorkQueue.Post(() =>
+            {
+                try { Process.Start(new ProcessStartInfo(ReleasesPage) { UseShellExecute = true }); }
+                catch (Exception ex) { Log.Error("open the release page", ex); }
             });
         }
 

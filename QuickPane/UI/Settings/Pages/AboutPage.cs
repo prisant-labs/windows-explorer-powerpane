@@ -55,6 +55,8 @@ namespace QuickPane.UI.Settings.Pages
             {
                 yield return new SettingsSearchEntry(Id, "updates", "Check for updates",
                     "See the installed version and check for a newer release.", "update", "version", "upgrade");
+                yield return new SettingsSearchEntry(Id, "updates-auto", "Check for updates automatically",
+                    "Once a day, ask GitHub whether a newer release exists and show a notice.", "update", "notification", "automatic");
                 // No single control to land on here: the version sits in the header card, and the
                 // licence is its own card below it. Null is the honest answer (FocusTarget simply
                 // returns false and the page is still opened) rather than pointing at either one.
@@ -74,6 +76,7 @@ namespace QuickPane.UI.Settings.Pages
             var panel = new StackPanel();
             panel.Children.Add(BuildHeaderCard(ctx));
             panel.Children.Add(BuildUpdatesCard(ctx, CheckForUpdates));
+            panel.Children.Add(BuildAutomaticCheckCard(ctx));
             panel.Children.Add(BuildLinksCard(ctx));
             panel.Children.Add(ctx.Cards.Card("licence", GlyphDocument, "Licence", LicenceText, null));
             panel.Children.Add(ctx.Cards.Card("third-party-notices", GlyphCertificate, "Third-party notices", ThirdPartyNoticeText, null));
@@ -161,6 +164,8 @@ namespace QuickPane.UI.Settings.Pages
 
                 checkForUpdates(r =>
                 {
+                    UpdateNotifier.ReportAboutResult(r);
+
                     // The page may have navigated away (or rebuilt) while the check was in flight;
                     // touching controls from a stale render would act on the page that happens to be
                     // on screen now instead of the one that asked for the check.
@@ -187,6 +192,20 @@ namespace QuickPane.UI.Settings.Pages
             var border = ctx.Cards.CardShell(grid, hoverable: true);
             ctx.Cards.Register("updates", checkButton);
             return border;
+        }
+
+        /// <summary>The switch for the daily check (#176). Turning it off leaves this page's own check
+        /// in place, because opening About is a request the user made.</summary>
+        private static FrameworkElement BuildAutomaticCheckCard(SettingsPageContext ctx)
+        {
+            var toggle = ctx.Cards.Toggle(!ctx.Settings.Current.UpdateCheckOff, on =>
+            {
+                ctx.Settings.Current.UpdateCheckOff = !on;
+                ctx.Settings.Save();
+            }, "Check for updates automatically");
+            return ctx.Cards.Card("updates-auto", GlyphSync, "Check for updates automatically",
+                "Once a day, ask GitHub whether a newer release exists, and show a notice if one does. Nothing is downloaded or installed.",
+                toggle, "Check for updates automatically");
         }
 
         /// <summary>The status line for a finished (or failed) check. A pure decision, unit-tested
