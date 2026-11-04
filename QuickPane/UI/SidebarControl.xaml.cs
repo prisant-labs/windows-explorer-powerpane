@@ -671,8 +671,7 @@ namespace QuickPane.UI
                 Grid.SetColumnSpan(TitleToggleButton, collapsed ? 2 : 1);
                 TitleToggleButton.HorizontalAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             }
-            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = collapsed ? "\uE76C" : "\uE76B"; // expand / collapse
-            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = collapsed ? "\uE76C" : "\uE76B"; // ChevronRight / ChevronLeft
+            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = ToggleGlyph(collapsed, _toggleChevronMirrored);
             if (TitleToggleButton != null)
             {
                 TitleToggleButton.ToolTip = collapsed ? "Expand" : "Collapse";
@@ -685,12 +684,38 @@ namespace QuickPane.UI
         private bool _resizeFromLeft;
 
         /// <summary>Place the resize grip on the left edge (used in beside mode, where the right edge is
-        /// held flush against the Explorer window). Dragging the left edge outward widens the pane.</summary>
+        /// held flush against the Explorer window, and on a right-edge dock, #184). Dragging the left
+        /// edge outward widens the pane.</summary>
         public void SetResizeFromLeft(bool fromLeft)
         {
             _resizeFromLeft = fromLeft;
             if (ResizeThumb != null)
                 ResizeThumb.HorizontalAlignment = fromLeft ? HorizontalAlignment.Left : HorizontalAlignment.Right;
+        }
+
+        /// <summary>How a horizontal drag of the grip changes the width: dragging a left grip outward
+        /// (left, a negative change) widens the pane, and dragging a right grip outward (right)
+        /// widens it.</summary>
+        internal static int ResizeSign(bool fromLeft)
+        {
+            return fromLeft ? -1 : 1;
+        }
+
+        private bool _toggleChevronMirrored;
+
+        /// <summary>Mirror the title-row chevron for a pane on the right edge of a display, so "collapse"
+        /// points toward the edge the pane sits on (#184).</summary>
+        public void SetToggleChevronMirrored(bool mirrored)
+        {
+            _toggleChevronMirrored = mirrored;
+            if (TitleToggleGlyph != null) TitleToggleGlyph.Text = ToggleGlyph(_paneCollapsed, mirrored);
+        }
+
+        /// <summary>The title-row chevron: ChevronLeft to collapse and ChevronRight to expand, swapped
+        /// when the pane is mirrored for the right edge.</summary>
+        internal static string ToggleGlyph(bool collapsed, bool mirrored)
+        {
+            return collapsed != mirrored ? "\uE76C" : "\uE76B";
         }
 
         private void OnResizeStarted(object sender, DragStartedEventArgs e)
@@ -705,7 +730,7 @@ namespace QuickPane.UI
             _resizeAccum += e.HorizontalChange;
             double scale = 1.0;
             try { scale = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }
-            int sign = _resizeFromLeft ? -1 : 1; // dragging the left grip outward (left) widens
+            int sign = ResizeSign(_resizeFromLeft);
             int px = _resizeStartPx + sign * (int)Math.Round(_resizeAccum * scale);
             App.Settings.NotifyWidthLive(px);
         }

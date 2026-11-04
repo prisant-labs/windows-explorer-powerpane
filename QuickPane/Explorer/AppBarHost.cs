@@ -229,6 +229,7 @@ namespace QuickPane.Explorer
             if (_handle == IntPtr.Zero) return;
             NM.RECT wa; GetWorkArea(out wa);
             bool right = EdgeIsRight();
+            ApplyEdgeToSidebar(right);
             _lastEdgeRight = right;
             var r = AutoHideRect(wa, WidthPx(), expanded, right);
             NM.SetWindowPos(_handle, NM.HWND_TOP, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top,
@@ -269,6 +270,7 @@ namespace QuickPane.Explorer
             // The edge counts the same way: a left strip and a right strip are different reservations,
             // and the old one must be replaced, not left standing, when the edge changes (#177).
             bool right = EdgeIsRight();
+            ApplyEdgeToSidebar(right);
             if (!_haveLastMonitorId || !string.Equals(monitor.Id, _lastMonitorId, StringComparison.Ordinal) || right != _lastEdgeRight)
             {
                 _lastEdgeRight = right;
@@ -345,6 +347,16 @@ namespace QuickPane.Explorer
                 if (touches && overlapsVertically) return true;
             }
             return false;
+        }
+
+        // The grip and the title chevron follow the dock's edge: on the right edge the side that faces
+        // the desktop is the left one, and a grip against the screen edge has no room to be dragged
+        // (#184). Both positioning paths call this, which covers startup and a live edge change.
+        private void ApplyEdgeToSidebar(bool right)
+        {
+            if (_sidebar == null) return;
+            _sidebar.SetResizeFromLeft(right);
+            _sidebar.SetToggleChevronMirrored(right);
         }
 
         private bool EdgeIsRight()
