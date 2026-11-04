@@ -177,6 +177,23 @@ namespace QuickPane.UI.Settings
             return CardCore(cardId, glyph, title, null, control, accessibleName, compact: true);
         }
 
+        /// <summary>The gap between a row's on/off switch and its Move buttons. They do different
+        /// things, and with no gap they read as one cluster (#203).</summary>
+        internal const double ToggleToMoveGap = 16;
+
+        /// <summary>The controls at the right of a reorderable row: its switch, then Move up and Move
+        /// down. Pane sections and Quick actions share this, so their rows stay the same. A caller may
+        /// add more buttons after these, as a custom command's Edit and Delete do.</summary>
+        public StackPanel ReorderControls(FrameworkElement toggle, FrameworkElement up, FrameworkElement down)
+        {
+            toggle.Margin = new Thickness(0, 0, ToggleToMoveGap, 0);
+            var controls = new StackPanel { Orientation = Orientation.Horizontal };
+            controls.Children.Add(toggle);
+            controls.Children.Add(up);
+            controls.Children.Add(down);
+            return controls;
+        }
+
         private Border CardCore(string cardId, string glyph, string title, string description,
             FrameworkElement control, string accessibleName, bool compact)
         {

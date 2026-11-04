@@ -5,6 +5,7 @@
 ### Fixed
 - The Backup & restore card in Settings stays at its own height. It stretched to fill the page, with its icon at the top and its buttons in the middle ([#201](https://github.com/prisant-labs/windows-explorer-quickpane/issues/201)).
 - Rows on the Quick actions settings page show the same icon as their row in the pane, instead of a blank gap ([#202](https://github.com/prisant-labs/windows-explorer-quickpane/issues/202)).
+- On the Pane sections and Quick actions settings pages, the on/off switch has more room from the Move buttons ([#203](https://github.com/prisant-labs/windows-explorer-quickpane/issues/203)).
 
 ## [3.12.0.0] - 2026-11-04
 

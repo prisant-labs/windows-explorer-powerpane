@@ -388,10 +388,7 @@ namespace QuickPane.UI.Settings.Pages
                     refocusToggle = toggle.Tag as Control;   // Toggle() keeps its ToggleButton in Tag
                 }
 
-                var controls = new StackPanel { Orientation = Orientation.Horizontal };
-                controls.Children.Add(toggle);
-                controls.Children.Add(up);
-                controls.Children.Add(down);
+                var controls = cards.ReorderControls(toggle, up, down);
                 if (def != null && def.Kind == QuickActionKind.Custom)
                 {
                     controls.Children.Add(cards.IconButton("\uE70F", "Edit " + name, () => _editCustomCommand(id)));
