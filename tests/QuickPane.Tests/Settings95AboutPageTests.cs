@@ -66,11 +66,11 @@ namespace QuickPane.Tests
         }
 
         [Test]
-        public void Links_HasSourceReleaseNotesAndIssueTracker()
+        public void Links_HasSourceChangelogAndIssueTracker()
         {
             var titles = Array.ConvertAll(AboutPage.Links, l => l.Title);
             Assert.That(titles, Has.Some.Contains("Source code"));
-            Assert.That(titles, Has.Some.Contains("Release notes"));
+            Assert.That(titles, Has.Some.Contains("Changelog"));
             Assert.That(titles, Has.Some.Contains("Report an issue"));
         }
 

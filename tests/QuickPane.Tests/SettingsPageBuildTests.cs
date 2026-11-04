@@ -301,6 +301,31 @@ namespace QuickPane.Tests
             }
         }
 
+        // ---- what's new (#208) -------------------------------------------------
+
+        [Test]
+        public void AboutPage_ShowsEveryWhatsNewLine_AboveTheLicence()
+        {
+            using (var f = new Fixture())
+            {
+                var body = (DependencyObject)f.Page("about").Build(f.Context());
+                var texts = Texts(body).ToList();
+                Assert.That(texts, Has.Some.EqualTo(AboutPage.WhatsNewTitle()));
+                foreach (var item in WhatsNew.Items)
+                {
+                    Assert.That(texts, Has.Some.EqualTo(item.Title));
+                    Assert.That(texts, Has.Some.EqualTo(item.Summary));
+                }
+
+                // The panel holds the cards in order, and each card's own texts come from a walk of it.
+                var cards = ((Panel)body).Children.Cast<DependencyObject>().ToList();
+                int whatsNew = cards.FindIndex(c => Texts(c).Contains(AboutPage.WhatsNewTitle()));
+                int licence = cards.FindIndex(c => Texts(c).Contains("Licence"));
+                Assert.That(whatsNew, Is.GreaterThanOrEqualTo(0));
+                Assert.That(licence, Is.GreaterThan(whatsNew));
+            }
+        }
+
         // ---- info buttons (#205) ----------------------------------------------
 
         private static Button InfoButtonFor(DependencyObject root, string title)

@@ -97,6 +97,7 @@
     <Compile Include="Services\HotkeyService.cs" />
     <Compile Include="Services\UpdateNotifier.cs" />
     <Compile Include="Services\UpdateService.cs" />
+    <Compile Include="Services\WhatsNew.cs" />
     <Compile Include="Services\BrowserProfiles.cs" />
     <Compile Include="Services\AppShortcuts.cs" />
     <Compile Include="Services\DriveService.cs" />
