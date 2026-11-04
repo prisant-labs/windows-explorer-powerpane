@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The Backup & restore card in Settings stays at its own height. It stretched to fill the page, with its icon at the top and its buttons in the middle ([#201](https://github.com/prisant-labs/windows-explorer-quickpane/issues/201)).
+
 ## [3.12.0.0] - 2026-11-04
 
 Quick actions you can extend: 18 more built-in actions, custom commands, and actions on the files selected in Explorer. QuickPane also tells you when a new version exists. See the [release notes](docs/releases/3.12.0.0.md).
