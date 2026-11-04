@@ -1,12 +1,14 @@
 # Changelog
 
-## [Unreleased]
+## [3.12.0.0] - 2026-11-04
+
+Quick actions you can extend: 18 more built-in actions, custom commands, and actions on the files selected in Explorer. QuickPane also tells you when a new version exists. See the [release notes](docs/releases/3.12.0.0.md).
 
 ### Added
 - QuickPane tells you when a new version exists. At most once a day, it asks GitHub for the latest release. A newer version shows one notice per version, an item in the tray menu, and a dot on About in Settings. Nothing is downloaded or installed, and the notice opens the release page. Turn off "Check for updates automatically" on the About page to stop the daily check ([#176](https://github.com/prisant-labs/windows-explorer-quickpane/issues/176)).
 - Ten more quick actions, each off until you turn it on: Copy folder name, Copy parent folder path, Copy as file URL, Copy PowerShell change-directory command, New PowerShell script, New README, New .gitignore, Open PowerShell here, Open WSL here, and Pin this folder ([#189](https://github.com/prisant-labs/windows-explorer-quickpane/issues/189)).
 - Custom commands. On the Quick actions settings page, give a command a name and a template such as `code {path}`, and it becomes a row you can turn on, reorder, edit, and delete. The placeholders are `{path}`, `{paths}`, `{dir}`, and `{name}`, and QuickPane quotes each value, so names with spaces or symbols are safe. A program comes from PATH or a full path, starts directly in the folder, and never runs elevated. A placeholder is refused for a program that would read a folder name as code, such as `cmd` or a batch file. Commands in a restored backup arrive turned off ([#190](https://github.com/prisant-labs/windows-explorer-quickpane/issues/190)).
-- Quick actions can act on the files selected in Explorer. Eight new actions, each off until you turn it on, copy the selected names, paths, quoted paths, forward-slash paths, WSL paths, file URLs, or Markdown links, one per line, or open the selection in Visual Studio Code. Custom command placeholders `{path}`, `{paths}`, and `{name}` also use the selection when there is one. "Copy path" and the other folder actions still act on the folder ([#191](https://github.com/prisant-labs/windows-explorer-quickpane/issues/191)).
+- Quick actions can act on the files selected in Explorer. Eight new actions, each off until you turn it on, copy the selected names, paths, quoted paths, forward-slash paths, WSL paths, file URLs, or Markdown links, one per line, or open the selection in Visual Studio Code. Custom command placeholders `{path}`, `{paths}`, and `{name}` also use the selection when there is one. "Copy path" and the other folder actions still act on the folder. When the selection cannot be read, an action says so in its row and stops, so a command never falls back to the folder by mistake ([#191](https://github.com/prisant-labs/windows-explorer-quickpane/issues/191)).
 
 ### Changed
 - A quick action added in a new release now starts in its own default state, so an update does not add rows to your pane. Reset to default restores that same state ([#189](https://github.com/prisant-labs/windows-explorer-quickpane/issues/189)).
