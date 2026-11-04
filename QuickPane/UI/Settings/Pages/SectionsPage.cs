@@ -279,7 +279,7 @@ namespace QuickPane.UI.Settings.Pages
         /// <summary>Same friendly names as the old window's private <c>Friendly</c> (commit 068301b,
         /// line 1848), copied rather than shared because <c>SettingsPanel.xaml.cs</c> is deleted from
         /// the tree after #90 and this page owns no shared file to put it in.</summary>
-        private static string Friendly(string type)
+        internal static string Friendly(string type)
         {
             switch (type)
             {
@@ -288,7 +288,7 @@ namespace QuickPane.UI.Settings.Pages
                 case "computer": return "This PC";
                 case "network": return "Network";
                 case "linux": return "Linux";
-                case "ssh": return "SSH";
+                case "ssh": return SshSection.DefaultTitle;
                 case "search": return "Search box";
                 case "appdefaults": return "App Folders";
                 case "recentapps": return "Recent Apps";

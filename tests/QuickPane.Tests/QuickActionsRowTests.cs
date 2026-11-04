@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using QuickPane.Services;
+using QuickPane.UI;
 using QuickPane.UI.Settings.Pages;
 
 namespace QuickPane.Tests
@@ -20,6 +21,14 @@ namespace QuickPane.Tests
         public void RowGlyph_AnUnknownActionStillHasAnIcon()
         {
             Assert.That(QuickActionsPage.RowGlyph(null), Is.Not.Null.And.Not.Empty);
+        }
+
+        // #204: the row, the pane's header, and the Settings page all use one name.
+        [Test]
+        public void SshSection_IsNamedAfterItsSettingsPage()
+        {
+            Assert.That(SectionsPage.Friendly("ssh"), Is.EqualTo(SshSection.DefaultTitle));
+            Assert.That(SshSection.DefaultTitle, Is.EqualTo(new SshPage().Title));
         }
     }
 }
