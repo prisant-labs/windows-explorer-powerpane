@@ -117,7 +117,7 @@ namespace QuickPane.UI.Settings.Pages
                 // No description line: the On/Off switch already says whether the section shows, so
                 // CompactCard's single-line row replaces Card's two-line one (#154). What the section
                 // is goes in the info button (#205).
-                var card = cards.CompactCard("section-" + sec.Type, "\uE8FD", friendly, controls, info: Describe(sec.Type));
+                var card = cards.CompactCard("section-" + sec.Type, SectionGlyph(sec.Type), friendly, controls, info: Describe(sec.Type));
 
                 // Drag grip at the row's left edge (#178). The grip lives in a wrapper beside the card,
                 // so the card itself stays the one registered for search focus.
@@ -275,6 +275,28 @@ namespace QuickPane.UI.Settings.Pages
 
             for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
             return true;
+        }
+
+        /// <summary>Each section's own icon. All ten rows once shared the bulleted list, which said
+        /// nothing about the section and read like the six-dot drag grip beside it (#207). A section
+        /// with a Settings page of its own uses that page's icon. A type this version does not know
+        /// keeps the generic list, since its row has nothing more specific to say.</summary>
+        internal static string SectionGlyph(string type)
+        {
+            switch (type)
+            {
+                case "search": return "\uE721";        // Search
+                case "appdefaults": return "\uE8B7";   // Folder
+                case "groups": return "\uE718";        // Pin
+                case "recents": return "\uE823";       // Recent
+                case "computer": return "\uE7F4";      // TVMonitor
+                case "network": return "\uE774";       // Globe
+                case "linux": return "\uE756";         // CommandPrompt
+                case "ssh": return "\uE968";           // the Remote drives page's icon
+                case "recentapps": return "\uE81C";    // the Recent apps page's icon
+                case "quickactions": return "\uE945";  // the Quick actions page's icon
+                default: return "\uE8FD";              // BulletedList
+            }
         }
 
         /// <summary>What a section is, for its row's info button (#205), including when it does not
