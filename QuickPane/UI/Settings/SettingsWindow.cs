@@ -9,6 +9,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Shell;
 using System.Windows.Threading;
 using QuickPane.Services;
@@ -256,10 +257,30 @@ namespace QuickPane.UI.Settings
                 Closed += (s, e) => _theme.ThemeChanged -= _onThemeChangedForBackdrop;
             }
 
+            UpdateNotifier.AvailabilityChanged += ApplyUpdateDot;
+            Closed += (s, e) => UpdateNotifier.AvailabilityChanged -= ApplyUpdateDot;
+
             RenderCurrentPage();
         }
 
         private Action _onThemeChangedForBackdrop;
+
+        // The dot on the About navigation item and that item's button (#176). Set while the navigation
+        // pane builds, and null until then.
+        private Ellipse _updateDot;
+        private Button _aboutNavButton;
+
+        /// <summary>Shows the dot while a newer version is known, and says the same thing to a screen
+        /// reader, which cannot see a dot. The name follows the item's title otherwise.</summary>
+        private void ApplyUpdateDot()
+        {
+            if (_updateDot == null || _aboutNavButton == null) return;
+            var available = UpdateNotifier.Available;
+            _updateDot.Visibility = available != null ? Visibility.Visible : Visibility.Collapsed;
+            AutomationProperties.SetName(_aboutNavButton, available != null
+                ? "About, version " + UpdateService.Display(available) + " is available"
+                : "About");
+        }
 
         /// <summary>internal, not private, so a unit test can check the real page list (eight
         /// unique ids, About last) with no window and no stores -- see SettingsSearchIndexTests.</summary>
@@ -512,6 +533,14 @@ namespace QuickPane.UI.Settings
             row.Children.Add(icon);
             row.Children.Add(label);
 
+            bool isAbout = string.Equals(page.Id, "about", StringComparison.Ordinal);
+            if (isAbout)
+            {
+                _updateDot = new Ellipse { Width = 8, Height = 8, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Visibility = Visibility.Collapsed };
+                _updateDot.SetResourceReference(Shape.FillProperty, "AccentFillColorDefaultBrush");
+                row.Children.Add(_updateDot);
+            }
+
             // Left, not the default Stretch: a fixed-width element set to stretch is centred, which
             // drew the pill beside the label instead of at the item's left edge.
             var pillHost = new Grid { Width = 11, HorizontalAlignment = HorizontalAlignment.Left };
@@ -536,6 +565,11 @@ namespace QuickPane.UI.Settings
 
             var button = SettingsCards.Invokable(bg, page.Title, () => Navigate(page.Id));
             button.Cursor = Cursors.Hand;
+            if (isAbout)
+            {
+                _aboutNavButton = button;
+                ApplyUpdateDot();
+            }
             button.KeyDown += (s, e) => OnNavItemArrowKey(button, e);
             // The implicit Fluent Button style's own FocusVisualStyle rings the whole (stretched,
             // full-width) button; NavItemFocusVisualStyle rings bg's own Margin(4,2,4,0)/

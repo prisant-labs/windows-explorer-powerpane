@@ -95,6 +95,7 @@
     <Compile Include="Services\ActiveDialog.cs" />
     <Compile Include="Services\PaneFilter.cs" />
     <Compile Include="Services\HotkeyService.cs" />
+    <Compile Include="Services\UpdateNotifier.cs" />
     <Compile Include="Services\UpdateService.cs" />
     <Compile Include="Services\BrowserProfiles.cs" />
     <Compile Include="Services\AppShortcuts.cs" />

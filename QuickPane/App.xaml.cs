@@ -212,6 +212,7 @@ namespace QuickPane
             ApplyHotkeys();
 
             CreateTrayIcon();
+            UpdateNotifier.Start(ShowUpdateNotice);
 
             ApplyHosts();            // starts the in-window pane and/or the desktop dock per settings
 
@@ -308,6 +309,14 @@ namespace QuickPane
             };
 
             var menu = new WinForms.ContextMenuStrip();
+
+            // Hidden until a newer version is known (#176). Opening below sets its text and visibility.
+            var updateItem = new WinForms.ToolStripMenuItem();
+            var updateSeparator = new WinForms.ToolStripSeparator();
+            updateItem.Click += (s, a) => UpdateService.OpenReleasePage();
+            menu.Items.Add(updateItem);
+            menu.Items.Add(updateSeparator);
+
             var profileMenu = new WinForms.ToolStripMenuItem("Profile");
             menu.Items.Add(profileMenu);
             menu.Items.Add(new WinForms.ToolStripSeparator());
@@ -327,6 +336,10 @@ namespace QuickPane
             // Rebuild the Profile submenu each time the tray menu opens, with a check on the active one.
             menu.Opening += (s, a) =>
             {
+                var available = UpdateNotifier.Available;
+                updateItem.Visible = updateSeparator.Visible = available != null;
+                if (available != null) updateItem.Text = "Version " + UpdateService.Display(available) + " is available";
+
                 profileMenu.DropDownItems.Clear();
                 var profiles = Settings.Current.Profiles;
                 if (profiles == null) return;
@@ -344,6 +357,23 @@ namespace QuickPane
             };
             _tray.ContextMenuStrip = menu;
             _tray.DoubleClick += (s, a) => Dispatcher.Invoke(ShowSettingsWindow);
+            _tray.BalloonTipClicked += (s, a) => UpdateService.OpenReleasePage();
+        }
+
+        /// <summary>The one-time notice for a newly found version (#176): a tray balloon, which Windows
+        /// shows as a notification and holds back while the user is in a full-screen app or Do Not
+        /// Disturb. The balloon's only action is opening the release page.</summary>
+        private void ShowUpdateNotice(Version latest)
+        {
+            try
+            {
+                Log.Info("update notice: " + UpdateService.Display(latest) + " is available.");
+                if (_tray != null)
+                    _tray.ShowBalloonTip(10000, UpdateNotifier.NoticeTitle(latest),
+                        "Click to open the release page. Nothing is downloaded until you choose to.",
+                        WinForms.ToolTipIcon.Info);
+            }
+            catch (Exception ex) { Log.Error("show the update notice", ex); }
         }
 
         private static void CreateDesktopShortcut()
@@ -461,6 +491,7 @@ namespace QuickPane
             // never opened the session the file describes.
             CrashGuard.MarkCleanExit();
             ShutdownSignal.Stop();
+            UpdateNotifier.Stop();
 
             try { _recentTracker?.Dispose(); } catch (Exception ex) { Log.Error("recent tracker dispose", ex); }
             try { _dialogPanes?.Dispose(); } catch (Exception ex) { Log.Error("dialog panes dispose", ex); }

@@ -258,7 +258,8 @@ Groups are stored as ordinary folders: a **group** is a folder under `Groups\`, 
 QuickPane makes one network request of its own, an update check:
 
 - **What it sends**: an HTTPS GET to `api.github.com` for this fork's latest release, with the header `User-Agent: QuickPane/<version>`. Like any web request, it shows GitHub your IP address. It sends nothing else.
-- **When it runs**: only when you open the About page in Settings, or press "Check for updates" there. Before 3.11.0.0 it also ran every time Settings opened.
+- **When it runs**: at most once a day, a few minutes after QuickPane starts, and also when you open the About page in Settings or press "Check for updates" there. To stop the daily check, turn off "Check for updates automatically" on the About page. Opening About still checks.
+- **What it does with the answer**: when a newer version exists, it shows one notice per version, adds an item to the tray menu, and puts a dot on About in Settings. It never downloads or installs anything. The notice opens the release page in your browser.
 
 Two other features reach the network only when you use them:
 
