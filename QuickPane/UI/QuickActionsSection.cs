@@ -169,16 +169,12 @@ namespace QuickPane.UI
             Action run = () => WorkQueue.Post(() =>
             {
                 var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
-                string message;
-                bool tooMany = false;
-                var selection = QuickActionLibrary.UsesSelection(def)
-                    ? ExplorerNavigator.GetSelectedPaths(hostWindow, out tooMany)
-                    : null;
-                // Too many items refuses rather than falling back to the folder, which is not what
-                // someone with a thousand files selected asked for.
-                message = tooMany
-                    ? QuickActionRunner.TooManySelected(ExplorerNavigator.MaxSelectedItems)
-                    : QuickActionRunner.Run(def, folder, selection);
+                List<string> selection = null;
+                var status = SelectionReadStatus.Ok;
+                if (QuickActionLibrary.UsesSelection(def))
+                    status = ExplorerNavigator.GetSelectedPaths(hostWindow, out selection);
+                string message = QuickActionRunner.SelectionProblem(status)
+                    ?? QuickActionRunner.Run(def, folder, selection);
                 if (message != null) WorkQueue.PostUI(() => ShowMessage(row, text, def, message));
             });
             row.MouseLeftButtonUp += (s, e) => run();

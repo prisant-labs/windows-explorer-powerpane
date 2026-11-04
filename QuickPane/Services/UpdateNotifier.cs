@@ -80,11 +80,19 @@ namespace QuickPane.Services
             });
         }
 
-        /// <summary>What the About page's own check found. The user is looking at the answer already,
-        /// so a later automatic check must not announce the same version again.</summary>
-        public static void ReportAboutResult(UpdateCheckResult r)
+        /// <summary>What the About page's own check found, whether or not the page is still open: the
+        /// tray item and the dot should know either way.</summary>
+        public static void RecordAboutResult(UpdateCheckResult r)
         {
             Record(r);
+        }
+
+        /// <summary>The About page put this result on screen, so a later automatic check must not
+        /// announce the same version again. Separate from recording it, because someone can leave the
+        /// page while the request is out, and that person has seen nothing: marking it then would use
+        /// up the one notice for that version.</summary>
+        public static void MarkShownOnAboutPage(UpdateCheckResult r)
+        {
             if (r != null && string.IsNullOrEmpty(r.Error) && r.Available) MarkNoticed(r.Latest);
         }
 
@@ -129,9 +137,18 @@ namespace QuickPane.Services
         /// and newer than the last version the user was told about.</summary>
         internal static bool ShouldNotify(Version latest, Version current, string lastNoticed)
         {
-            if (latest == null || current == null || latest <= current) return false;
+            if (latest == null || current == null || Full(latest) <= Full(current)) return false;
             Version noticed;
-            return !TryReadVersion(lastNoticed, out noticed) || latest > noticed;
+            return !TryReadVersion(lastNoticed, out noticed) || Full(latest) > noticed;
+        }
+
+        /// <summary>The same version with missing parts read as zero. A Version parsed from "3.12.0"
+        /// has a revision of -1, so it sorts below 3.12.0.0. The notice stores the display form, which
+        /// drops a zero revision, so without this a x.y.z.0 release looked newer than its own record
+        /// and announced itself again every day.</summary>
+        private static Version Full(Version v)
+        {
+            return new Version(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
         }
 
         /// <summary>A round-trip UTC timestamp. Stored as text because DataContractJsonSerializer
@@ -154,7 +171,10 @@ namespace QuickPane.Services
         private static bool TryReadVersion(string text, out Version version)
         {
             version = null;
-            return !string.IsNullOrWhiteSpace(text) && Version.TryParse(text, out version);
+            Version parsed;
+            if (string.IsNullOrWhiteSpace(text) || !Version.TryParse(text, out parsed)) return false;
+            version = Full(parsed);
+            return true;
         }
 
         /// <summary>The balloon's and the tray item's wording, in one place.</summary>
