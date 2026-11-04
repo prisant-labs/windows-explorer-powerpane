@@ -164,7 +164,7 @@ namespace QuickPane.UI.Settings.Pages
 
                 checkForUpdates(r =>
                 {
-                    UpdateNotifier.ReportAboutResult(r);
+                    UpdateNotifier.RecordAboutResult(r);
 
                     // The page may have navigated away (or rebuilt) while the check was in flight;
                     // touching controls from a stale render would act on the page that happens to be
@@ -174,6 +174,9 @@ namespace QuickPane.UI.Settings.Pages
                     checkButton.IsEnabled = true;
                     status.Text = StatusText(r);
                     status.ToolTip = r?.Error;
+
+                    // IsCurrent alone stays true after the window closes, since nothing renders again.
+                    if (status.IsVisible) UpdateNotifier.MarkShownOnAboutPage(r);
 
                     if (ShowDownload(r))
                     {

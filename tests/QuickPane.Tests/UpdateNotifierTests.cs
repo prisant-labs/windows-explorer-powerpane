@@ -72,6 +72,21 @@ namespace QuickPane.Tests
         }
 
         [Test]
+        public void ShouldNotify_AZeroRevisionReleaseMatchesItsDisplayedRecord()
+        {
+            // The notice stores the display form, which drops the zero, so this repeated every day.
+            var latest = new Version(3, 12, 0, 0);
+            Assert.That(UpdateService.Display(latest), Is.EqualTo("3.12.0"));
+            Assert.That(UpdateNotifier.ShouldNotify(latest, new Version(3, 11, 0, 2), "3.12.0"), Is.False);
+        }
+
+        [Test]
+        public void ShouldNotify_AThreePartTagIsNotNewerThanTheSameRunningBuild()
+        {
+            Assert.That(UpdateNotifier.ShouldNotify(new Version(3, 12, 0), new Version(3, 12, 0, 0), null), Is.False);
+        }
+
+        [Test]
         public void ShouldNotify_NewerThanTheLastNotice_IsTrue()
         {
             Assert.That(UpdateNotifier.ShouldNotify(new Version(3, 12, 0, 1), new Version(3, 11, 0), "3.12.0"), Is.True);
