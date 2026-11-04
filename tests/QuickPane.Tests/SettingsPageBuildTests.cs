@@ -301,6 +301,66 @@ namespace QuickPane.Tests
             }
         }
 
+        // ---- info buttons (#205) ----------------------------------------------
+
+        private static Button InfoButtonFor(DependencyObject root, string title)
+        {
+            return Descendants(root).OfType<Button>()
+                .FirstOrDefault(b => AutomationProperties.GetName(b) == "About " + title);
+        }
+
+        private static string TipText(Button button)
+        {
+            return ((TextBlock)((ToolTip)button.ToolTip).Content).Text;
+        }
+
+        [Test]
+        public void SectionsPage_EverySectionHasAnInfoButtonWithItsDescription()
+        {
+            using (var f = new Fixture())
+            {
+                var body = (DependencyObject)f.Page("sections").Build(f.Context());
+                foreach (var section in f.Settings.Current.Sections)
+                {
+                    string title = SectionsPage.Friendly(section.Type);
+                    var button = InfoButtonFor(body, title);
+                    Assert.That(button, Is.Not.Null, "no info button for " + title);
+                    Assert.That(TipText(button), Is.EqualTo(SectionsPage.Describe(section.Type)));
+                    Assert.That(AutomationProperties.GetHelpText(button), Is.EqualTo(SectionsPage.Describe(section.Type)));
+                }
+            }
+        }
+
+        [Test]
+        public void QuickActionsPage_BuiltInRow_MovesItsDescriptionIntoTheInfoButton()
+        {
+            using (var f = new Fixture())
+            {
+                var body = (DependencyObject)f.Page("quickactions").Build(f.Context());
+                foreach (var def in QuickActionLibrary.All)
+                {
+                    var button = InfoButtonFor(body, def.Name);
+                    Assert.That(button, Is.Not.Null, "no info button for " + def.Name);
+                    Assert.That(TipText(button), Is.EqualTo(def.Description));
+                    // A ToolTip is no logical child of its button, so this walk sees only the row.
+                    Assert.That(Texts(body), Has.None.EqualTo(def.Description),
+                        "the description should appear only in the tooltip, for " + def.Name);
+                }
+            }
+        }
+
+        [Test]
+        public void QuickActionsPage_CustomCommandRow_KeepsItsTemplateOnScreen()
+        {
+            using (var f = new Fixture())
+            {
+                QuickActionsPage.AddCustomCommand(f.Settings.Current, "Demo command", "demo-tool {path}");
+                var body = (DependencyObject)f.Page("quickactions").Build(f.Context());
+                Assert.That(InfoButtonFor(body, "Demo command"), Is.Null);
+                Assert.That(Texts(body), Has.Some.EqualTo("demo-tool {path}"));
+            }
+        }
+
         private static IEnumerable<string> Texts(DependencyObject root)
         {
             return Descendants(root).OfType<TextBlock>().Select(t => t.Text);

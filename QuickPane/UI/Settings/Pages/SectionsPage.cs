@@ -114,9 +114,10 @@ namespace QuickPane.UI.Settings.Pages
 
                 var controls = cards.ReorderControls(toggle, up, down);
 
-                // No description: the On/Off switch already says whether the section shows, so
-                // CompactCard's single-line row replaces Card's two-line one (#154).
-                var card = cards.CompactCard("section-" + sec.Type, "\uE8FD", friendly, controls);
+                // No description line: the On/Off switch already says whether the section shows, so
+                // CompactCard's single-line row replaces Card's two-line one (#154). What the section
+                // is goes in the info button (#205).
+                var card = cards.CompactCard("section-" + sec.Type, "\uE8FD", friendly, controls, info: Describe(sec.Type));
 
                 // Drag grip at the row's left edge (#178). The grip lives in a wrapper beside the card,
                 // so the card itself stays the one registered for search focus.
@@ -274,6 +275,28 @@ namespace QuickPane.UI.Settings.Pages
 
             for (int i = 0; i < ordered.Count; i++) ordered[i].Order = i;
             return true;
+        }
+
+        /// <summary>What a section is, for its row's info button (#205), including when it does not
+        /// appear, because a section that is on but missing from the pane otherwise looks broken. The
+        /// conditions match <c>SidebarControl.BuildSection</c>. Null for a section type this version
+        /// does not know, which then gets no button.</summary>
+        internal static string Describe(string type)
+        {
+            switch (type)
+            {
+                case "groups": return "Your pinned folders, organized into groups.";
+                case "recents": return "Folders you recently browsed in Explorer.";
+                case "computer": return "A This PC row that opens the folder and expands to your drives.";
+                case "network": return "A Network row that opens your network locations.";
+                case "linux": return "Your WSL distributions, browsed like drives. Appears only when WSL is installed.";
+                case "ssh": return "Remote folders connected as drive letters. Appears only after you add a connection on the Remote drives page.";
+                case "search": return "A box that filters the rows already in the pane as you type. It does not search the disk.";
+                case "appdefaults": return "The folder you set as an app's starting point. Appears only in that app's Open and Save dialogs. To set one, right-click a folder while the dialog is open and choose \"Always start here\".";
+                case "recentapps": return "The programs you have been using. A row opens its app, and its right-click menu goes to the folder that app's dialog last used.";
+                case "quickactions": return "Buttons that act on the folder on screen, such as copying its path. Choose them on the Quick actions page. Not shown in file dialogs or on the desktop dock.";
+                default: return null;
+            }
         }
 
         /// <summary>Same friendly names as the old window's private <c>Friendly</c> (commit 068301b,

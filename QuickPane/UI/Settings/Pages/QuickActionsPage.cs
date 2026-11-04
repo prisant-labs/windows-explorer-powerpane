@@ -395,7 +395,12 @@ namespace QuickPane.UI.Settings.Pages
                     controls.Children.Add(cards.IconButton("\uE74D", "Delete " + name, () => _confirmDeleteCustomCommand(id, name)));
                 }
 
-                var card = cards.Card("action-" + setting.Id, RowGlyph(def), name, description, controls);
+                // A built-in row's name says what it does, so its description moves to the info
+                // button and 28 rows take far less height (#205). A custom command's description is
+                // its template, which says what the row will run, so that one stays on screen.
+                var card = def != null && def.Kind == QuickActionKind.Custom
+                    ? cards.Card("action-" + setting.Id, RowGlyph(def), name, description, controls)
+                    : cards.CompactCard("action-" + setting.Id, RowGlyph(def), name, controls, info: description);
 
                 // Drag grip at the row's left edge (#178); see SectionsPage.Populate. Moves by id, not
                 // by captured index, for the staleness reason on FindActionById.
