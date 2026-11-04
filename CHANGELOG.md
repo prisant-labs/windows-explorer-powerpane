@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- With a window maximized, the width grip of a desktop dock with auto-hide off can be dragged again. The maximized window's invisible frame covered the whole grip, so the grip is now wider on that dock ([#185](https://github.com/prisant-labs/windows-explorer-quickpane/issues/185)).
+
 ## [3.11.0.2] - 2026-11-03
 
 The first published release of the redesigned Settings window. 3.11.0.0 and 3.11.0.1 were built as drafts and never published, so this release also carries everything listed under both.

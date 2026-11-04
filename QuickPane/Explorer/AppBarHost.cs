@@ -48,6 +48,9 @@ namespace QuickPane.Explorer
             bool dark = App.Theme != null && App.Theme.IsDark;
             _sidebar = new SidebarControl();
             _sidebar.Attach(NavigateOrOpen); // navigate the active Explorer, or open a new one
+            // A reserved dock sits under a maximized window's invisible frame (#185). An auto-hide dock
+            // is topmost, so nothing covers its grip, and it keeps the usual width.
+            if (!_autoHide) _sidebar.SetResizeGripWidth(SidebarControl.ReservedDockGripWidth);
             _sidebar.TitleToggle = () =>
             {
                 // For the dock, the title toggle flips auto-hide on or off.
