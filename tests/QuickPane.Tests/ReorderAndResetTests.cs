@@ -233,11 +233,11 @@ namespace QuickPane.Tests
         // ---- ResetActions ------------------------------------------------------------------
 
         [Test]
-        public void ResetActions_IsLibraryOrderAllEnabled()
+        public void ResetActions_IsLibraryOrderInDefaultState()
         {
             var reset = QuickActionsPage.ResetActions();
             Assert.That(reset.Select(x => x.Id), Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
-            Assert.That(reset.All(x => x.Enabled), Is.True);
+            Assert.That(reset.Select(x => x.Enabled), Is.EqualTo(QuickActionLibrary.All.Select(d => d.DefaultEnabled)));
         }
 
         [Test]

@@ -4,6 +4,10 @@
 
 ### Added
 - QuickPane tells you when a new version exists. At most once a day, it asks GitHub for the latest release. A newer version shows one notice per version, an item in the tray menu, and a dot on About in Settings. Nothing is downloaded or installed, and the notice opens the release page. Turn off "Check for updates automatically" on the About page to stop the daily check ([#176](https://github.com/prisant-labs/windows-explorer-quickpane/issues/176)).
+- Ten more quick actions, each off until you turn it on: Copy folder name, Copy parent folder path, Copy as file URL, Copy PowerShell change-directory command, New PowerShell script, New README, New .gitignore, Open PowerShell here, Open WSL here, and Pin this folder ([#189](https://github.com/prisant-labs/windows-explorer-quickpane/issues/189)).
+
+### Changed
+- A quick action added in a new release now starts in its own default state, so an update does not add rows to your pane. Reset to default restores that same state ([#189](https://github.com/prisant-labs/windows-explorer-quickpane/issues/189)).
 
 ### Fixed
 - With a window maximized, the width grip of a desktop dock with auto-hide off can be dragged again. The maximized window's invisible frame covered the whole grip, so the grip is now wider on that dock ([#185](https://github.com/prisant-labs/windows-explorer-quickpane/issues/185)).

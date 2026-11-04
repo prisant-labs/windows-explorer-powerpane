@@ -46,7 +46,7 @@ namespace QuickPane.Tests
         // ---- NormalizeQuickActions, through AppSettings.Normalize ------------------------------
 
         [Test]
-        public void Normalize_NullQuickActions_SeedsEveryBuiltInEnabledInLibraryOrder()
+        public void Normalize_NullQuickActions_SeedsEveryBuiltInInLibraryOrderAndDefaultState()
         {
             var s = AppSettings.CreateDefault();
             s.QuickActions = null;
@@ -54,7 +54,8 @@ namespace QuickPane.Tests
 
             Assert.That(s.QuickActions.Select(a => a.Id),
                 Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
-            Assert.That(s.QuickActions.All(a => a.Enabled), Is.True);
+            Assert.That(s.QuickActions.Select(a => a.Enabled),
+                Is.EqualTo(QuickActionLibrary.All.Select(d => d.DefaultEnabled)));
         }
 
         [Test]
@@ -84,7 +85,7 @@ namespace QuickPane.Tests
         }
 
         [Test]
-        public void Normalize_MissingBuiltIn_IsAppendedEnabledAtTheEnd()
+        public void Normalize_MissingBuiltIn_IsAppendedInItsDefaultStateAtTheEnd()
         {
             var s = AppSettings.CreateDefault();
             s.QuickActions = new List<QuickActionSetting> { new QuickActionSetting { Id = "copy-path", Enabled = false } };
@@ -93,7 +94,8 @@ namespace QuickPane.Tests
             Assert.That(s.QuickActions[0].Id, Is.EqualTo("copy-path"));
             Assert.That(s.QuickActions[0].Enabled, Is.False); // the stored entry's own value is kept
             Assert.That(s.QuickActions.Select(a => a.Id), Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
-            Assert.That(s.QuickActions.Skip(1).All(a => a.Enabled), Is.True); // every appended one defaults on
+            Assert.That(s.QuickActions.Skip(1).Select(a => a.Enabled),
+                Is.EqualTo(QuickActionLibrary.All.Skip(1).Select(d => d.DefaultEnabled)));
         }
 
         [Test]
@@ -120,6 +122,34 @@ namespace QuickPane.Tests
             var firstPass = s.QuickActions.Select(a => a.Id).ToList();
             s.Normalize();
             Assert.That(s.QuickActions.Select(a => a.Id).ToList(), Is.EqualTo(firstPass));
+        }
+
+        // ---- per-action defaults ----------------------------------------------------------------
+
+        // The first ten shipped on. Anyone with an older settings file has already seen them, so they
+        // keep that default. An id does not belong here unless it shipped before per-action defaults.
+        private static readonly string[] OriginalActions =
+        {
+            "copy-path", "copy-path-quoted", "copy-path-forward", "copy-path-wsl", "copy-markdown-link",
+            "new-text-file", "new-markdown-file", "new-dated-folder", "open-terminal", "open-vscode",
+        };
+
+        [Test]
+        public void EveryActionAddedAfterTheOriginalTen_DefaultsToOff()
+        {
+            foreach (var def in QuickActionLibrary.All)
+                Assert.That(def.DefaultEnabled, Is.EqualTo(OriginalActions.Contains(def.Id)), def.Id);
+        }
+
+        [Test]
+        public void Normalize_SettingsFromBeforeNewActions_LeavesThePaneUnchanged()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = OriginalActions.Select(id => new QuickActionSetting { Id = id, Enabled = true }).ToList();
+            s.Normalize();
+
+            Assert.That(s.QuickActions.Where(a => a.Enabled).Select(a => a.Id), Is.EqualTo(OriginalActions));
+            Assert.That(s.QuickActions, Has.Count.EqualTo(QuickActionLibrary.All.Length));
         }
 
         // ---- QuickActionsPage.MoveAction (the Settings page's Move up/down) --------------------

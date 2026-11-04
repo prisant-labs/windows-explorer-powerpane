@@ -11,6 +11,65 @@ namespace QuickPane.Tests
     [TestFixture]
     public class QuickActionLibraryTests
     {
+        // ---- the formats added with per-action defaults ---------------------------------------
+
+        [TestCase(@"C:\Demo\Apollo", @"C:\Demo")]
+        [TestCase(@"C:\Demo\Apollo\", @"C:\Demo")]
+        [TestCase(@"C:\Demo", @"C:\")]
+        [TestCase(@"\\server\share\Apollo", @"\\server\share")]
+        public void ParentPath_ReturnsTheFolderAbove(string path, string expected)
+        {
+            Assert.That(QuickActionLibrary.ParentPath(path), Is.EqualTo(expected));
+        }
+
+        [TestCase(@"C:\")]
+        [TestCase(@"\\server\share")]
+        public void ParentPath_AtARoot_IsNull(string path)
+        {
+            Assert.That(QuickActionLibrary.ParentPath(path), Is.Null);
+        }
+
+        [TestCase(@"C:\Demo\Apollo", "file:///C:/Demo/Apollo")]
+        [TestCase(@"C:\Demo\My Apollo\", "file:///C:/Demo/My%20Apollo")]
+        [TestCase(@"C:\", "file:///C:/")]
+        [TestCase(@"\\server\share\My Apollo", "file://server/share/My%20Apollo")]
+        [TestCase(@"C:\Demo\R&D #2 100%", "file:///C:/Demo/R%26D%20%232%20100%25")]
+        [TestCase("C:\\Demo\\Caf\u00e9", "file:///C:/Demo/Caf%C3%A9")]
+        public void ToFileUrl_EncodesEachSegment(string path, string expected)
+        {
+            Assert.That(QuickActionLibrary.ToFileUrl(path), Is.EqualTo(expected));
+        }
+
+        [TestCase(@"C:\Demo\Apollo", @"Set-Location -LiteralPath 'C:\Demo\Apollo'")]
+        [TestCase(@"C:\Demo\It's", @"Set-Location -LiteralPath 'C:\Demo\It''s'")]
+        [TestCase(@"C:\$RECYCLE.BIN", @"Set-Location -LiteralPath 'C:\$RECYCLE.BIN'")]
+        [TestCase("C:\\Demo\\It\u2019s", "Set-Location -LiteralPath 'C:\\Demo\\It\u2019\u2019s'")]
+        public void ToPowerShellChangeDirectory_KeepsThePathLiteral(string path, string expected)
+        {
+            Assert.That(QuickActionLibrary.ToPowerShellChangeDirectory(path), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void ReadmeContent_UsesTheFoldersNameAsTheHeading()
+        {
+            Assert.That(QuickActionLibrary.ReadmeContent(@"C:\Demo\Apollo").TrimEnd(), Is.EqualTo("# Apollo"));
+        }
+
+        [TestCase(@"C:\Demo\Apollo", "--pin C:\\Demo\\Apollo")]
+        [TestCase(@"C:\Demo\My Apollo", "--pin \"C:\\Demo\\My Apollo\"")]
+        [TestCase(@"C:\My Demo\", "--pin \"C:\\My Demo\\\\\"")]
+        public void PinArguments_QuotesThePathAsOneArgument(string path, string expected)
+        {
+            Assert.That(QuickActionLibrary.PinArguments(path), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void AppliesToPinnedRow_ExcludesPinThisFolder()
+        {
+            Assert.That(QuickActionLibrary.AppliesToPinnedRow(QuickActionLibrary.Find("pin-folder")), Is.False);
+            Assert.That(QuickActionLibrary.AppliesToPinnedRow(QuickActionLibrary.Find("copy-path")), Is.True);
+        }
+
         // ---- path formats, including a drive root, a UNC path, and a trailing backslash ---------
 
         [TestCase(@"C:\Demo\Projects\Apollo")]

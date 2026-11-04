@@ -8,26 +8,32 @@ namespace QuickPane.Services
     /// <summary>What a quick action does with the folder it runs against (quick actions, first version):
     /// copies some form of its path to the clipboard, adds something new inside it, or starts an
     /// external program there. Only picks the pane row's icon glyph; QuickActionRunner is what
-    /// actually runs an action, keyed on its Id.</summary>
-    internal enum QuickActionKind { CopyPath, NewItem, OpenTool }
+    /// actually runs an action, keyed on its Id. FolderAction is anything else done to the folder
+    /// itself, today only pinning it.</summary>
+    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction }
 
     /// <summary>One built-in quick action: a stable <see cref="Id"/> that settings.json stores
     /// (QuickActionSetting carries only this), and the display <see cref="Name"/> and one-line
     /// <see cref="Description"/> the Quick actions settings page and the pane's tooltip show. A later
-    /// release can reword either without migrating anyone's settings.</summary>
+    /// release can reword either without migrating anyone's settings. <see cref="DefaultEnabled"/> is
+    /// the state the action starts in, both for someone whose settings predate it and after Reset to
+    /// default. An action added after the first ten must leave it false, or every release would grow
+    /// the section of everyone already using it.</summary>
     internal sealed class QuickActionDefinition
     {
         public string Id { get; private set; }
         public string Name { get; private set; }
         public string Description { get; private set; }
         public QuickActionKind Kind { get; private set; }
+        public bool DefaultEnabled { get; private set; }
 
-        public QuickActionDefinition(string id, string name, string description, QuickActionKind kind)
+        public QuickActionDefinition(string id, string name, string description, QuickActionKind kind, bool defaultEnabled)
         {
             Id = id;
             Name = name;
             Description = description;
             Kind = kind;
+            DefaultEnabled = defaultEnabled;
         }
     }
 
@@ -41,25 +47,45 @@ namespace QuickPane.Services
         public static readonly QuickActionDefinition[] All =
         {
             new QuickActionDefinition("copy-path", "Copy path",
-                "The folder's path, exactly as Windows shows it.", QuickActionKind.CopyPath),
+                "The folder's path, exactly as Windows shows it.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-path-quoted", "Copy path in quotes",
-                "The path wrapped in \"double quotes\", ready to paste into a command line.", QuickActionKind.CopyPath),
+                "The path wrapped in \"double quotes\", ready to paste into a command line.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-path-forward", "Copy path with forward slashes",
-                "The path with every backslash changed to a forward slash.", QuickActionKind.CopyPath),
+                "The path with every backslash changed to a forward slash.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-path-wsl", "Copy WSL path",
-                "The path as WSL would read it, such as /mnt/c/Demo. Does nothing for a network path.", QuickActionKind.CopyPath),
+                "The path as WSL would read it, such as /mnt/c/Demo. Does nothing for a network path.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-markdown-link", "Copy Markdown link",
-                "A Markdown link to the folder, such as [Demo](<C:/Demo>).", QuickActionKind.CopyPath),
+                "A Markdown link to the folder, such as [Demo](<C:/Demo>).", QuickActionKind.CopyPath, true),
+            new QuickActionDefinition("copy-folder-name", "Copy folder name",
+                "Only the folder's own name, such as Apollo.", QuickActionKind.CopyPath, false),
+            new QuickActionDefinition("copy-parent-path", "Copy parent folder path",
+                "The path of the folder that holds this one. Does nothing at a drive root.", QuickActionKind.CopyPath, false),
+            new QuickActionDefinition("copy-file-url", "Copy as file URL",
+                "The path as a file:// URL, with special characters encoded.", QuickActionKind.CopyPath, false),
+            new QuickActionDefinition("copy-cd-powershell", "Copy PowerShell change-directory command",
+                "A Set-Location command for this folder, ready to paste into PowerShell.", QuickActionKind.CopyPath, false),
             new QuickActionDefinition("new-text-file", "New text file",
-                "Adds \"New Text Document.txt\" to the folder, never overwriting one already there.", QuickActionKind.NewItem),
+                "Adds \"New Text Document.txt\" to the folder, never overwriting one already there.", QuickActionKind.NewItem, true),
             new QuickActionDefinition("new-markdown-file", "New Markdown file",
-                "Adds a dated Markdown file with a \"# Untitled\" heading.", QuickActionKind.NewItem),
+                "Adds a dated Markdown file with a \"# Untitled\" heading.", QuickActionKind.NewItem, true),
             new QuickActionDefinition("new-dated-folder", "New folder with today's date",
-                "Adds a folder named with today's date.", QuickActionKind.NewItem),
+                "Adds a folder named with today's date.", QuickActionKind.NewItem, true),
+            new QuickActionDefinition("new-powershell-script", "New PowerShell script",
+                "Adds \"script.ps1\" to the folder, never overwriting one already there.", QuickActionKind.NewItem, false),
+            new QuickActionDefinition("new-readme", "New README",
+                "Adds \"README.md\" with the folder's name as its heading, never overwriting one already there.", QuickActionKind.NewItem, false),
+            new QuickActionDefinition("new-gitignore", "New .gitignore",
+                "Adds a \".gitignore\" with common entries, never overwriting one already there.", QuickActionKind.NewItem, false),
             new QuickActionDefinition("open-terminal", "Open in Terminal",
-                "Opens Windows Terminal here, or PowerShell if Terminal is not installed.", QuickActionKind.OpenTool),
+                "Opens Windows Terminal here, or PowerShell if Terminal is not installed.", QuickActionKind.OpenTool, true),
             new QuickActionDefinition("open-vscode", "Open in Visual Studio Code",
-                "Opens the folder in VS Code. Hidden when \"code\" is not on PATH.", QuickActionKind.OpenTool),
+                "Opens the folder in VS Code. Hidden when \"code\" is not on PATH.", QuickActionKind.OpenTool, true),
+            new QuickActionDefinition("open-powershell", "Open PowerShell here",
+                "Opens PowerShell in the folder: PowerShell 7 if it is installed, or else Windows PowerShell.", QuickActionKind.OpenTool, false),
+            new QuickActionDefinition("open-wsl", "Open WSL here",
+                "Opens your default WSL distribution in the folder. Hidden when no distribution is installed.", QuickActionKind.OpenTool, false),
+            new QuickActionDefinition("pin-folder", "Pin this folder",
+                "Opens the group picker to pin the folder, the same as the Explorer right-click command.", QuickActionKind.FolderAction, false),
         };
 
         public static QuickActionDefinition Find(string id)
@@ -124,6 +150,74 @@ namespace QuickPane.Services
             return i >= 0 ? trimmed.Substring(i + 1) : path;
         }
 
+        /// <summary>"C:\Demo\Apollo" -&gt; "C:\Demo". Null at a drive root or a share root, which have
+        /// nothing above them. The trailing separator comes off first, because
+        /// Path.GetDirectoryName would otherwise read "C:\Demo\Apollo\" as "C:\Demo\Apollo".</summary>
+        public static string ParentPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            try { return Path.GetDirectoryName(path.TrimEnd('\\', '/')); }
+            catch (ArgumentException) { return null; }
+        }
+
+        /// <summary>"C:\Demo\My Apollo" -&gt; "file:///C:/Demo/My%20Apollo", and "\\server\share" -&gt;
+        /// "file://server/share". Each segment is encoded on its own instead of going through
+        /// new Uri(path).AbsoluteUri, because a path is not a URL: a "#" or "%" in a folder name is an
+        /// ordinary character there, and must come out encoded rather than start a fragment or read as
+        /// an escape.</summary>
+        public static string ToFileUrl(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            bool unc = IsUncPath(path);
+            var segments = path.Replace('\\', '/').Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+            var encoded = segments.Select((s, i) =>
+                !unc && i == 0 && s.Length == 2 && s[1] == ':' ? s : Uri.EscapeDataString(s));
+            string joined = string.Join("/", encoded);
+            if (unc) return "file://" + joined;
+            // A bare drive root needs its slash: "file:///C:" does not name a folder.
+            return "file:///" + joined + (segments.Length == 1 ? "/" : string.Empty);
+        }
+
+        /// <summary>A Set-Location command for the folder. A single-quoted string is the one PowerShell
+        /// form that expands nothing, so "$RECYCLE.BIN" stays literal, and doubling a quote is its only
+        /// escape. PowerShell also treats U+2018 to U+201B as single quotes, so those are doubled too:
+        /// left alone, one of them would close the string early when the command is pasted.</summary>
+        public static string ToPowerShellChangeDirectory(string path)
+        {
+            var sb = new StringBuilder("Set-Location -LiteralPath '");
+            foreach (char c in path ?? string.Empty)
+            {
+                sb.Append(c);
+                if (c == '\'' || (c >= '\u2018' && c <= '\u201B')) sb.Append(c);
+            }
+            return sb.Append('\'').ToString();
+        }
+
+        // ---- text for new files ------------------------------------------------
+
+        public static string ReadmeContent(string folder)
+        {
+            return "# " + Leaf(folder) + Environment.NewLine;
+        }
+
+        public static string PowerShellScriptContent()
+        {
+            return "Set-StrictMode -Version Latest" + Environment.NewLine + "$ErrorActionPreference = 'Stop'" + Environment.NewLine;
+        }
+
+        /// <summary>A short built-in list, never a downloaded one: the app does not write out content
+        /// it fetched.</summary>
+        public static string GitignoreContent()
+        {
+            return string.Join(Environment.NewLine, new[]
+            {
+                "# Operating system files", "Thumbs.db", "desktop.ini", ".DS_Store", "",
+                "# Build output", "bin/", "obj/", "build/", "dist/", "",
+                "# Dependencies and caches", "node_modules/", "__pycache__/", "",
+                "# Logs", "*.log", "",
+            });
+        }
+
         // ---- process-argument quoting ---------------------------------------
 
         /// <summary>Quotes one value the way CommandLineToArgvW parses a command line back apart, so
@@ -183,6 +277,12 @@ namespace QuickPane.Services
             return haveWt ? "-d ." : "-NoExit";
         }
 
+        /// <summary>The argument string that starts QuickPane's pin mode for a folder.</summary>
+        public static string PinArguments(string folder)
+        {
+            return "--pin " + QuoteArgument(folder);
+        }
+
         // ---- unique naming ---------------------------------------------------
 
         /// <summary>A file path inside <paramref name="directory"/> that does not exist yet: the
@@ -205,6 +305,15 @@ namespace QuickPane.Services
         public static string UniqueFolderName(string directory, string baseName)
         {
             return UniqueFileName(directory, baseName, string.Empty);
+        }
+
+        // ---- where an action may appear -----------------------------------------
+
+        /// <summary>Whether an action belongs in a pinned row's Quick actions submenu. "Pin this folder"
+        /// does not: that row is a pin already.</summary>
+        public static bool AppliesToPinnedRow(QuickActionDefinition def)
+        {
+            return def != null && def.Id != "pin-folder";
         }
 
         // ---- PATH lookup -------------------------------------------------------

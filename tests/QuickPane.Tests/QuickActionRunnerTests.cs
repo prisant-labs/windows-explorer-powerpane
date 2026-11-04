@@ -17,6 +17,21 @@ namespace QuickPane.Tests
     {
         // ---- ClipboardTextFor (pure) ----------------------------------------------------------
 
+        [TestCase("copy-folder-name", @"C:\Demo\Apollo", "Apollo")]
+        [TestCase("copy-parent-path", @"C:\Demo\Apollo", @"C:\Demo")]
+        [TestCase("copy-file-url", @"C:\Demo\Apollo", "file:///C:/Demo/Apollo")]
+        [TestCase("copy-cd-powershell", @"C:\Demo\Apollo", @"Set-Location -LiteralPath 'C:\Demo\Apollo'")]
+        public void ClipboardTextFor_NewFormats(string id, string folder, string expected)
+        {
+            Assert.That(QuickActionRunner.ClipboardTextFor(id, folder), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void ClipboardTextFor_ParentOfADriveRoot_IsNothingToCopy()
+        {
+            Assert.That(QuickActionRunner.ClipboardTextFor("copy-parent-path", @"C:\"), Is.Null);
+        }
+
         [Test]
         public void ClipboardTextFor_CopyPath_ReturnsThePlainFolder()
         {
