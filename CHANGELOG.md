@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+- The About page has a What's new card with a short summary of this version and a link to its full release notes. The summary ships inside the program, so it adds no network request. The row that opens the whole changelog is now called Changelog ([#208](https://github.com/prisant-labs/windows-explorer-quickpane/issues/208)).
+
 ### Changed
+- Each row on the Pane sections settings page has its own icon. They all shared one list icon, which looked like the drag grip beside it ([#207](https://github.com/prisant-labs/windows-explorer-quickpane/issues/207)).
 - Rows on the Pane sections and Quick actions settings pages have an info button beside the label. Its tooltip says what the row is, and for a section, when it does not appear. Built-in quick actions move their description there, so their rows are shorter and more fit on screen. A custom command keeps its template on the row ([#205](https://github.com/prisant-labs/windows-explorer-quickpane/issues/205)).
 - The SSH section is now called Remote drives on the Pane sections page, in the pane's section header, and in its row menu, the same as its Settings page. A header you renamed keeps your name ([#204](https://github.com/prisant-labs/windows-explorer-quickpane/issues/204)).
 

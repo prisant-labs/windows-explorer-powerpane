@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using QuickPane.Models;
 using QuickPane.UI.Settings.Pages;
@@ -131,6 +132,26 @@ namespace QuickPane.Tests
             Assert.That(SectionsPage.MoveSection(ordered, -1, 1), Is.False);
             Assert.That(SectionsPage.MoveSection(ordered, 5, -1), Is.False);
             Assert.That(SectionsPage.MoveSection(null, 0, 1), Is.False);
+        }
+
+        // #207: one shared icon said nothing about the section and read like the drag grip.
+        [Test]
+        public void SectionGlyph_EveryDefaultSectionHasItsOwnIcon()
+        {
+            var types = AppSettings.CreateDefault().Sections.Select(s => s.Type).ToList();
+            var glyphs = types.Select(SectionsPage.SectionGlyph).ToList();
+
+            Assert.That(types, Has.Count.GreaterThan(1));
+            Assert.That(glyphs, Is.Unique);
+            Assert.That(glyphs, Has.None.EqualTo(SectionsPage.SectionGlyph("from-a-newer-version")));
+        }
+
+        [Test]
+        public void SectionGlyph_MatchesThePageOfASectionThatHasOne()
+        {
+            Assert.That(SectionsPage.SectionGlyph("ssh"), Is.EqualTo(new SshPage().Glyph));
+            Assert.That(SectionsPage.SectionGlyph("recentapps"), Is.EqualTo(new RecentAppsPage().Glyph));
+            Assert.That(SectionsPage.SectionGlyph("quickactions"), Is.EqualTo(new QuickActionsPage().Glyph));
         }
     }
 }

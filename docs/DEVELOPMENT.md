@@ -138,7 +138,7 @@ The `upstream` remote points at `lso2/QuickPane`, and `origin` points at this fo
 ## Releasing the fork
 
 1. Set the version in `QuickPane/Properties/AssemblyInfo.cs` (both attributes). `Installer.iss` reads it from the built program. Fork versions add a fourth number to the upstream base, for example 3.10.0.1.
-2. Add a `CHANGELOG.md` entry with Added, Changed, and Fixed sections, linking upstream issues where they exist. When a release needs more than its changelog section, write a full release document in `docs/releases/<version>.md`, as for 3.10.0.2, the first published fork release.
+2. Add a `CHANGELOG.md` entry with Added, Changed, and Fixed sections, linking upstream issues where they exist. When a release needs more than its changelog section, write a full release document in `docs/releases/<version>.md`, as for 3.10.0.2, the first published fork release. Also update `QuickPane/Services/WhatsNew.cs`, which is the short summary on the About page. Set its `Version` to the new version and rewrite its lines. `WhatsNewTests` fails until its version matches the assembly's, so the tests catch a forgotten update. The "At a glance" table in a release document is a good source for these lines.
 3. When the release changes what a user sees, add an item to "What this fork adds" at the top of `README.md`. Link it to the release that will publish it, and to its issues. A version that is never published gets a line under its `CHANGELOG.md` heading naming the release that first shipped its changes.
 4. Merge to `main` through a pull request with green CI.
 5. Tag the merged commit on `main` and push the tag: `git tag -a v<version> -m "QuickPane <version>"`, then `git push origin v<version>`.

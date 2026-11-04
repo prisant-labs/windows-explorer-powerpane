@@ -18,8 +18,8 @@ namespace QuickPane.UI.Settings.Pages
     // see SettingsSearchIndexTests for the test that pins this down.
 
     /// <summary>App header, an Updates card (status, "Check for updates", Download when an update
-    /// exists), a Links card (source, release notes, report an issue), a Licence card, and a
-    /// Third-party notices card. Last item in the navigation pane.</summary>
+    /// exists), a Links card (source, changelog, report an issue), a What's new card, a Licence card,
+    /// and a Third-party notices card. Last item in the navigation pane.</summary>
     internal sealed class AboutPage : SettingsPage
     {
         public override string Id => "about";
@@ -35,12 +35,14 @@ namespace QuickPane.UI.Settings.Pages
         private const string GlyphExternal = "\uE8A7";   // OpenInNewWindow
         private const string GlyphDocument = "\uE8A5";   // Document (licence)
         private const string GlyphCertificate = "\uE8EF"; // Certificate-ish (third-party notices)
+        private const string GlyphWhatsNew = "\uE789";    // Megaphone
 
         // The fork's own repository, matching UpdateService's own repo (not upstream's: offering
         // upstream's release notes or issue tracker to someone running a fork build would point them
         // at the wrong project).
         private const string RepoUrl = "https://github.com/prisant-labs/windows-explorer-quickpane";
-        private const string ReleaseNotesUrl = RepoUrl + "/blob/main/CHANGELOG.md";
+        private const string ChangelogUrl = RepoUrl + "/blob/main/CHANGELOG.md";
+        internal const string ThisVersionNotesUrl = RepoUrl + "/releases/tag/v" + WhatsNew.Version;
         private const string IssueTrackerUrl = RepoUrl + "/issues/new";
 
         private const string AppDescription = "Pinned folders inside File Explorer and file dialogs";
@@ -62,8 +64,10 @@ namespace QuickPane.UI.Settings.Pages
                 // returns false and the page is still opened) rather than pointing at either one.
                 yield return new SettingsSearchEntry(Id, null, "App version and licence",
                     "The installed version, and the MIT licence QuickPane is built on.", "version", "licence", "license");
-                yield return new SettingsSearchEntry(Id, "links", "Source code, release notes, report an issue",
+                yield return new SettingsSearchEntry(Id, "links", "Source code, changelog, report an issue",
                     "Links to the repository, the changelog, and the issue tracker.", "github", "changelog", "issue");
+                yield return new SettingsSearchEntry(Id, WhatsNewCardId, "What's new",
+                    "What changed in this version, with a link to its full release notes.", "new", "release notes", "changes");
             }
         }
 
@@ -78,6 +82,7 @@ namespace QuickPane.UI.Settings.Pages
             panel.Children.Add(BuildUpdatesCard(ctx, CheckForUpdates));
             panel.Children.Add(BuildAutomaticCheckCard(ctx));
             panel.Children.Add(BuildLinksCard(ctx));
+            panel.Children.Add(BuildWhatsNewCard(ctx));
             panel.Children.Add(ctx.Cards.Card("licence", GlyphDocument, "Licence", LicenceText, null));
             panel.Children.Add(ctx.Cards.Card("third-party-notices", GlyphCertificate, "Third-party notices", ThirdPartyNoticeText, null));
             return panel;
@@ -303,6 +308,61 @@ namespace QuickPane.UI.Settings.Pages
             return SettingsCards.Invokable(border, accessibleName, () => OpenUrl(url));
         }
 
+        // ---- what's new card -------------------------------------------------
+
+        private const string WhatsNewCardId = "whats-new";
+
+        /// <summary>The version's summary from <see cref="WhatsNew"/>, then a link to its full release
+        /// notes (#208). It sits above Licence and Third-party notices, because those two are long and
+        /// few people would scroll past them. The lines line up under the title, as a child row does
+        /// under its parent card: a 20 px icon in its 24 px box, plus the 20 px gap after it.</summary>
+        private static FrameworkElement BuildWhatsNewCard(SettingsPageContext ctx)
+        {
+            var icon = GlyphText(GlyphWhatsNew, 20);
+            icon.Margin = new Thickness(0, 0, 20, 0);
+            icon.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+
+            var title = new TextBlock { Text = WhatsNewTitle(), FontSize = 14 };
+            title.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+
+            var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+            header.Children.Add(icon);
+            header.Children.Add(title);
+
+            var body = new StackPanel();
+            body.Children.Add(header);
+            foreach (var item in WhatsNew.Items)
+            {
+                var name = new TextBlock { Text = item.Title, FontSize = 12, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+                name.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+                var summary = new TextBlock { Text = item.Summary, FontSize = 12, TextWrapping = TextWrapping.Wrap };
+                summary.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+                var row = new StackPanel { Margin = new Thickness(44, 0, 0, 8) };
+                row.Children.Add(name);
+                row.Children.Add(summary);
+                body.Children.Add(row);
+            }
+
+            var divider = new Border { Height = 1, Margin = new Thickness(0, 4, 0, 0) };
+            divider.SetResourceReference(Border.BackgroundProperty, "CardStrokeColorDefaultBrush");
+            body.Children.Add(divider);
+
+            var link = BuildLinkRow(GlyphDocument, "Full release notes", ThisVersionNotesUrl, "Full release notes, opens in your browser");
+            body.Children.Add(link);
+
+            var shell = ctx.Cards.CardShell(body, hoverable: false);
+            ctx.Cards.Register(WhatsNewCardId, link);
+            return shell;
+        }
+
+        /// <summary>Uses the same short form as the version in the header card, so the page never shows
+        /// one version two ways. A pure decision, so it is unit-testable.</summary>
+        internal static string WhatsNewTitle()
+        {
+            return "What's new in " + UpdateService.Display(new Version(WhatsNew.Version));
+        }
+
         internal struct LinkEntry
         {
             public string Glyph;
@@ -317,8 +377,8 @@ namespace QuickPane.UI.Settings.Pages
         {
             new LinkEntry { Glyph = GlyphLink, Title = "Source code on GitHub", Url = RepoUrl,
                 AccessibleName = "Source code on GitHub, opens in your browser" },
-            new LinkEntry { Glyph = GlyphDocument, Title = "Release notes", Url = ReleaseNotesUrl,
-                AccessibleName = "Release notes, opens in your browser" },
+            new LinkEntry { Glyph = GlyphDocument, Title = "Changelog", Url = ChangelogUrl,
+                AccessibleName = "Changelog, opens in your browser" },
             new LinkEntry { Glyph = GlyphInfo, Title = "Report an issue", Url = IssueTrackerUrl,
                 AccessibleName = "Report an issue, opens in your browser" },
         };
