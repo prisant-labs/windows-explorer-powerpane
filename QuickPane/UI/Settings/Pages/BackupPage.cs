@@ -82,7 +82,7 @@ namespace QuickPane.UI.Settings.Pages
                 {
                     // Rebuilds the whole window on this same page, exactly as the old
                     // handler's BuildUI() call did.
-                    _pendingRestoreMessage = RestoredMessage;
+                    _pendingRestoreMessage = RestoredMessageFor(settings.Current);
                     ctx.Rebuild();
                 }
                 else
@@ -115,6 +115,16 @@ namespace QuickPane.UI.Settings.Pages
         /// <summary>Matches the old status text verbatim for a successful restore
         /// (<c>"Settings restored."</c>).</summary>
         internal const string RestoredMessage = "Settings restored.";
+
+        /// <summary>A restore turns custom commands off (#190). The message says so, because otherwise
+        /// the rows would seem to have vanished from the pane for no reason.</summary>
+        internal static string RestoredMessageFor(Models.AppSettings settings)
+        {
+            bool anyCommands = settings != null && settings.CustomCommands != null && settings.CustomCommands.Count > 0;
+            return anyCommands
+                ? RestoredMessage + " Custom commands are turned off until you review them on the Quick actions page."
+                : RestoredMessage;
+        }
 
         /// <summary>Matches the old status text verbatim for a restore that could not read the
         /// chosen file (<c>"Restore failed: the file could not be read."</c>).</summary>

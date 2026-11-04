@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -18,6 +19,51 @@ namespace QuickPane.Services
     /// calls other actions and sections use -- does not have.</summary>
     internal static class QuickActionRunner
     {
+        /// <summary>Runs any action. Returns a short message for the row to show when the action could
+        /// not do what was asked, or null. <paramref name="selection"/> is what a custom command acts on
+        /// when it holds anything, and the folder is used otherwise.</summary>
+        public static string Run(QuickActionDefinition def, string folder, IList<string> selection)
+        {
+            if (def == null) return null;
+            if (def.Kind == QuickActionKind.Custom) return RunCustom(def, folder, selection);
+            Run(def.Id, folder);
+            return null;
+        }
+
+        /// <summary>Starts a custom command (#190): directly, as the user, in the folder, with the
+        /// argument string CustomCommandTemplate built. Never through cmd /c, and never elevated.</summary>
+        private static string RunCustom(QuickActionDefinition def, string folder, IList<string> selection)
+        {
+            if (string.IsNullOrEmpty(folder) || !Directory.Exists(folder))
+            {
+                Log.Info("custom command '" + def.Name + "': the folder '" + folder + "' is not available.");
+                return "Folder not available";
+            }
+            IList<string> targets = selection != null && selection.Count > 0 ? selection : new[] { folder };
+            var line = CustomCommandTemplate.Build(def.Template, targets, folder, QuickActionLibrary.FindOnPath);
+            if (line.Error != null)
+            {
+                Log.Info("custom command '" + def.Name + "': " + line.Error);
+                return line.Error;
+            }
+            try
+            {
+                Process.Start(new ProcessStartInfo(line.Program)
+                {
+                    Arguments = line.Arguments,
+                    WorkingDirectory = folder,
+                    UseShellExecute = false
+                });
+                Log.Info("custom command '" + def.Name + "': started '" + line.Program + "' in '" + folder + "'.");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("custom command '" + def.Name + "'", ex);
+                return "Could not start " + def.Name;
+            }
+        }
+
         public static void Run(string actionId, string folder)
         {
             if (string.IsNullOrEmpty(folder))

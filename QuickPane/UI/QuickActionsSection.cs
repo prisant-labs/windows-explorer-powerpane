@@ -91,7 +91,7 @@ namespace QuickPane.UI
             foreach (var setting in settings)
             {
                 if (!setting.Enabled) continue;
-                var def = QuickActionLibrary.Find(setting.Id);
+                var def = QuickActionLibrary.Resolve(App.Settings.Current, setting.Id);
                 if (def == null) continue;
 
                 if (!IsAvailable(def)) continue;
@@ -165,11 +165,11 @@ namespace QuickPane.UI
             row.LostKeyboardFocus += (s, e) => row.Background = Brushes.Transparent;
 
             var hostWindow = _hostWindow;
-            var id = def.Id;
             Action run = () => WorkQueue.Post(() =>
             {
                 var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
-                QuickActionRunner.Run(id, folder);
+                var message = QuickActionRunner.Run(def, folder, null);
+                if (message != null) WorkQueue.PostUI(() => ShowMessage(row, text, def, message));
             });
             row.MouseLeftButtonUp += (s, e) => run();
             row.KeyDown += (s, e) =>
@@ -181,7 +181,24 @@ namespace QuickPane.UI
             return row;
         }
 
-        // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow, Pin.
+        /// <summary>Puts a short message in the row for a few seconds, because an action that could not
+        /// run must not look as if nothing was clicked. The tooltip holds it too, since a narrow pane
+        /// trims the row's text. The pane rebuilding meanwhile only leaves this acting on a retired row.</summary>
+        private static void ShowMessage(Border row, TextBlock text, QuickActionDefinition def, string message)
+        {
+            text.Text = message;
+            row.ToolTip = message;
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                text.Text = def.Name;
+                row.ToolTip = def.Description;
+            };
+            timer.Start();
+        }
+
+        // Segoe Fluent Icons code points: Copy, Add, OpenInNewWindow, Pin, CommandPrompt.
         private static string Glyph(QuickActionKind kind)
         {
             switch (kind)
@@ -190,6 +207,7 @@ namespace QuickPane.UI
                 case QuickActionKind.NewItem: return "\uE710";
                 case QuickActionKind.OpenTool: return "\uE8A7";
                 case QuickActionKind.FolderAction: return "\uE718";
+                case QuickActionKind.Custom: return "\uE756";
                 default: return "\uE8C8";
             }
         }

@@ -270,6 +270,11 @@ namespace QuickPane.UI
             {
                 foreach (var a in s.QuickActions)
                     sb.Append(a.Id).Append('\u0001').Append(a.Enabled).Append('\u0002');
+                if (s.CustomCommands != null)
+                {
+                    foreach (var c in s.CustomCommands)
+                        sb.Append(c.Id).Append('\u0001').Append(c.Name).Append('\u0001').Append(c.Template).Append('\u0002');
+                }
             }
             sb.Append('\u0003');
 

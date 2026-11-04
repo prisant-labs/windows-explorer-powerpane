@@ -152,6 +152,157 @@ namespace QuickPane.Tests
             Assert.That(s.QuickActions, Has.Count.EqualTo(QuickActionLibrary.All.Length));
         }
 
+        // ---- custom commands (#190) ---------------------------------------------------------------
+
+        private static AppSettings WithCommand(out string id)
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            id = QuickActionsPage.AddCustomCommand(s, "  Demo  ", "  demo {path}  ");
+            return s;
+        }
+
+        [Test]
+        public void AddCustomCommand_TrimsAndAppendsItOn()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(id, Does.StartWith(CustomCommandTemplate.IdPrefix));
+            Assert.That(s.CustomCommands.Single().Name, Is.EqualTo("Demo"));
+            Assert.That(s.CustomCommands.Single().Template, Is.EqualTo("demo {path}"));
+            Assert.That(s.QuickActions.Last().Id, Is.EqualTo(id));
+            Assert.That(s.QuickActions.Last().Enabled, Is.True);
+        }
+
+        [Test]
+        public void Normalize_KeepsACustomCommandsStateAndPlace()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(QuickActionsPage.MoveActionByIdTo(s, id, 0), Is.True);
+            s.Normalize();
+            Assert.That(s.QuickActions[0].Id, Is.EqualTo(id));
+            Assert.That(s.QuickActions[0].Enabled, Is.True);
+        }
+
+        [Test]
+        public void Normalize_EntryWhoseCommandIsGone_IsDropped()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            s.QuickActions.Add(new QuickActionSetting { Id = CustomCommandTemplate.IdPrefix + "gone", Enabled = true });
+            s.Normalize();
+            Assert.That(s.QuickActions.Any(a => CustomCommandTemplate.IsCustomId(a.Id)), Is.False);
+        }
+
+        [Test]
+        public void Normalize_CommandWithNoEntry_IsAddedOff()
+        {
+            var s = AppSettings.CreateDefault();
+            s.CustomCommands = new List<CustomCommand>
+            {
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "a", Name = "A", Template = "calc" },
+            };
+            s.Normalize();
+            Assert.That(s.QuickActions.Single(a => a.Id == CustomCommandTemplate.IdPrefix + "a").Enabled, Is.False);
+        }
+
+        [Test]
+        public void Normalize_DropsUnusableCommands_AndNamesABlankOne()
+        {
+            var s = AppSettings.CreateDefault();
+            s.CustomCommands = new List<CustomCommand>
+            {
+                null,
+                new CustomCommand { Id = "no-prefix", Name = "A", Template = "calc" },
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "blank", Name = "B", Template = "  " },
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "dup", Name = "", Template = "calc" },
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "dup", Name = "D", Template = "calc" },
+            };
+            s.Normalize();
+            Assert.That(s.CustomCommands, Has.Count.EqualTo(1));
+            Assert.That(s.CustomCommands[0].Name, Is.EqualTo("calc"));
+        }
+
+        [Test]
+        public void TurnOffCustomCommands_LeavesBuiltInsAlone()
+        {
+            string id;
+            var s = WithCommand(out id);
+            s.TurnOffCustomCommands();
+            Assert.That(s.QuickActions.Single(a => a.Id == id).Enabled, Is.False);
+            Assert.That(s.QuickActions.Single(a => a.Id == "copy-path").Enabled, Is.True);
+        }
+
+        [Test]
+        public void ImportFrom_TurnsCustomCommandsOff()
+        {
+            using (var temp = new TempDir())
+            {
+                var source = new SettingsStore(System.IO.Path.Combine(temp.Path, "source"));
+                source.Load();
+                string id = QuickActionsPage.AddCustomCommand(source.Current, "Demo", "demo {path}");
+                string backup = System.IO.Path.Combine(temp.Path, "backup.json");
+                source.ExportTo(backup);
+
+                var target = new SettingsStore(System.IO.Path.Combine(temp.Path, "target"));
+                target.Load();
+                Assert.That(target.ImportFrom(backup), Is.True);
+                target.Flush();
+
+                Assert.That(target.Current.CustomCommands.Single().Template, Is.EqualTo("demo {path}"));
+                Assert.That(target.Current.QuickActions.Single(a => a.Id == id).Enabled, Is.False);
+            }
+        }
+
+        [Test]
+        public void RestoredMessageFor_MentionsCommandsOnlyWhenThereAreSome()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(BackupPage.RestoredMessageFor(s), Does.Contain("turned off"));
+            s.CustomCommands.Clear();
+            Assert.That(BackupPage.RestoredMessageFor(s), Is.EqualTo(BackupPage.RestoredMessage));
+        }
+
+        [Test]
+        public void DeleteCustomCommand_RemovesBothEntries()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(QuickActionsPage.DeleteCustomCommand(s, id), Is.True);
+            Assert.That(s.CustomCommands, Is.Empty);
+            Assert.That(s.QuickActions.Any(a => a.Id == id), Is.False);
+            Assert.That(QuickActionsPage.DeleteCustomCommand(s, id), Is.False);
+        }
+
+        [Test]
+        public void ResetActions_KeepsCustomCommandsAfterTheBuiltIns()
+        {
+            string id;
+            var s = WithCommand(out id);
+            s.QuickActions.Single(a => a.Id == id).Enabled = false;
+            Assert.That(QuickActionsPage.MoveActionByIdTo(s, id, 0), Is.True);
+
+            var reset = QuickActionsPage.ResetActions(s);
+            Assert.That(reset.Take(QuickActionLibrary.All.Length).Select(a => a.Id), Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
+            Assert.That(reset.Last().Id, Is.EqualTo(id));
+            Assert.That(reset.Last().Enabled, Is.False);
+        }
+
+        [Test]
+        public void Resolve_FindsBuiltInsAndCustomCommands()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(QuickActionLibrary.Resolve(s, "copy-path").Template, Is.Null);
+            var custom = QuickActionLibrary.Resolve(s, id);
+            Assert.That(custom.Kind, Is.EqualTo(QuickActionKind.Custom));
+            Assert.That(custom.Template, Is.EqualTo("demo {path}"));
+            Assert.That(QuickActionLibrary.Resolve(s, CustomCommandTemplate.IdPrefix + "gone"), Is.Null);
+            Assert.That(QuickActionLibrary.Resolve(s, "not-real"), Is.Null);
+        }
+
         // ---- QuickActionsPage.MoveAction (the Settings page's Move up/down) --------------------
 
         private static List<QuickActionSetting> Actions(params string[] ids)
