@@ -168,6 +168,31 @@ namespace QuickPane.Tests
             Assert.That(CustomCommandTemplate.Validate(template), Is.Not.Null);
         }
 
+        // The Codex review of 2026-11-03: the program must be judged as it will run.
+        [Test]
+        public void Validate_RefusesAShellNamedByAnEnvironmentVariable()
+        {
+            Assert.That(CustomCommandTemplate.Validate("%COMSPEC% /c echo {path}"), Is.Not.Null);
+            Assert.That(CustomCommandTemplate.Validate("%SystemRoot%\\System32\\cmd.exe /c {path}"), Is.Not.Null);
+        }
+
+        [Test]
+        public void Validate_AllowsAShellNamedByAVariableWithNoPlaceholder()
+        {
+            Assert.That(CustomCommandTemplate.Validate("%COMSPEC% /k echo hello"), Is.Null);
+        }
+
+        [TestCase(@"C:\Windows\System32\cmd.exe")]
+        [TestCase(@"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe")]
+        [TestCase(@"C:\Windows\System32\wsl.exe")]
+        [TestCase(@"C:\Tools\wrapper.bat")]
+        public void Build_BareNameThatResolvesToAShell_IsRefusedWithAPlaceholder(string resolved)
+        {
+            var line = CustomCommandTemplate.Build("mytool {path}", new[] { @"C:\Demo\foo&calc" }, Folder, n => resolved);
+            Assert.That(line.Error, Is.Not.Null);
+            Assert.That(line.Program, Is.Null);
+        }
+
         [TestCase("code {path}", true)]
         [TestCase("code {paths}", true)]
         [TestCase("code {name}", true)]

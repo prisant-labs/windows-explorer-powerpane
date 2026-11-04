@@ -162,10 +162,12 @@ namespace QuickPane.Services
         /// argument as code or splits it on its own separators, so correct quoting does not help: a
         /// folder named "a&amp;calc" would run calc through cmd or a batch file. A plain program with no
         /// placeholder is fine, since every word of its command line is the user's own, and it still
-        /// starts in the folder through its working directory.</summary>
+        /// starts in the folder through its working directory. The program is read after environment
+        /// variables expand, the way it will run: read as typed, %COMSPEC% looked like an unknown
+        /// program and reached cmd.exe with a folder name on its command line.</summary>
         internal static string ShellRefusal(IList<string> tokens)
         {
-            string program = tokens[0];
+            string program = Environment.ExpandEnvironmentVariables(tokens[0]);
             string ext = SafeExtension(program);
             string stem = SafeStem(program);
 
@@ -270,8 +272,8 @@ namespace QuickPane.Services
         }
 
         /// <summary>A template resolved as far as it can be for this machine: the program, the
-        /// arguments, or the reason it cannot run. A bare name such as "code" can turn out to be a
-        /// batch file only here, once PATH has answered, so that refusal happens at this point too.
+        /// arguments, or the reason it cannot run. A bare name can turn out to be a batch file or a
+        /// shell only here, once PATH has answered, so the refusal runs again on the resolved program.
         /// VS Code's own shim is the one case with a known real program behind it.</summary>
         public static CustomCommandLine Build(string template, IList<string> targets, string dir, Func<string, string> findOnPath)
         {
@@ -298,11 +300,12 @@ namespace QuickPane.Services
                 string e;
                 return PlaceholdersIn(t, out e).Count > 0;
             });
-            string ext = SafeExtension(program);
-            if (hasPlaceholder && (ext == ".bat" || ext == ".cmd"))
+            if (hasPlaceholder)
             {
-                result.Error = tokens[0] + " is a batch file, which would read a folder name as commands.";
-                return result;
+                var resolved = new List<string>(tokens);
+                resolved[0] = program;
+                result.Error = ShellRefusal(resolved);
+                if (result.Error != null) return result;
             }
             if (program.Length + arguments.Length + 3 > MaxCommandLineLength)
             {
