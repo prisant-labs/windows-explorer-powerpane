@@ -22,20 +22,20 @@ namespace QuickPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "3.12.0.0";
+        public const string Version = "3.12.0.1";
 
         public static readonly Item[] Items =
         {
-            new Item("Update notice",
-                "One notice for each new version, an item in the tray menu, and a dot on About."),
-            new Item("Ten more quick actions",
-                "New ways to copy a folder, new starter files, Open PowerShell here, Open WSL here, and Pin this folder. All start off."),
-            new Item("Custom commands",
-                "Name a command, give it a template such as code {path}, and it becomes a row in the pane."),
-            new Item("Selection actions",
-                "Eight actions that copy or open the files selected in Explorer. All start off."),
-            new Item("Dock grip with a maximized window",
-                "The width grip of a reserved desktop dock can be dragged while a window is maximized."),
+            new Item("Lighter with many pins",
+                "A pinned folder's right-click menu is built when it opens, so many pins and windows use far less memory."),
+            new Item("What's new on About",
+                "This card: a short summary of each version, with a link to its full notes."),
+            new Item("Clearer settings rows",
+                "Pane sections and Quick actions rows have their own icons, an info button, and more room around the switch."),
+            new Item("Remote drives",
+                "The SSH section is called Remote drives everywhere. A header you renamed keeps your name."),
+            new Item("Backup & restore",
+                "The card stays at its own height instead of stretching to fill the page."),
         };
     }
 }

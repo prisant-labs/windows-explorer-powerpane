@@ -43,6 +43,8 @@
 > - **Update notice:** QuickPane tells you when a new version exists, at most once a day and once per version, and it never downloads anything. You can turn the daily check off on the About page. [3.12.0.0](docs/releases/3.12.0.0.md) ([#176](https://github.com/prisant-labs/windows-explorer-quickpane/issues/176))
 > - **Quick actions you can extend:** ten more built-in actions, your own custom commands from a template such as `code {path}`, and eight actions on the files selected in Explorer. All of them start off. [3.12.0.0](docs/releases/3.12.0.0.md) ([#189](https://github.com/prisant-labs/windows-explorer-quickpane/issues/189), [#190](https://github.com/prisant-labs/windows-explorer-quickpane/issues/190), [#191](https://github.com/prisant-labs/windows-explorer-quickpane/issues/191))
 > - **Dock grip with a maximized window:** the width grip of a reserved desktop dock can be dragged while a window is maximized. [3.12.0.0](docs/releases/3.12.0.0.md) ([#185](https://github.com/prisant-labs/windows-explorer-quickpane/issues/185))
+> - **Lighter with many pins:** a pinned folder's right-click menu is built when it opens, so many pins and windows use far less memory and the pane rebuilds faster. [3.12.0.1](docs/releases/3.12.0.1.md) ([#210](https://github.com/prisant-labs/windows-explorer-quickpane/issues/210))
+> - **What's new and clearer settings rows:** the About page summarizes each version and links to its full notes, and rows on the Pane sections and Quick actions pages have their own icons and an info button. [3.12.0.1](docs/releases/3.12.0.1.md) ([#208](https://github.com/prisant-labs/windows-explorer-quickpane/issues/208), [#207](https://github.com/prisant-labs/windows-explorer-quickpane/issues/207), [#205](https://github.com/prisant-labs/windows-explorer-quickpane/issues/205))
 
 A folder sidebar for Windows File Explorer. QuickPane embeds a pinned-folders pane inside every Explorer window, so your groups, recent locations, drives, network shares, and WSL distros travel with the window you are already using. Pin it inside the window, float it beside the window, or run it as a slim screen-edge dock. Everything runs locally as a single tray app, no code is ever injected into Explorer, and all data stays in plain files under your user profile.
 
@@ -254,7 +256,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 - Open Settings from the tray icon or the gear in the pane
 - A navigation pane lists the pages, and a search box jumps to a setting
 - Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, which apps Recent Apps lists, the keyboard shortcut, and profiles
-- The About page shows the running version and offers a download when a newer release is published
+- The About page shows the running version and a short summary of what is new in it, and offers a download when a newer release is published
 - Changes apply live
 
 ## Settings and data
@@ -402,6 +404,7 @@ QuickPane/
     │   ├── CustomCommandTemplate.cs # Custom command templates: placeholders, quoting, refusals
     │   ├── UpdateService.cs   # Asks GitHub for the latest release
     │   ├── UpdateNotifier.cs  # The daily check and the one-time notice
+    │   ├── WhatsNew.cs        # The version summary on the About page
     │   └── Log.cs
     ├── Themes/Fluent/         # Ported Microsoft WPF Fluent theme (see NOTICE.md below)
     └── UI/
@@ -412,6 +415,7 @@ QuickPane/
         ├── ShellRootSection.cs       # Network and Linux roots
         ├── FolderItem.xaml(.cs)      # One folder row
         ├── FolderTreeNode.cs         # A lazy tree node
+        ├── LazyContextMenu.cs        # Builds a pinned row's menu when it opens
         ├── Settings/                 # The native Settings window, its cards, and its pages
         ├── GroupPickerWindow.xaml(.cs) # Pick a group when pinning
         ├── TextPrompt.cs             # Top-level prompts for text entry

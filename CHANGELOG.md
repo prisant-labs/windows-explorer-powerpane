@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [3.12.0.1] - 2026-11-05
+
+Much lighter with many pinned folders, a What's new card on the About page, and clearer rows on two settings pages.
 
 ### Added
 - The About page has a What's new card with a short summary of this version and a link to its full release notes. The summary ships inside the program, so it adds no network request. The row that opens the whole changelog is now called Changelog ([#208](https://github.com/prisant-labs/windows-explorer-quickpane/issues/208)).
