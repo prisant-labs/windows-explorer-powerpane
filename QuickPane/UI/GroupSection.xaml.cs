@@ -202,7 +202,7 @@ namespace QuickPane.UI
                     var captured = pin;
                     var node = new FolderTreeNode(pin.DisplayName, pin.TargetPath, pin.Exists, _navigate, 0,
                         captured.IsFile, null, pinCtx);
-                    node.Row.ContextMenu = BuildPinMenu(group, active, captured);
+                    LazyContextMenu.Attach(node.Row, () => BuildPinMenu(group, active, captured));
                     WirePinDragSource(node.Row, captured);
                     items.Children.Add(node);
                 }
