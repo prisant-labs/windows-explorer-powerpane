@@ -44,7 +44,11 @@ namespace QuickPane.Services
             if (settings != null && TryReadVersion(settings.Current.UpdateNoticeVersion, out noticed) && noticed > UpdateService.Current)
                 SetAvailable(noticed);
 
-            _timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = FirstTickDelay };
+            // Normal priority, not Background: WPF holds Background work back while input is pending,
+            // and in inside mode this thread shares Explorer's input queue. One Sandbox run saw a check
+            // wait until the cursor moved (#199). The tick mostly reads a timestamp, so it has no reason
+            // to yield. DialogPaneWatcher's sweep avoids Background for the same reason.
+            _timer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = FirstTickDelay };
             _timer.Tick += (s, e) =>
             {
                 _timer.Interval = TickInterval;

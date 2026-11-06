@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The automatic update check no longer gives way to mouse and keyboard input, which once delayed it until the cursor moved. That delay was seen once and could not be repeated, so this is a precaution ([#199](https://github.com/prisant-labs/windows-explorer-quickpane/issues/199)).
+
 ## [3.12.0.1] - 2026-11-05
 
 Much lighter with many pinned folders, a What's new card on the About page, and clearer rows on two settings pages.
