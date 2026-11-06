@@ -22,20 +22,12 @@ namespace QuickPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "3.12.0.1";
+        public const string Version = "3.12.0.2";
 
         public static readonly Item[] Items =
         {
-            new Item("Lighter with many pins",
-                "A pinned folder's right-click menu is built when it opens, so many pins and windows use far less memory."),
-            new Item("What's new on About",
-                "This card: a short summary of each version, with a link to its full notes."),
-            new Item("Clearer settings rows",
-                "Pane sections and Quick actions rows have their own icons, an info button, and more room around the switch."),
-            new Item("Remote drives",
-                "The SSH section is called Remote drives everywhere. A header you renamed keeps your name."),
-            new Item("Backup & restore",
-                "The card stays at its own height instead of stretching to fill the page."),
+            new Item("Update check",
+                "The daily check no longer gives way to mouse and keyboard input. This is a precaution against a delay seen once."),
         };
     }
 }

@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [3.12.0.2] - 2026-11-06
+
+A small precaution for the automatic update check.
 
 ### Fixed
 - The automatic update check no longer gives way to mouse and keyboard input, which once delayed it until the cursor moved. That delay was seen once and could not be repeated, so this is a precaution ([#199](https://github.com/prisant-labs/windows-explorer-quickpane/issues/199)).
