@@ -169,7 +169,8 @@ namespace QuickPane.Tests
             "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops", "DesktopDockDisplay", "DesktopDockEdge",
             "ActiveProfile", // derived from Profiles + ActiveProfileIndex, both already in the key
             "PaneColor", // live through SidebarBackground's DynamicResource binding, no rebuild (#134)
-            "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion" // read by UpdateNotifier; the pane shows none of them (#176)
+            "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion", // read by UpdateNotifier; the pane shows none of them (#176)
+            "RecentHiddenFolders", "RecentClearedTicks" // RecentFoldersService rescans on its own and raises RecentsChanged; no pane rebuild (#224)
         };
 
         private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath" };
