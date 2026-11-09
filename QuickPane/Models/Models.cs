@@ -218,6 +218,19 @@ namespace QuickPane.Models
         [DataMember(Name = "recentsMaxCount", Order = 2)]
         public int RecentsMaxCount { get; set; } = 15;
 
+        // Folders Recent never shows or records, with everything inside them (#224). Shared by every
+        // profile, because a folder kept private in one profile should not appear in another. The
+        // Recent scan reads this from the work lane, so a change replaces the list rather than editing
+        // it in place: the scan then keeps reading the list it started with.
+        [DataMember(Name = "recentHiddenFolders", Order = 51, EmitDefaultValue = false)]
+        public List<string> RecentHiddenFolders { get; set; }
+
+        // When Clear Recent was last pressed, in UTC ticks. Windows' own Recent shortcuts written at or
+        // before this moment stay hidden, without deleting them: those shortcuts are also Windows'
+        // own Recent list and Quick Access. A later visit rewrites a shortcut, so it shows again.
+        [DataMember(Name = "recentClearedTicks", Order = 52, EmitDefaultValue = false)]
+        public long RecentClearedTicks { get; set; }
+
         [DataMember(Name = "sidebarWidthPx", Order = 3)]
         public int SidebarWidthPx { get; set; } = 220;
 

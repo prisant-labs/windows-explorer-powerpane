@@ -3,7 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- Folders Recent never shows. A Recent row's right-click menu gains "Never show this folder", and the Recent page in Settings lists the hidden folders, adds one, and shows one again. Recent neither shows nor records a hidden folder or anything inside it, and the list is shared by every profile ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
+- Clear Recent, on the Recent page in Settings, empties the Recent section. Windows' own Recent list and Quick Access keep their items, and a folder opened again shows again ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
 - Trace events for diagnosing stalls. A performance trace started with Windows Performance Recorder or PerfView now shows when QuickPane's background jobs, pane rebuilds, and calls into Explorer start and end. QuickPane writes nothing until someone on the same computer starts a trace, sends nothing anywhere, and keeps folder and file names out of the events. `docs/DEVELOPMENT.md` describes how to record one ([#219](https://github.com/prisant-labs/windows-explorer-quickpane/issues/219)).
+
+### Changed
+- The "Recent apps" page in Settings is now "Recent", with the new Recent folders controls above the Recent apps choice ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
+- Changing the Recents count refreshes Recent at once, instead of at its next scan ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
 
 ### Fixed
 - The installer runs on Windows 11 on Arm, which runs QuickPane's x64 build through emulation. It refused those computers before. Nobody has yet run QuickPane on an Arm computer, so how well it works there is untested ([#215](https://github.com/prisant-labs/windows-explorer-quickpane/issues/215)).
