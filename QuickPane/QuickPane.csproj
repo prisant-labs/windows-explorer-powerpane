@@ -85,6 +85,7 @@
     <Compile Include="Services\ShortcutRepair.cs" />
     <Compile Include="Services\ShutdownSignal.cs" />
     <Compile Include="Services\WorkQueue.cs" />
+    <Compile Include="Services\PerfTrace.cs" />
     <Compile Include="Services\PathStatus.cs" />
     <Compile Include="Services\LruCache.cs" />
     <Compile Include="Services\SettingsStore.cs" />

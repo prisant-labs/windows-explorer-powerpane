@@ -326,6 +326,7 @@ namespace QuickPane.UI
                 .Where(s => s.Visible)
                 .OrderBy(s => s.Order)
                 .ToList();
+            long traced = PerfTrace.PaneBuildBegin(ordered.Count);
 
             bool first = true;
             foreach (var s in ordered)
@@ -347,6 +348,7 @@ namespace QuickPane.UI
             // nothing that changes the pane's shape actually changed (#51).
             _shapeKey = PaneShapeKey(current);
             _shapeSettings = current;
+            PerfTrace.PaneBuildEnd(ordered.Count, traced);
         }
 
         /// <summary>Hide the rows that do not match what was typed in the search box.

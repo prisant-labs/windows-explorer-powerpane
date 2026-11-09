@@ -117,6 +117,14 @@ namespace QuickPane.Interop
 
         public static bool Navigate(IntPtr dlg, string path)
         {
+            long traced = PerfTrace.ShellCallBegin("DialogNavigate");
+            bool ok = false;
+            try { ok = NavigateCore(dlg, path); return ok; }
+            finally { PerfTrace.ShellCallEnd("DialogNavigate", traced, ok); }
+        }
+
+        private static bool NavigateCore(IntPtr dlg, string path)
+        {
             try
             {
                 if (string.IsNullOrEmpty(path) || !NM.IsWindow(dlg)) return false;
