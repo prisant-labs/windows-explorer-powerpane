@@ -6,14 +6,19 @@ using NM = QuickPane.Interop.NativeMethods;
 namespace QuickPane.Services
 {
     /// <summary>
-    /// One system-wide shortcut that moves focus into the pane, so a Save dialog can be driven without
-    /// the mouse. Registered only when the user turns keyboard navigation on, because a global hotkey
-    /// takes a combination away from every other program on the machine.
+    /// One system-wide shortcut: the one that moves focus into the pane, so a Save dialog can be driven
+    /// without the mouse, or the one that opens the quick switcher (#226). Each is registered only when
+    /// the user turns it on, because a global hotkey takes a combination away from every other program
+    /// on the machine. Each instance has its own id and its own message window.
     /// </summary>
     internal sealed class HotkeyService : IDisposable
     {
         private const int WM_HOTKEY = 0x0312;
-        private const int HotkeyId = 0xB19;
+        public const int KeyboardNavId = 0xB19;
+        public const int QuickSwitcherId = 0xB1A;
+
+        private readonly int _id;
+        private readonly string _purpose;
 
         private readonly NativeWindow _sink;
         private bool _registered;
@@ -31,13 +36,18 @@ namespace QuickPane.Services
             }
         }
 
-        public HotkeyService()
+        public HotkeyService() : this(KeyboardNavId, "keyboard navigation") { }
+
+        /// <param name="purpose">Names the shortcut in the log, e.g. "quick switcher".</param>
+        public HotkeyService(int id, string purpose)
         {
+            _id = id;
+            _purpose = purpose;
             var sink = new Sink();
             sink.CreateHandle(new CreateParams());
             sink.OnMessage = m =>
             {
-                if (m.Msg != WM_HOTKEY || m.WParam.ToInt32() != HotkeyId) return;
+                if (m.Msg != WM_HOTKEY || m.WParam.ToInt32() != _id) return;
                 var h = Pressed;
                 if (h != null) h();
             };
@@ -53,23 +63,23 @@ namespace QuickPane.Services
             uint mods; uint vk;
             if (!TryParse(spec, out mods, out vk))
             {
-                Log.Event("shortcut", "the keyboard navigation shortcut \"" + spec +
-                    "\" could not be read, so keyboard navigation is off.");
+                Log.Event("shortcut", "the " + _purpose + " shortcut \"" + spec +
+                    "\" could not be read, so it is off.");
                 return;
             }
 
-            _registered = NM.RegisterHotKey(_sink.Handle, HotkeyId, mods, vk);
+            _registered = NM.RegisterHotKey(_sink.Handle, _id, mods, vk);
             if (!_registered)
-                Log.Event("shortcut", "the keyboard navigation shortcut \"" + spec +
-                    "\" is already taken by another program, so it was not registered.");
+                Log.Event("shortcut", "the " + _purpose + " shortcut \"" + spec +
+                    "\" is already taken by another program or shortcut, so it was not registered.");
             else
-                Log.Info("keyboard navigation shortcut registered as " + spec + ".");
+                Log.Info(_purpose + " shortcut registered as " + spec + ".");
         }
 
         private void Unregister()
         {
             if (!_registered) return;
-            try { NM.UnregisterHotKey(_sink.Handle, HotkeyId); } catch { }
+            try { NM.UnregisterHotKey(_sink.Handle, _id); } catch { }
             _registered = false;
         }
 

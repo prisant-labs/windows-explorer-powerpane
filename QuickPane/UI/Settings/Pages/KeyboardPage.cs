@@ -34,6 +34,10 @@ namespace QuickPane.UI.Settings.Pages
                     "Turn keyboard navigation of the pane on or off.", "hotkey", "shortcut", "focus", "keyboard navigation");
                 yield return new SettingsSearchEntry(Id, ShortcutCardId, "Shortcut",
                     "The key combination that moves focus into the pane.", "hotkey", "shortcut", "ctrl+shift");
+                yield return new SettingsSearchEntry(Id, SwitcherToggleCardId, "Let a keyboard shortcut open the quick switcher",
+                    "Search pins, Recent, drives, and actions from the keyboard.", "quick switcher", "search", "jump", "go to", "palette", "hotkey");
+                yield return new SettingsSearchEntry(Id, SwitcherShortcutCardId, "Quick switcher shortcut",
+                    "The key combination that opens the quick switcher.", "hotkey", "shortcut", "ctrl+alt");
             }
         }
 
@@ -72,7 +76,46 @@ namespace QuickPane.UI.Settings.Pages
                 "Modifiers joined with +, ending in a key, e.g. ctrl+shift+Q. At least one modifier is required.",
                 box, "Keyboard navigation shortcut"));
 
+            BuildQuickSwitcher(ctx, panel);
             return panel;
+        }
+
+        private const string SwitcherToggleCardId = "switcher-enabled";
+        private const string SwitcherShortcutCardId = "switcher-shortcut";
+        private const string SwitcherGlyph = "\uE721";   // Segoe Fluent Icons Search
+
+        /// <summary>The quick switcher's toggle and shortcut (#226), validated the same way as the
+        /// keyboard navigation shortcut above.</summary>
+        private static void BuildQuickSwitcher(SettingsPageContext ctx, StackPanel panel)
+        {
+            var settings = ctx.Settings;
+            var s = settings.Current;
+            panel.Children.Add(ctx.Cards.Subheader("Quick switcher"));
+
+            var toggle = ctx.Cards.Toggle(s.QuickSwitcher, enabled =>
+            {
+                s.QuickSwitcher = enabled;
+                settings.Save();
+            }, "Let a keyboard shortcut open the quick switcher");
+            panel.Children.Add(ctx.Cards.Card(SwitcherToggleCardId, SwitcherGlyph, "Let a keyboard shortcut open the quick switcher",
+                "Type part of a pin, a Recent folder, a drive, or an action, then press Enter. The Explorer window or file dialog in front goes there, and Escape closes the box.",
+                toggle, "Let a keyboard shortcut open the quick switcher"));
+
+            var box = new TextBox { Text = s.QuickSwitcherHotkey, MinWidth = 160 };
+            box.LostFocus += (sender, e) =>
+            {
+                bool accepted;
+                string result = ValidateHotkeyText(box.Text, s.QuickSwitcherHotkey, out accepted);
+                box.Text = result;
+                if (accepted)
+                {
+                    s.QuickSwitcherHotkey = result;
+                    settings.Save();
+                }
+            };
+            panel.Children.Add(ctx.Cards.Card(SwitcherShortcutCardId, SwitcherGlyph, "Quick switcher shortcut",
+                "Modifiers joined with +, ending in a key, e.g. ctrl+alt+Space. Pick a combination other programs do not use, because QuickPane takes it from all of them.",
+                box, "Quick switcher shortcut"));
         }
 
         /// <summary>The same decision as the old text box's <c>LostFocus</c> handler

@@ -209,6 +209,10 @@ namespace QuickPane
 
             _hotkeys = new HotkeyService();
             _hotkeys.Pressed += FocusPaneFromHotkey;
+            // WM_HOTKEY arrives on this thread, and the window in front is still the user's, so the
+            // switcher records it before it takes focus (#226).
+            _switcherHotkey = new HotkeyService(HotkeyService.QuickSwitcherId, "quick switcher");
+            _switcherHotkey.Pressed += () => Dispatcher.BeginInvoke(new Action(UI.QuickSwitcher.Toggle));
             ApplyHotkeys();
 
             CreateTrayIcon();
@@ -224,13 +228,15 @@ namespace QuickPane
         }
 
         private static HotkeyService _hotkeys;
+        private static HotkeyService _switcherHotkey;
 
-        /// <summary>Re-read the keyboard navigation settings and register or drop the shortcut.</summary>
+        /// <summary>Re-read the keyboard settings and register or drop each shortcut.</summary>
         private void ApplyHotkeys()
         {
             if (_hotkeys == null || Settings == null) return;
             var s = Settings.Current;
             _hotkeys.Apply(s.KeyboardNav, s.KeyboardNavHotkey);
+            if (_switcherHotkey != null) _switcherHotkey.Apply(s.QuickSwitcher, s.QuickSwitcherHotkey);
         }
 
         /// <summary>Put focus in the pane belonging to whatever dialog is in front.</summary>

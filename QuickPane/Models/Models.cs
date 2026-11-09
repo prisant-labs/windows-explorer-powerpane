@@ -185,6 +185,17 @@ namespace QuickPane.Models
         [DataMember(Name = "keyboardNavHotkey", Order = 41, EmitDefaultValue = false)]
         public string KeyboardNavHotkey { get; set; } = "ctrl+shift+Q";
 
+        // The quick switcher (#226): a shortcut that opens a search over pins, Recent, drives, and
+        // actions. Off by default, like the shortcut above, because a global hotkey takes its
+        // combination from every other program.
+        [DataMember(Name = "quickSwitcher", Order = 53, EmitDefaultValue = false)]
+        public bool QuickSwitcher { get; set; }
+
+        [DataMember(Name = "quickSwitcherHotkey", Order = 54, EmitDefaultValue = false)]
+        public string QuickSwitcherHotkey { get; set; } = DefaultQuickSwitcherHotkey;
+
+        public const string DefaultQuickSwitcherHotkey = "ctrl+alt+Space";
+
         // Which apps the Recent Apps section lists: "open" for the ones brought to the front, "dialogs"
         // for the ones whose Save and Open dialogs were used, "both" for either.
         [DataMember(Name = "recentAppsSource", Order = 42, EmitDefaultValue = false)]
@@ -389,6 +400,7 @@ namespace QuickPane.Models
                 sp.AuthMethod = am == "password" ? "password" : "key";
             }
             if (string.IsNullOrWhiteSpace(KeyboardNavHotkey)) KeyboardNavHotkey = "ctrl+shift+Q";
+            if (string.IsNullOrWhiteSpace(QuickSwitcherHotkey)) QuickSwitcherHotkey = DefaultQuickSwitcherHotkey;
             var ras = (RecentAppsSource ?? "").Trim().ToLowerInvariant();
             RecentAppsSource = (ras == "open" || ras == "dialogs") ? ras : "both";
             if (RecentsMaxCount < 5) RecentsMaxCount = 5;

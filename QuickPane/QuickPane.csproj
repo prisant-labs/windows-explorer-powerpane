@@ -107,6 +107,7 @@
     <Compile Include="Services\CustomCommandTemplate.cs" />
     <Compile Include="Services\QuickActionLibrary.cs" />
     <Compile Include="Services\QuickActionRunner.cs" />
+    <Compile Include="Services\QuickSwitcherSearch.cs" />
     <Compile Include="Themes\Fluent\Controls\AnimationFactorToValueConverter.cs" />
     <Compile Include="Services\ShellLink.cs" />
     <Compile Include="Services\SshfsService.cs" />
@@ -122,6 +123,7 @@
     <Compile Include="UI\RecentAppsSection.cs" />
     <Compile Include="UI\AppDefaultsSection.cs" />
     <Compile Include="UI\QuickActionsSection.cs" />
+    <Compile Include="UI\QuickSwitcher.cs" />
     <Compile Include="UI\SshSection.cs" />
     <Compile Include="UI\DropLineAdorner.cs" />
     <Compile Include="UI\DragGhostAdorner.cs" />

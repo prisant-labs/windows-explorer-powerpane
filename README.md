@@ -147,6 +147,10 @@ Right-click a folder while an app's Save or Open dialog is open and choose "Alwa
 
 An optional shortcut moves focus into the pane, where the arrow keys move between folders and Enter opens one. It stays off until it is switched on under Settings, Keyboard, so no key combination is taken from the rest of the system by default.
 
+### Quick switcher
+
+A second optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front. Type part of a pin, a Recent folder, a drive, or a quick action, and press Enter. The Explorer window or Open or Save dialog in front goes to that folder, or the action runs against that Explorer window. With neither in front, the folder opens in a new Explorer window. Escape closes the box. Pins rank above Recent folders when both match equally well. The shortcut also stays off until it is switched on under Settings, Keyboard.
+
 ### Profiles
 
 Each profile is an independent workspace with its own groups folder, recents count, and sidebar width.
@@ -255,7 +259,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 
 - Open Settings from the tray icon or the gear in the pane
 - A navigation pane lists the pages, and a search box jumps to a setting
-- Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, folders Recent never shows, which apps Recent Apps lists, the keyboard shortcut, and profiles
+- Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, folders Recent never shows, which apps Recent Apps lists, the keyboard shortcuts, and profiles
 - The About page shows the running version and a short summary of what is new in it, and offers a download when a newer release is published
 - Changes apply live
 
