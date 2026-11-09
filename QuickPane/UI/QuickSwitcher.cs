@@ -257,7 +257,7 @@ namespace QuickPane.UI
             content.Children.Add(icon);
             content.Children.Add(text);
 
-            var row = new Border
+            var row = new ResultRow
             {
                 Background = Brushes.Transparent, CornerRadius = new CornerRadius(3),
                 Padding = new Thickness(8, 5, 8, 5), Cursor = Cursors.Hand, Child = content,
@@ -295,9 +295,37 @@ namespace QuickPane.UI
             for (int i = 0; i < _list.Children.Count; i++)
             {
                 var row = _list.Children[i] as Border;
-                if (row != null)
-                    row.Background = i == _selected ? UiHelpers.AppBrush("ItemActiveBackground") : Brushes.Transparent;
+                if (row == null) continue;
+                bool selected = i == _selected;
+                row.Background = selected ? UiHelpers.AppBrush("ItemActiveBackground") : Brushes.Transparent;
+                System.Windows.Automation.AutomationProperties.SetItemStatus(row, selected ? "Selected" : string.Empty);
             }
+        }
+
+        /// <summary>A result row. A plain Border has no UI Automation peer, so a screen reader and
+        /// UI Automation never saw the rows or their names (#228). The
+        /// peer reports a list item named by AutomationProperties.Name, and ItemStatus marks the row
+        /// Enter would choose, since keyboard focus stays in the search box.</summary>
+        private sealed class ResultRow : Border
+        {
+            protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer()
+            {
+                return new ResultRowPeer(this);
+            }
+        }
+
+        private sealed class ResultRowPeer : System.Windows.Automation.Peers.FrameworkElementAutomationPeer
+        {
+            public ResultRowPeer(FrameworkElement owner) : base(owner) { }
+
+            protected override System.Windows.Automation.Peers.AutomationControlType GetAutomationControlTypeCore()
+            {
+                return System.Windows.Automation.Peers.AutomationControlType.ListItem;
+            }
+
+            protected override string GetClassNameCore() { return "QuickSwitcherResult"; }
+            protected override bool IsControlElementCore() { return true; }
+            protected override bool IsContentElementCore() { return true; }
         }
 
         private void ShowStatus(string text) { _status.Text = text; _status.Visibility = Visibility.Visible; }
