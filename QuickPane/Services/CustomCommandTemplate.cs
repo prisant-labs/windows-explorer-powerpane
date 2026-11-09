@@ -167,7 +167,7 @@ namespace QuickPane.Services
         /// program and reached cmd.exe with a folder name on its command line.</summary>
         internal static string ShellRefusal(IList<string> tokens)
         {
-            string program = Environment.ExpandEnvironmentVariables(tokens[0]);
+            string program = AsWindowsOpensIt(Environment.ExpandEnvironmentVariables(tokens[0]));
             string ext = SafeExtension(program);
             string stem = SafeStem(program);
 
@@ -193,6 +193,15 @@ namespace QuickPane.Services
                 if (hasCommand) return "A shell given -c would read a folder name as code. Pass a script file instead, or remove the placeholder.";
             }
             return null;
+        }
+
+        /// <summary>The program path with the trailing dots and spaces removed, because Windows drops
+        /// them when it opens a file. Read as typed, "cmd.exe." had the stem "cmd.exe" and "run.bat." had
+        /// no extension, so both passed the checks above and still ran Command Prompt with a folder name
+        /// on its command line. A property test found this (#222).</summary>
+        internal static string AsWindowsOpensIt(string program)
+        {
+            return program == null ? string.Empty : program.TrimEnd('.', ' ');
         }
 
         private static string SafeExtension(string program)
