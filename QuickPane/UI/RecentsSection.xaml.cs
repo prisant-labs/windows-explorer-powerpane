@@ -155,6 +155,13 @@ namespace QuickPane.UI
             menu.Items.Add(pinTo);
 
             menu.Items.Add(Item("Remove from recents", () => App.Recents.RemoveFromRecents(rec)));
+
+            // Remove lasts until the next visit; this lasts until the folder is shown again from
+            // Settings (#224). A file hides its folder, since a file alone would be hidden for one row.
+            string hideFolder = rec.IsFile ? SafeParent(rec.TargetPath) : rec.TargetPath;
+            if (!string.IsNullOrEmpty(hideFolder))
+                menu.Items.Add(Item(rec.IsFile ? "Never show this file's folder" : "Never show this folder",
+                    () => App.Recents.HideFolder(hideFolder)));
             return menu;
         }
 
@@ -195,6 +202,11 @@ namespace QuickPane.UI
             };
             menu.Items.Add(reset);
             return menu;
+        }
+
+        private static string SafeParent(string path)
+        {
+            try { return Path.GetDirectoryName(path); } catch { return null; }
         }
 
         private static MenuItem Item(string header, Action action)

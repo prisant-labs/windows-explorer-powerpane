@@ -97,7 +97,7 @@ The pane is a stack of sections you can show, hide, reorder, and rename:
 - **Search box**: filters the rows already on screen as you type, so it stays instant however many groups are pinned
 - **App Folders**: inside a file dialog, the folder you set as that app's starting point
 - **Groups**: your pinned folder groups
-- **Recent**: folders browsed directly in Explorer, captured through window activation, title changes, and a light periodic check, with a location-URL fallback when the shell returns nothing, and a configurable count from 5 to 50
+- **Recent**: folders browsed directly in Explorer, captured through window activation, title changes, and a light periodic check, with a location-URL fallback when the shell returns nothing, and a configurable count from 5 to 50. Folders you choose never appear there, and Clear Recent empties it without touching Windows' own Recent list
 - **This PC**: a This PC row that opens the folder and expands to the drives, each drive expanding into subtrees that enumerate lazily like the native Explorer tree
 - **Network** and **Linux (WSL)**: each its own section with a proper icon and a visibility toggle
 - **Recent Apps**: the programs you have been using, each opening its app
@@ -259,7 +259,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 
 - Open Settings from the tray icon or the gear in the pane
 - A navigation pane lists the pages, and a search box jumps to a setting
-- Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, which apps Recent Apps lists, the keyboard shortcuts, and profiles
+- Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, folders Recent never shows, which apps Recent Apps lists, the keyboard shortcuts, and profiles
 - The About page shows the running version and a short summary of what is new in it, and offers a download when a newer release is published
 - Changes apply live
 

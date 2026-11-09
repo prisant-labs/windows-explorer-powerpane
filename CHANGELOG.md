@@ -4,7 +4,13 @@
 
 ### Added
 - A quick switcher. An optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front that finds pins, Recent folders, drives, and quick actions together. Enter sends the Explorer window or Open or Save dialog in front to the folder, or runs the action against that Explorer window, and Escape closes the box. The shortcut is off until it is turned on under Settings, Keyboard ([#226](https://github.com/prisant-labs/windows-explorer-quickpane/issues/226)).
+- Folders Recent never shows. A Recent row's right-click menu gains "Never show this folder", and the Recent page in Settings lists the hidden folders, adds one, and shows one again. Recent neither shows nor records a hidden folder or anything inside it, and the list is shared by every profile ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
+- Clear Recent, on the Recent page in Settings, empties the Recent section. Windows' own Recent list and Quick Access keep their items, and a folder opened again shows again ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
 - Trace events for diagnosing stalls. A performance trace started with Windows Performance Recorder or PerfView now shows when QuickPane's background jobs, pane rebuilds, and calls into Explorer start and end. QuickPane writes nothing until someone on the same computer starts a trace, sends nothing anywhere, and keeps folder and file names out of the events. `docs/DEVELOPMENT.md` describes how to record one ([#219](https://github.com/prisant-labs/windows-explorer-quickpane/issues/219)).
+
+### Changed
+- The "Recent apps" page in Settings is now "Recent", with the new Recent folders controls above the Recent apps choice ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
+- Changing the Recents count refreshes Recent at once, instead of at its next scan ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224)).
 
 ### Fixed
 - A custom command whose program ended in a dot or a space, such as `cmd.exe.` or `run.bat.`, got past the check that refuses Command Prompt, batch files, and other programs that read a folder name as code. Windows drops those trailing characters when it opens the file, so the command still ran Command Prompt. The check now reads the program the way Windows opens it ([#222](https://github.com/prisant-labs/windows-explorer-quickpane/issues/222)).
