@@ -81,6 +81,24 @@ The manual steps, if you prefer them:
 
 Windows Sandbox makes a safe test bed for UI checks. It is a disposable desktop with no personal files, where scripted clicks cannot disturb your own windows.
 
+## Recording a performance trace
+
+QuickPane writes trace events through an `EventSource` named `QuickPane`, in `QuickPane/Services/PerfTrace.cs` (#219). The events mark the start and end of background lane jobs, pane and group rebuilds, and cross-process calls into Explorer windows and file dialogs. A trace records them on the same timeline as Explorer's threads, CPU use, and waits, which the text log cannot show. That makes a trace the tool for a stall whose cause the log does not explain, such as #53.
+
+The events cost almost nothing until a trace asks for them, and nothing is sent anywhere. Payloads carry kinds, counts, and durations, never a folder or file name, so a trace can be shared to ask for help. A trace also holds Windows' own data, such as other programs' names and window titles, so look at it before sharing it.
+
+Windows Performance Recorder is built into Windows. It needs an administrator prompt.
+
+```powershell
+wpr -start scripts\trace\QuickPane.wprp -filemode
+# reproduce the stall, then:
+wpr -stop $env:USERPROFILE\Desktop\quickpane-stall.etl
+```
+
+Open the `.etl` file in Windows Performance Analyzer. QuickPane's events appear under Generic Events, provider `QuickPane`. The profile names the provider by its GUID, `c52f37e7-4bdd-5f3c-332f-56c59bf9dc07`, because WPR does not take an `EventSource` name. A test fails if the provider's name and the GUID drift apart.
+
+PerfView takes the name directly: `PerfView /OnlyProviders=*QuickPane collect`.
+
 ## Code conventions
 
 - **C# 7.3 and .NET Framework 4.8 only.** That rules out switch expressions, `is not` patterns, nullable reference types, `using` declarations, ranges, records, and target-typed `new()`.

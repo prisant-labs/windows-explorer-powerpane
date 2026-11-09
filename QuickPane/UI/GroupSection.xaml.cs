@@ -168,12 +168,14 @@ namespace QuickPane.UI
             if (App.Groups == null) return;
 
             var groups = App.Groups.Groups;
+            long traced = PerfTrace.GroupBuildBegin(groups.Count);
             for (int i = 0; i < groups.Count; i++)
             {
                 AddGroup(groups[i]);
                 if (i < groups.Count - 1) Root.Children.Add(UiHelpers.MakeSeparator());
             }
             if (groups.Count == 0) Root.Children.Add(BuildAddGroupRow());
+            PerfTrace.GroupBuildEnd(groups.Count, traced);
         }
 
         private void Rebuild() { Build(_navigate); }

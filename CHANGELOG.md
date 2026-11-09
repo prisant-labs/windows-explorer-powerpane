@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Trace events for diagnosing stalls. A performance trace started with Windows Performance Recorder or PerfView now shows when QuickPane's background jobs, pane rebuilds, and calls into Explorer start and end. QuickPane writes nothing until someone on the same computer starts a trace, sends nothing anywhere, and keeps folder and file names out of the events. `docs/DEVELOPMENT.md` describes how to record one ([#219](https://github.com/prisant-labs/windows-explorer-quickpane/issues/219)).
+
 ### Fixed
 - The installer runs on Windows 11 on Arm, which runs QuickPane's x64 build through emulation. It refused those computers before. Nobody has yet run QuickPane on an Arm computer, so how well it works there is untested ([#215](https://github.com/prisant-labs/windows-explorer-quickpane/issues/215)).
 

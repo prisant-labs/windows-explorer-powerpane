@@ -67,6 +67,14 @@ namespace QuickPane.Interop
         /// <summary>Navigate the Explorer window identified by topLevelHwnd to path, in place.</summary>
         public static bool Navigate(IntPtr topLevelHwnd, string path)
         {
+            long traced = PerfTrace.ShellCallBegin("ExplorerNavigate");
+            bool ok = false;
+            try { ok = NavigateCore(topLevelHwnd, path); return ok; }
+            finally { PerfTrace.ShellCallEnd("ExplorerNavigate", traced, ok); }
+        }
+
+        private static bool NavigateCore(IntPtr topLevelHwnd, string path)
+        {
             if (string.IsNullOrEmpty(path)) return false;
             Log.Activity("explorer navigate to " + path);
 
@@ -117,6 +125,14 @@ namespace QuickPane.Interop
         /// <summary>The folder currently shown in the Explorer window with this top-level HWND, or null.</summary>
         public static string GetCurrentPath(IntPtr topLevelHwnd)
         {
+            long traced = PerfTrace.ShellCallBegin("ExplorerCurrentPath");
+            string path = null;
+            try { path = GetCurrentPathCore(topLevelHwnd); return path; }
+            finally { PerfTrace.ShellCallEnd("ExplorerCurrentPath", traced, path != null); }
+        }
+
+        private static string GetCurrentPathCore(IntPtr topLevelHwnd)
+        {
             object shell = null, windows = null;
             try
             {
@@ -156,6 +172,14 @@ namespace QuickPane.Interop
         /// command meant for one file at the whole folder. A selected item with no place on disk fails
         /// the read for the same reason: acting on the rest would be a set the user did not choose.</summary>
         public static SelectionReadStatus GetSelectedPaths(IntPtr topLevelHwnd, out List<string> paths)
+        {
+            long traced = PerfTrace.ShellCallBegin("ExplorerSelection");
+            var status = SelectionReadStatus.Failed;
+            try { status = GetSelectedPathsCore(topLevelHwnd, out paths); return status; }
+            finally { PerfTrace.ShellCallEnd("ExplorerSelection", traced, status == SelectionReadStatus.Ok); }
+        }
+
+        private static SelectionReadStatus GetSelectedPathsCore(IntPtr topLevelHwnd, out List<string> paths)
         {
             paths = new List<string>();
             object shell = null, windows = null, w = null, doc = null, items = null;
