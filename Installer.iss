@@ -47,8 +47,10 @@ OutputBaseFilename={#MyAppName}-{#MyAppVersion}-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesInstallIn64BitMode=x64
-ArchitecturesAllowed=x64
+; x64compatible matches x64 Windows and Windows 11 on Arm, which runs x64 programs through emulation.
+; The older x64 identifier matches x64 Windows only, so it refused Arm computers outright (#215).
+ArchitecturesInstallIn64BitMode=x64compatible
+ArchitecturesAllowed=x64compatible
 CloseApplications=yes
 RestartApplications=no
 

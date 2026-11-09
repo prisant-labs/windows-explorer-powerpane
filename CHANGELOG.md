@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The installer runs on Windows 11 on Arm, which runs QuickPane's x64 build through emulation. It refused those computers before. Nobody has yet run QuickPane on an Arm computer, so how well it works there is untested ([#215](https://github.com/prisant-labs/windows-explorer-quickpane/issues/215)).
+
 ## [3.12.0.2] - 2026-11-06
 
 A small precaution for the automatic update check.
