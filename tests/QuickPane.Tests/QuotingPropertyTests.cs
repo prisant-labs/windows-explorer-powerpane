@@ -169,6 +169,7 @@ namespace QuickPane.Tests
         // case-insensitively after the directory and extension are removed.
         private static readonly string[] RefusedBare = { "cmd", "command", "wsl", "wt", "powershell", "pwsh" };
         private static readonly string[] RefusedBatch = { "build.bat", "run.cmd", "x.BAT", "setup.Cmd" };
+        private static readonly string[] TrailingNoise = { string.Empty, string.Empty, ".", "..", " ", ". .", " . " };
         private static readonly string[] Directories =
         {
             string.Empty, @"C:\Demo\Tools\", @"C:\Demo\Tools With Space\", "C:/Demo/Tools/", @"D:\a\b\c\d\", @"\\server\share\",
@@ -191,7 +192,9 @@ namespace QuickPane.Tests
                     ? RefusedBatch[rng.Next(RefusedBatch.Length)]
                     : RefusedBare[rng.Next(RefusedBare.Length)] + (rng.Next(2) == 0 ? ".exe" : string.Empty);
                 name = RandomCase(name, rng);
-                string program = Directories[rng.Next(Directories.Length)] + name;
+                // Windows drops trailing dots and spaces when it opens a file, so "cmd.exe." still
+                // runs Command Prompt (#222).
+                string program = Directories[rng.Next(Directories.Length)] + name + TrailingNoise[rng.Next(TrailingNoise.Length)];
                 return program;
             });
             var arb = Arb.From(gen);
