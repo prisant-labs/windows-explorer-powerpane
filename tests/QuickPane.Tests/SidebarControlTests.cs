@@ -169,7 +169,8 @@ namespace QuickPane.Tests
             "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops", "DesktopDockDisplay", "DesktopDockEdge",
             "ActiveProfile", // derived from Profiles + ActiveProfileIndex, both already in the key
             "PaneColor", // live through SidebarBackground's DynamicResource binding, no rebuild (#134)
-            "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion" // read by UpdateNotifier; the pane shows none of them (#176)
+            "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion", // read by UpdateNotifier; the pane shows none of them (#176)
+            "QuickSwitcher", "QuickSwitcherHotkey" // read by App.ApplyHotkeys; the switcher is its own window (#226)
         };
 
         private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath" };
