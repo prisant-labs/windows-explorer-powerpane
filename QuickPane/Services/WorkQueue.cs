@@ -119,12 +119,18 @@ namespace QuickPane.Services
         private void Loop()
         {
             var sw = new Stopwatch();
+            var trace = PerfTrace.Instance;
             foreach (var work in _queue.GetConsumingEnumerable())
             {
+                // Checked per job, so a trace started while the lane runs picks it up at the next job.
+                bool traced = trace.IsEnabled();
+                if (traced) trace.LaneJobStart(_name, _queue.Count);
+                bool failed = false;
                 sw.Restart();
                 try { work(); }
-                catch (Exception ex) { _onError("background work failed on " + _name, ex); }
+                catch (Exception ex) { failed = true; _onError("background work failed on " + _name, ex); }
                 var ms = sw.ElapsedMilliseconds;
+                if (traced) trace.LaneJobStop(_name, ms, failed);
                 var waiting = _queue.Count;
                 if (ms > SlowTaskMs)
                     _onInfo("task on " + _name + " ran " + ms + " ms; " + waiting + " waiting");

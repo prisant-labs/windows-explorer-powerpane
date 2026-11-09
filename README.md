@@ -169,7 +169,7 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 
 ## Requirements
 
-- **Windows 10 or Windows 11**, 64-bit (developed and tested on Windows 10 LTSC)
+- **Windows 11 or Windows 10**, 64-bit. This fork is developed and tested on Windows 11, including in Windows Sandbox. Windows 10 is expected to work, but the fork does not test it regularly. See [Compatibility](#compatibility).
 - **.NET Framework 4.8** runtime (preinstalled on current Windows)
 - To build from source: **Visual Studio 2019/2022** with the .NET Framework 4.8 targeting pack
 - To build the installer: **[Inno Setup](https://jrsoftware.org/isinfo.php)** 6+
@@ -322,10 +322,10 @@ Two other features reach the network only when you use them:
 
 | OS | Supported | Notes |
 |----|-----------|-------|
-| Windows 11 | ✅ | Full support |
-| Windows 10 (incl. LTSC) | ✅ | Developed and tested here |
-| Windows 8.1 | ⚠️ | Untested; some shell integration may differ |
-| Windows 7 | ⚠️ | Untested; the Explorer window classes differ |
+| Windows 11 x64 | ✅ | Developed and tested on, including in Windows Sandbox |
+| Windows 10 x64 (incl. LTSC) | ✅ | Expected to work. The original project was developed on Windows 10 LTSC, but this fork does not test Windows 10 regularly. Windows 11-only features, such as tabs, are skipped there. |
+| Windows 11 on Arm | ⚠️ | The installer accepts it from the release after 3.12.0.2, and Windows runs the x64 build through emulation. Nobody has run QuickPane on an Arm computer yet. |
+| Windows 8.1 and Windows 7 | ❌ | Not supported. Both are past Microsoft's end of support, and the Explorer window classes differ. |
 | macOS / Linux | ❌ | Windows-only (Win32 + WPF) |
 
 ## Troubleshooting
