@@ -45,6 +45,8 @@
 > - **Dock grip with a maximized window:** the width grip of a reserved desktop dock can be dragged while a window is maximized. [3.12.0.0](docs/releases/3.12.0.0.md) ([#185](https://github.com/prisant-labs/windows-explorer-quickpane/issues/185))
 > - **Lighter with many pins:** a pinned folder's right-click menu is built when it opens, so many pins and windows use far less memory and the pane rebuilds faster. [3.12.0.1](docs/releases/3.12.0.1.md) ([#210](https://github.com/prisant-labs/windows-explorer-quickpane/issues/210))
 > - **What's new and clearer settings rows:** the About page summarizes each version and links to its full notes, and rows on the Pane sections and Quick actions pages have their own icons and an info button. [3.12.0.1](docs/releases/3.12.0.1.md) ([#208](https://github.com/prisant-labs/windows-explorer-quickpane/issues/208), [#207](https://github.com/prisant-labs/windows-explorer-quickpane/issues/207), [#205](https://github.com/prisant-labs/windows-explorer-quickpane/issues/205))
+> - **Quick switcher:** an optional shortcut opens one search box over the window in front, which finds pins, Recent folders, drives, and quick actions and sends Explorer or an Open or Save dialog to the result. It starts off. [3.13.0.0](docs/releases/3.13.0.0.md) ([#226](https://github.com/prisant-labs/windows-explorer-quickpane/issues/226))
+> - **Folders Recent never shows, and Clear Recent:** a Recent row's menu can hide a folder and everything inside it, and the Recent page in Settings lists hidden folders and clears Recent without touching Windows' own lists. [3.13.0.0](docs/releases/3.13.0.0.md) ([#224](https://github.com/prisant-labs/windows-explorer-quickpane/issues/224))
 
 A folder sidebar for Windows File Explorer. QuickPane embeds a pinned-folders pane inside every Explorer window, so your groups, recent locations, drives, network shares, and WSL distros travel with the window you are already using. Pin it inside the window, float it beside the window, or run it as a slim screen-edge dock. Everything runs locally as a single tray app, no code is ever injected into Explorer, and all data stays in plain files under your user profile.
 
@@ -328,7 +330,7 @@ Two other features reach the network only when you use them:
 |----|-----------|-------|
 | Windows 11 x64 | ✅ | Developed and tested on, including in Windows Sandbox |
 | Windows 10 x64 (incl. LTSC) | ✅ | Expected to work. The original project was developed on Windows 10 LTSC, but this fork does not test Windows 10 regularly. Windows 11-only features, such as tabs, are skipped there. |
-| Windows 11 on Arm | ⚠️ | The installer accepts it from the release after 3.12.0.2, and Windows runs the x64 build through emulation. Nobody has run QuickPane on an Arm computer yet. |
+| Windows 11 on Arm | ⚠️ | The installer accepts it from 3.13.0.0, and Windows runs the x64 build through emulation. Nobody has run QuickPane on an Arm computer yet. |
 | Windows 8.1 and Windows 7 | ❌ | Not supported. Both are past Microsoft's end of support, and the Explorer window classes differ. |
 | macOS / Linux | ❌ | Windows-only (Win32 + WPF) |
 
