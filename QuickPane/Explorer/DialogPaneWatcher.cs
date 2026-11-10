@@ -49,15 +49,29 @@ namespace QuickPane.Explorer
                 v.IsDialog = DialogNavigator.IsFileDialog(hwnd);
                 return v.IsDialog;
             }
-            if (NM.ClassOf(hwnd) != "#32770")
+            uint pid;
+            NM.GetWindowThreadProcessId(hwnd, out pid);
+            if (NM.ClassOf(hwnd) != "#32770" || IsOwnProcess(pid, OwnPid))
             {
                 // Cheap class miss: cache as final so plain windows are never enumerated at all.
+                // QuickPane's own pickers are final misses too: they list the pins themselves
+                // (PickerPlaces), and a pane on them never sees a move or resize, because the shared
+                // hook skips this process and only the one-second sweep would ever reach it.
                 _verdicts[hwnd] = new Verdict { IsDialog = false, Tick = Environment.TickCount, Rechecks = 6 };
                 return false;
             }
             var isDialog = DialogNavigator.IsFileDialog(hwnd);
             _verdicts[hwnd] = new Verdict { IsDialog = isDialog, Tick = Environment.TickCount };
             return isDialog;
+        }
+
+        private static readonly uint OwnPid = (uint)System.Diagnostics.Process.GetCurrentProcess().Id;
+
+        /// <summary>Whether a dialog belongs to QuickPane itself. A pid of 0 means the window was
+        /// already gone when asked, which is not ours.</summary>
+        internal static bool IsOwnProcess(uint windowPid, uint ownPid)
+        {
+            return windowPid != 0 && windowPid == ownPid;
         }
 
         private void ForgetWindow(IntPtr hwnd)

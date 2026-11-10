@@ -1064,6 +1064,7 @@ namespace QuickPane.UI
         private static string PickFile()
         {
             var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Pick a file to pin" };
+            PickerPlaces.AddTo(dlg);
             return dlg.ShowDialog() == true ? dlg.FileName : null;
         }
 
@@ -1083,6 +1084,7 @@ namespace QuickPane.UI
             try { parent = System.IO.Path.GetDirectoryName(current ?? string.Empty); } catch { }
             var dir = NearestExistingFolder(parent);
             if (!string.IsNullOrEmpty(dir)) dlg.InitialDirectory = dir;
+            PickerPlaces.AddTo(dlg);
             return dlg.ShowDialog() == true ? dlg.FileName : null;
         }
 

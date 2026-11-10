@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- QuickPane's own file and folder pickers, such as Browse in "Edit path", Add folder, and Restore settings, now list your pins in their own navigation pane, under a QuickPane heading, instead of getting a pane attached. The attached pane did not follow these pickers when they were moved or resized. The list shows what the pane shows: each expanded group's visible tab, folders only, in the same order. A pin on a drive or share that does not answer is left out rather than holding the picker. Other programs' Open and Save dialogs keep the pane ([#231](https://github.com/prisant-labs/windows-explorer-quickpane/issues/231)).
+
 ## [3.13.0.0] - 2026-11-09
 
 A quick switcher, control over what Recent shows, and an installer that runs on Arm. See the [release notes](docs/releases/3.13.0.0.md).
