@@ -19,6 +19,7 @@ namespace QuickPane.UI
         private const uint FOS_PICKFOLDERS = 0x00000020;
         private const uint FOS_FORCEFILESYSTEM = 0x00000040;
         private const int ERROR_CANCELLED = unchecked((int)0x800704C7);
+        private const int FDAP_BOTTOM = 0;
 
         /// <summary>Show the picker and return the chosen folder, or null if canceled.
         /// <paramref name="startFolder"/> is best effort: a null, empty, or missing path is simply not
@@ -54,6 +55,8 @@ namespace QuickPane.UI
                     }
                 }
 
+                AddPins(dialog);
+
                 // Owned by the calling thread's active window, the same way FolderBrowserDialog.ShowDialog()
                 // picks an owner when none is given explicitly (see NativeMethods.GetActiveWindow).
                 int hr = dialog.Show(NM.GetActiveWindow());
@@ -72,6 +75,26 @@ namespace QuickPane.UI
                 finally { Marshal.ReleaseComObject(result); }
             }
             finally { Marshal.ReleaseComObject(dialog); }
+        }
+
+        // The pins go in the picker's own navigation pane, since the pane no longer attaches to
+        // QuickPane's own dialogs (see PickerPlaces). Bottom alignment, in pin order, is what WPF's
+        // FileDialog.CustomPlaces uses too, so every picker lists them the same way. One pin that
+        // fails is skipped: an exception escaping here would send the whole picker to the legacy tree.
+        private static void AddPins(IFileOpenDialog dialog)
+        {
+            var iid = typeof(IShellItem).GUID;
+            foreach (var path in PickerPlaces.ForPicker())
+            {
+                IShellItem item = null;
+                try
+                {
+                    if (SHCreateItemFromParsingName(path, IntPtr.Zero, ref iid, out item) == 0 && item != null)
+                        dialog.AddPlace(item, FDAP_BOTTOM);
+                }
+                catch (Exception ex) { Log.Error("adding a pin to the folder picker", ex); }
+                finally { if (item != null) Marshal.ReleaseComObject(item); }
+            }
         }
 
         // Runs on the UI thread before the dialog opens, so the check is bounded: a start folder on a

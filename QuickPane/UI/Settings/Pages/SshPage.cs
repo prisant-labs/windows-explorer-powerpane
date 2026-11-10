@@ -388,6 +388,7 @@ namespace QuickPane.UI.Settings.Pages
             browse.Click += (a, b) =>
             {
                 var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "Private key (*.*)|*.*" };
+                PickerPlaces.AddTo(dlg);
                 if (dlg.ShowDialog() == true)
                 {
                     box.Text = dlg.FileName;

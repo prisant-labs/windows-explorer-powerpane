@@ -60,6 +60,7 @@ namespace QuickPane.UI.Settings.Pages
             backupButton.Click += (s, e) =>
             {
                 var dlg = new SaveFileDialog { FileName = "QuickPane-settings.json", Filter = "JSON file (*.json)|*.json|All files (*.*)|*.*" };
+                PickerPlaces.AddTo(dlg);
                 if (dlg.ShowDialog() != true) return;
 
                 try
@@ -76,6 +77,7 @@ namespace QuickPane.UI.Settings.Pages
             restoreButton.Click += (s, e) =>
             {
                 var dlg = new OpenFileDialog { Filter = "JSON file (*.json)|*.json|All files (*.*)|*.*" };
+                PickerPlaces.AddTo(dlg);
                 if (dlg.ShowDialog() != true) return;
 
                 if (settings.ImportFrom(dlg.FileName))
