@@ -22,16 +22,12 @@ namespace QuickPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "3.13.0.0";
+        public const string Version = "3.13.0.1";
 
         public static readonly Item[] Items =
         {
-            new Item("Quick switcher",
-                "An optional shortcut opens one search box for pins, Recent folders, drives, and quick actions. Turn it on under Keyboard."),
-            new Item("Recent, your way",
-                "Hide a folder from Recent with its right-click menu, or clear Recent from the Recent page."),
-            new Item("Arm computers",
-                "The installer now runs on Windows 11 on Arm, which runs QuickPane through emulation."),
+            new Item("Pins in QuickPane's pickers",
+                "Browse, Add folder, and QuickPane's other pickers list your pins in their own navigation pane, so nothing trails behind when you move or resize them."),
         };
     }
 }
