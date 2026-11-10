@@ -145,12 +145,19 @@ namespace QuickPane.Tests
         [Test]
         public void Reachable_SlowPinsCostOneBudget_NotOneEach()
         {
-            // Three pins on shares that never answer, and one local pin. All are checked at once, so
-            // the wait is one budget, the slow ones are left out, and the local one is kept.
+            // Sixteen pins on shares that never answer, more than any machine's thread-pool minimum,
+            // listed before and between two local pins. Every volume is checked at once on its own
+            // thread, so the wait is one budget, the slow ones are left out, and the local ones are
+            // kept. With pool tasks, this failed on a two-core CI runner: the hung checks held every
+            // pool thread and the local ones never ran in time.
             var release = new ManualResetEventSlim(false);
             try
             {
-                var candidates = new List<string> { @"\\demo-nas\a", @"C:\Demo\Local", @"\\demo-nas\b", @"\\demo-nas\c" };
+                var candidates = new List<string>();
+                for (int i = 0; i < 8; i++) candidates.Add(@"\\demo-nas\share" + i);
+                candidates.Add(@"C:\Demo\Local");
+                for (int i = 8; i < 16; i++) candidates.Add(@"\\demo-nas\share" + i);
+                candidates.Add(@"D:\Demo\Other");
                 Func<string, bool> exists = p =>
                 {
                     if (p.StartsWith(@"\\")) { release.Wait(); return true; }
@@ -160,10 +167,26 @@ namespace QuickPane.Tests
                 var result = PickerPlaces.Reachable(candidates, exists, 300, 50);
                 sw.Stop();
 
-                Assert.That(result, Is.EqualTo(new[] { @"C:\Demo\Local" }));
-                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(1500), "three slow pins must not cost three budgets");
+                Assert.That(result, Is.EqualTo(new[] { @"C:\Demo\Local", @"D:\Demo\Other" }));
+                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(1500), "slow pins must not cost one budget each");
             }
             finally { release.Set(); }
+        }
+
+        [Test]
+        public void ByVolume_GroupsByDriveOrShare_InFirstSeenOrder()
+        {
+            var candidates = new List<string>
+            {
+                @"C:\Demo\A", @"\\demo-nas\share\X", @"c:\Demo\B", @"D:\Work", @"\\DEMO-NAS\SHARE\Y", @"\\demo-nas\other\Z", "",
+            };
+            var groups = PickerPlaces.ByVolume(candidates);
+            Assert.That(groups.Count, Is.EqualTo(5));
+            Assert.That(groups[0], Is.EqualTo(new[] { 0, 2 }));
+            Assert.That(groups[1], Is.EqualTo(new[] { 1, 4 }));
+            Assert.That(groups[2], Is.EqualTo(new[] { 3 }));
+            Assert.That(groups[3], Is.EqualTo(new[] { 5 }));
+            Assert.That(groups[4], Is.EqualTo(new[] { 6 }));
         }
 
         [Test]

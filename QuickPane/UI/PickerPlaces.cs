@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using QuickPane.Models;
 using QuickPane.Services;
@@ -62,26 +63,64 @@ namespace QuickPane.UI
         }
 
         /// <summary>The candidates that answered as existing folders within budgetMs, in their original
-        /// order, at most max of them. All checks start together on the thread pool, so the wait is bounded by budgetMs no
-        /// matter how many pins are slow; a check still running at the deadline counts as "no", and
-        /// finishes on its own.</summary>
+        /// order, at most max of them. Each drive or share is checked on its own thread, all at once,
+        /// so the wait is bounded by budgetMs however many pins are slow, and a share that does not
+        /// answer holds up only its own pins. A check still running at the deadline counts as "no",
+        /// and finishes on its own.
+        ///
+        /// Not the thread pool: with one pool task per pin, pins on hung shares took every pool
+        /// thread on a two-core machine, and a local pin queued behind them missed the deadline.
+        /// </summary>
         internal static List<string> Reachable(IList<string> candidates, Func<string, bool> exists, int budgetMs, int max)
         {
             var result = new List<string>();
             if (candidates == null || candidates.Count == 0 || max <= 0) return result;
             var check = exists ?? Directory.Exists;
 
-            var checks = new Task<bool>[candidates.Count];
+            // 0 = not answered yet, 1 = a folder, 2 = not a folder. Written by the volume threads,
+            // read here after the wait; a slot still 0 at the deadline is a "no".
+            var answers = new int[candidates.Count];
+            var tasks = new List<Task>();
+            foreach (var volume in ByVolume(candidates))
+            {
+                var indexes = volume;
+                tasks.Add(Task.Factory.StartNew(() =>
+                {
+                    foreach (var i in indexes)
+                    {
+                        bool ok;
+                        try { ok = check(candidates[i]); } catch { ok = false; }
+                        Volatile.Write(ref answers[i], ok ? 1 : 2);
+                    }
+                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default));
+            }
+            try { Task.WaitAll(tasks.ToArray(), Math.Max(0, budgetMs)); } catch { }
+
+            for (int i = 0; i < answers.Length && result.Count < max; i++)
+                if (Volatile.Read(ref answers[i]) == 1) result.Add(candidates[i]);
+            return result;
+        }
+
+        /// <summary>Candidate indexes grouped by drive or share root, in first-seen order. A path
+        /// whose root cannot be read gets a group of its own.</summary>
+        internal static List<List<int>> ByVolume(IList<string> candidates)
+        {
+            var groups = new List<List<int>>();
+            var byRoot = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
             for (int i = 0; i < candidates.Count; i++)
             {
-                var path = candidates[i];
-                checks[i] = Task.Run(() => { try { return check(path); } catch { return false; } });
+                string root = null;
+                try { root = Path.GetPathRoot(candidates[i]); } catch { }
+                List<int> group;
+                if (string.IsNullOrEmpty(root) || !byRoot.TryGetValue(root, out group))
+                {
+                    group = new List<int>();
+                    groups.Add(group);
+                    if (!string.IsNullOrEmpty(root)) byRoot[root] = group;
+                }
+                group.Add(i);
             }
-            try { Task.WaitAll(checks, Math.Max(0, budgetMs)); } catch { }
-
-            for (int i = 0; i < checks.Length && result.Count < max; i++)
-                if (checks[i].Status == TaskStatus.RanToCompletion && checks[i].Result) result.Add(candidates[i]);
-            return result;
+            return groups;
         }
 
         /// <summary>The places for a picker opening now, read from the live groups. Runs on the UI
