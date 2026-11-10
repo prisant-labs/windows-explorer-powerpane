@@ -22,12 +22,16 @@ namespace QuickPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "3.12.0.2";
+        public const string Version = "3.13.0.0";
 
         public static readonly Item[] Items =
         {
-            new Item("Update check",
-                "The daily check no longer gives way to mouse and keyboard input. This is a precaution against a delay seen once."),
+            new Item("Quick switcher",
+                "An optional shortcut opens one search box for pins, Recent folders, drives, and quick actions. Turn it on under Keyboard."),
+            new Item("Recent, your way",
+                "Hide a folder from Recent with its right-click menu, or clear Recent from the Recent page."),
+            new Item("Arm computers",
+                "The installer now runs on Windows 11 on Arm, which runs QuickPane through emulation."),
         };
     }
 }

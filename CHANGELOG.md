@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [3.13.0.0] - 2026-11-09
+
+A quick switcher, control over what Recent shows, and an installer that runs on Arm. See the [release notes](docs/releases/3.13.0.0.md).
 
 ### Added
 - A quick switcher. An optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front that finds pins, Recent folders, drives, and quick actions together. Enter sends the Explorer window or Open or Save dialog in front to the folder, or runs the action against that Explorer window, and Escape closes the box. The shortcut is off until it is turned on under Settings, Keyboard ([#226](https://github.com/prisant-labs/windows-explorer-quickpane/issues/226)).
