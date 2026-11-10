@@ -22,14 +22,22 @@ namespace QuickPane.UI
         /// <summary>More places than this makes the picker's navigation pane a second pane.</summary>
         internal const int MaxPlaces = 50;
 
+        /// <summary>How many pins are checked at most. Some candidates turn out to be files or gone,
+        /// so this is larger than MaxPlaces, but bounded so a huge group cannot start hundreds of
+        /// checks.</summary>
+        internal const int MaxCandidates = 150;
+
         /// <summary>The longest the picker waits, in total, for pins to answer before it opens. Every
         /// pin is checked at once, so a pin on a share that does not answer costs this much once and
         /// is left out, rather than costing the network timeout per pin.</summary>
         internal const int ProbeBudgetMs = 400;
 
-        /// <summary>The pins worth offering, in the order the pane shows them: each expanded group's
-        /// visible tab, folders only, each folder once. A collapsed group's pins are hidden in the pane,
-        /// so they stay out of the picker too. Nothing here touches the disk.</summary>
+        /// <summary>The pins worth checking, in the order the pane shows them: each expanded group's
+        /// visible tab, each path once. A collapsed group's pins are hidden in the pane, so they stay
+        /// out of the picker too. Nothing here touches the disk, and nothing here trusts a pin's
+        /// IsFile or Exists: those are scan-time snapshots, and before its first probe IsFile is a
+        /// guess from the extension, which would drop a folder named like "Site.v2". Reachable's
+        /// folder check is what removes files and missing targets.</summary>
         internal static List<string> Candidates(IEnumerable<PinnedGroup> groups, int max)
         {
             var result = new List<string>();
@@ -42,7 +50,7 @@ namespace QuickPane.UI
                 if (tab == null || tab.Items == null) continue;
                 foreach (var pin in tab.Items)
                 {
-                    if (pin == null || pin.IsFile || !pin.Exists) continue;
+                    if (pin == null) continue;
                     var path = pin.TargetPath;
                     if (string.IsNullOrWhiteSpace(path)) continue;
                     if (!seen.Add(path.TrimEnd('\\', '/'))) continue;
@@ -54,13 +62,13 @@ namespace QuickPane.UI
         }
 
         /// <summary>The candidates that answered as existing folders within budgetMs, in their original
-        /// order. All checks start together on the thread pool, so the wait is bounded by budgetMs no
+        /// order, at most max of them. All checks start together on the thread pool, so the wait is bounded by budgetMs no
         /// matter how many pins are slow; a check still running at the deadline counts as "no", and
         /// finishes on its own.</summary>
-        internal static List<string> Reachable(IList<string> candidates, Func<string, bool> exists, int budgetMs)
+        internal static List<string> Reachable(IList<string> candidates, Func<string, bool> exists, int budgetMs, int max)
         {
             var result = new List<string>();
-            if (candidates == null || candidates.Count == 0) return result;
+            if (candidates == null || candidates.Count == 0 || max <= 0) return result;
             var check = exists ?? Directory.Exists;
 
             var checks = new Task<bool>[candidates.Count];
@@ -71,7 +79,7 @@ namespace QuickPane.UI
             }
             try { Task.WaitAll(checks, Math.Max(0, budgetMs)); } catch { }
 
-            for (int i = 0; i < checks.Length; i++)
+            for (int i = 0; i < checks.Length && result.Count < max; i++)
                 if (checks[i].Status == TaskStatus.RanToCompletion && checks[i].Result) result.Add(candidates[i]);
             return result;
         }
@@ -83,7 +91,7 @@ namespace QuickPane.UI
             try
             {
                 var groups = App.Groups != null ? App.Groups.Groups : null;
-                return Reachable(Candidates(groups, MaxPlaces), null, ProbeBudgetMs);
+                return Reachable(Candidates(groups, MaxCandidates), null, ProbeBudgetMs, MaxPlaces);
             }
             catch (Exception ex)
             {

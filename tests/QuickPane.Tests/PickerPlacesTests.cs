@@ -65,19 +65,29 @@ namespace QuickPane.Tests
         }
 
         [Test]
-        public void Candidates_SkipFilesMissingTargetsAndBlankPaths()
+        public void Candidates_SkipBlankPaths()
         {
             var groups = new List<PinnedGroup>
             {
-                Group(true, 0, Tab(
-                    Pin(@"C:\Demo\notes.txt", isFile: true),
-                    Pin(@"C:\Demo\Gone", exists: false),
-                    Pin("   "),
-                    Pin(null),
-                    null,
-                    Pin(@"C:\Demo\Kept"))),
+                Group(true, 0, Tab(Pin("   "), Pin(null), null, Pin(@"C:\Demo\Kept"))),
             };
             Assert.That(PickerPlaces.Candidates(groups, 50), Is.EqualTo(new[] { @"C:\Demo\Kept" }));
+        }
+
+        [Test]
+        public void Candidates_IgnoreScanTimeSnapshots_TheFolderCheckDecides()
+        {
+            // Before its first probe, a pin's IsFile is a guess from the extension, so a folder named
+            // like a file reads as a file. The snapshot must not drop it; Reachable's check decides.
+            var groups = new List<PinnedGroup>
+            {
+                Group(true, 0, Tab(
+                    Pin(@"C:\Demo\Site.v2", isFile: true),
+                    Pin(@"C:\Demo\Back", exists: false))),
+            };
+            var candidates = PickerPlaces.Candidates(groups, 50);
+            Assert.That(candidates, Is.EqualTo(new[] { @"C:\Demo\Site.v2", @"C:\Demo\Back" }));
+            Assert.That(PickerPlaces.Reachable(candidates, p => true, 2000, 50), Is.EqualTo(candidates));
         }
 
         [Test]
@@ -109,15 +119,27 @@ namespace QuickPane.Tests
         }
 
         [Test]
-        public void Reachable_KeepsOrder_AndDropsMissingAndThrowing()
+        public void Reachable_KeepsOrder_AndDropsFilesMissingAndThrowing()
         {
-            var candidates = new List<string> { @"C:\Demo\A", @"C:\Demo\Missing", @"C:\Demo\Throws", @"C:\Demo\B" };
+            // The real check is Directory.Exists, which is false for a file as well as for a folder
+            // that is gone.
+            var candidates = new List<string> { @"C:\Demo\A", @"C:\Demo\Missing", @"C:\Demo\notes.txt", @"C:\Demo\Throws", @"C:\Demo\B" };
             Func<string, bool> exists = p =>
             {
                 if (p.EndsWith("Throws")) throw new UnauthorizedAccessException();
-                return !p.EndsWith("Missing");
+                return !p.EndsWith("Missing") && !p.EndsWith(".txt");
             };
-            Assert.That(PickerPlaces.Reachable(candidates, exists, 2000), Is.EqualTo(new[] { @"C:\Demo\A", @"C:\Demo\B" }));
+            Assert.That(PickerPlaces.Reachable(candidates, exists, 2000, 50), Is.EqualTo(new[] { @"C:\Demo\A", @"C:\Demo\B" }));
+        }
+
+        [Test]
+        public void Reachable_CapCountsOnlyFoldersThatAnswered()
+        {
+            // The cap applies after the check, so files and missing folders early in the list do not
+            // use up places that later live folders should get.
+            var candidates = new List<string> { @"C:\Demo\Gone1", @"C:\Demo\Gone2", @"C:\Demo\A", @"C:\Demo\B", @"C:\Demo\C" };
+            var result = PickerPlaces.Reachable(candidates, p => !p.Contains("Gone"), 2000, 2);
+            Assert.That(result, Is.EqualTo(new[] { @"C:\Demo\A", @"C:\Demo\B" }));
         }
 
         [Test]
@@ -135,7 +157,7 @@ namespace QuickPane.Tests
                     return true;
                 };
                 var sw = Stopwatch.StartNew();
-                var result = PickerPlaces.Reachable(candidates, exists, 300);
+                var result = PickerPlaces.Reachable(candidates, exists, 300, 50);
                 sw.Stop();
 
                 Assert.That(result, Is.EqualTo(new[] { @"C:\Demo\Local" }));
@@ -147,8 +169,8 @@ namespace QuickPane.Tests
         [Test]
         public void Reachable_EmptyInput_GivesNothing()
         {
-            Assert.That(PickerPlaces.Reachable(null, p => true, 100), Is.Empty);
-            Assert.That(PickerPlaces.Reachable(new List<string>(), p => true, 100), Is.Empty);
+            Assert.That(PickerPlaces.Reachable(null, p => true, 100, 50), Is.Empty);
+            Assert.That(PickerPlaces.Reachable(new List<string>(), p => true, 100, 50), Is.Empty);
         }
 
         [TestCase(1234u, 1234u, true)]
