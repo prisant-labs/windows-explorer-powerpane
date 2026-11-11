@@ -98,7 +98,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Name: "{userappdata}\PowerPane\Groups"
 
 [Run]
-Filename: "{app}\{#MyAppExe}"; Description: "Launch PowerPane"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExe}"; Description: "Launch Explorer PowerPane"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; Ask the app to close rather than killing it. A force kill reads as a crash to the watchdog, which

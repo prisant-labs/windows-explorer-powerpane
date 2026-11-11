@@ -195,8 +195,8 @@ QuickPane and Explorer PowerPane are separate installs, with their own program a
 
 1. Copy `%APPDATA%\QuickPane` somewhere safe, as a backup
 2. Uninstall QuickPane from Settings, Apps. Its data folder stays
-3. Install Explorer PowerPane, and untick "Launch PowerPane" on the installer's last page
-4. In PowerShell, run `robocopy "$env:APPDATA\QuickPane" "$env:APPDATA\PowerPane" /E`
+3. Install Explorer PowerPane, and untick "Launch Explorer PowerPane" on the installer's last page
+4. In PowerShell, run `robocopy "$env:APPDATA\QuickPane" "$env:APPDATA\PowerPane" /E /XD "$env:APPDATA\QuickPane\Logs"`. The old logs stay behind, because they describe QuickPane's last run
 5. Start Explorer PowerPane from the Start menu
 
 The copied settings still name `%APPDATA%\QuickPane\Groups`, and PowerPane reads any path inside the old data folder as the same place inside `%APPDATA%\PowerPane`. Backups made by QuickPane restore the same way. The [4.0.0.0 release notes](docs/releases/4.0.0.0.md) have the details and the way back.

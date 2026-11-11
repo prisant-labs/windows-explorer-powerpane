@@ -95,5 +95,43 @@ namespace PowerPane.Tests
                 Assert.That(target.ExpandedGroupsPath, Does.Not.Contain(AppSettings.FormerDataFolderName));
             }
         }
+
+        /// <summary>The main path of the move: QuickPane's settings.json copied as is into the new data
+        /// folder, then read at startup. The release notes promise this finds the pins.</summary>
+        [Test]
+        public void Load_ACopiedQuickPaneSettingsFile_PointsAtThePowerPaneFolder()
+        {
+            using (var temp = new TempDir())
+            {
+                File.WriteAllText(Path.Combine(temp.Path, "settings.json"),
+                    "{\"groupsPath\":\"%APPDATA%\\\\QuickPane\\\\Groups\"," +
+                    "\"profiles\":[" +
+                    "{\"name\":\"Home\",\"groupsPath\":\"%APPDATA%\\\\QuickPane\\\\Groups\"}," +
+                    "{\"name\":\"Work\",\"groupsPath\":\"%APPDATA%\\\\QuickPane\\\\Profiles\\\\Work\\\\Groups\"}]," +
+                    "\"activeProfile\":1}");
+
+                var store = new SettingsStore(temp.Path);
+                store.Load();
+
+                Assert.That(store.Current.Profiles.Select(p => p.GroupsPath), Is.EqualTo(new[]
+                {
+                    @"%APPDATA%\PowerPane\Groups",
+                    @"%APPDATA%\PowerPane\Profiles\Work\Groups",
+                }));
+                Assert.That(store.Current.GroupsPath, Is.EqualTo(@"%APPDATA%\PowerPane\Profiles\Work\Groups"),
+                    "the active profile's folder is the one the pane reads");
+            }
+        }
+
+        [TestCase(@"group:C:\Demo\AppData\Roaming\QuickPane\Groups\10_Work", @"group:C:\Demo\AppData\Roaming\PowerPane\Groups\10_Work")]
+        [TestCase(@"tree:C:\Demo\AppData\Roaming\QuickPane\Groups", @"tree:C:\Demo\AppData\Roaming\PowerPane\Groups")]
+        [TestCase(@"group:D:\Demo\Pins\10_Work", @"group:D:\Demo\Pins\10_Work")]
+        [TestCase(@"tree:C:\Demo\Projects", @"tree:C:\Demo\Projects")]
+        [TestCase("section:computer", "section:computer")]
+        [TestCase("", "")]
+        public void UiStateKeys_InsideTheOldDataFolder_MoveToTheNewOne(string stored, string expected)
+        {
+            Assert.That(UiState.MapFormerKey(stored, AppData), Is.EqualTo(expected));
+        }
     }
 }

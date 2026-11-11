@@ -22,7 +22,8 @@ namespace PowerPane.Services
             _loaded = true;
             try
             {
-                var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PowerPane");
+                var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+                var dir = Path.Combine(appData, "PowerPane");
                 _file = Path.Combine(dir, "uistate.txt");
                 if (File.Exists(_file))
                 {
@@ -30,11 +31,27 @@ namespace PowerPane.Services
                     {
                         int bar = line.LastIndexOf('|');
                         if (bar <= 0) continue;
-                        Map[line.Substring(0, bar)] = line.Substring(bar + 1).Trim() == "1";
+                        Map[MapFormerKey(line.Substring(0, bar), appData)] = line.Substring(bar + 1).Trim() == "1";
                     }
                 }
             }
             catch (Exception ex) { Log.Error("uistate load", ex); }
+        }
+
+        /// <summary>Moves a key that names a folder inside QuickPane's old data folder to the same folder
+        /// inside PowerPane's. A group's key is "group:" plus its expanded folder path, so a uistate.txt
+        /// copied over from QuickPane would otherwise miss every group and open each one at its
+        /// default. Section keys, and tree keys for folders anywhere else, come back unchanged.</summary>
+        internal static string MapFormerKey(string key, string appData)
+        {
+            if (string.IsNullOrEmpty(key)) return key;
+            foreach (var prefix in new[] { "group:", "tree:" })
+            {
+                if (key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    return key.Substring(0, prefix.Length) +
+                        Models.AppSettings.MapFormerDataPath(key.Substring(prefix.Length), appData);
+            }
+            return key;
         }
 
         public static bool GetExpanded(string key, bool dflt = true)
