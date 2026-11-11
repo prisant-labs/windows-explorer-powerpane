@@ -17,7 +17,9 @@ namespace PowerPane.Services
     /// </summary>
     internal static class ShortcutRepair
     {
-        public const string LinkName = "PowerPane.lnk";
+        // The long name (rename decision D9): the Start menu lists many apps, and the installer's
+        // [Icons] entry uses the same name, so the app and the installer keep one shortcut between them.
+        public const string LinkName = "Explorer PowerPane.lnk";
         private const string Description = "PowerPane sidebar for File Explorer";
 
         public static string StartMenuPath

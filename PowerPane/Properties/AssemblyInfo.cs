@@ -8,10 +8,10 @@ using System.Windows;
 [assembly: InternalsVisibleTo("PowerPane.Tests")]
 
 [assembly: AssemblyTitle("PowerPane")]
-[assembly: AssemblyDescription("Explorer sidebar replacement for Windows 10 LTSC")]
+[assembly: AssemblyDescription("Pinned folders inside File Explorer and file dialogs")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("PlexWebs")]
-[assembly: AssemblyProduct("PowerPane")]
+[assembly: AssemblyCompany("Prisant Labs")]
+[assembly: AssemblyProduct("Explorer PowerPane")]
 [assembly: AssemblyCopyright("Copyright 2026")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]

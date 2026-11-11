@@ -880,7 +880,7 @@ namespace PowerPane.UI
             menu.Items.Add(Item("Move down", () => App.Groups.PostEdit(store => store.MovePin(tab, pin, +1))));
             menu.Items.Add(Item("Copy path", () => SafeClipboard(pin.TargetPath)));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Remove Shortcut", () => App.Groups.PostEdit(store => store.RemovePin(pin))));
+            menu.Items.Add(Item("Remove pin", () => App.Groups.PostEdit(store => store.RemovePin(pin))));
             return menu;
         }
 

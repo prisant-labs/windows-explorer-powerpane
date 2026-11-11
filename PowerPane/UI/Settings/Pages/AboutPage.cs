@@ -96,8 +96,8 @@ namespace PowerPane.UI.Settings.Pages
         {
             var version = new TextBlock { Text = "Version " + UpdateService.CurrentDisplay, FontSize = 12 };
             version.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-            return ctx.Cards.Card("about-app", GlyphInfo, "PowerPane", AppDescription, version,
-                accessibleName: "PowerPane version " + UpdateService.CurrentDisplay);
+            return ctx.Cards.Card("about-app", GlyphInfo, "Explorer PowerPane", AppDescription, version,
+                accessibleName: "Explorer PowerPane version " + UpdateService.CurrentDisplay);
         }
 
         // ---- updates card ---------------------------------------------------

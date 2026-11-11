@@ -118,7 +118,7 @@ namespace PowerPane.Services
             {
                 Log.Event("restart", "suppressed after " + recent + " restarts within " +
                     CrashGuard.RestartWindow.TotalMinutes + " minutes, because a fault that returns on every launch would otherwise cycle without end. " +
-                    "Start PowerPane from the Start menu once the cause is addressed.");
+                    "Start Explorer PowerPane from the Start menu once the cause is addressed.");
                 return;
             }
 
