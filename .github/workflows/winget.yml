@@ -1,6 +1,6 @@
 name: winget
 # When a release is published, opens a pull request in microsoft/winget-pkgs that adds the new
-# version of PrisantLabs.QuickPane. It runs on publish, never on a tag, because a person publishes a
+# version of PrisantLabs.PowerPane. It runs on publish, never on a tag, because a person publishes a
 # release only after testing its draft on a real desktop. The first version of the package was
 # submitted by hand; this workflow only adds later versions.
 #
@@ -51,7 +51,7 @@ jobs:
           if ($release.isDraft -or $release.isPrerelease) {
               throw "Release $env:TAG is a draft or a pre-release; winget gets full releases only."
           }
-          $installer = "QuickPane-$version-x64-setup.exe"
+          $installer = "PowerPane-$version-x64-setup.exe"
           if (-not ($release.assets | Where-Object { $_.name -eq $installer })) {
               throw "Release $env:TAG has no $installer."
           }
@@ -67,7 +67,7 @@ jobs:
               throw "wingetcreate.exe does not match its pinned hash (got $hash)."
           }
 
-          & $tool update PrisantLabs.QuickPane --version $version --urls $url `
+          & $tool update PrisantLabs.PowerPane --version $version --urls $url `
               --release-notes-url "https://github.com/$env:REPO/releases/tag/$env:TAG" `
               --release-date $date --submit --token $env:WINGET_TOKEN
           if ($LASTEXITCODE -ne 0) { throw "wingetcreate failed with exit code $LASTEXITCODE." }

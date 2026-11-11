@@ -1,0 +1,513 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.Serialization;
+using PowerPane.Services;
+
+namespace PowerPane.Models
+{
+    /// <summary>One pinned folder. Backed by a single .lnk inside a group folder.</summary>
+    public sealed class PinnedFolder
+    {
+        public string DisplayName { get; set; }   // the .lnk name, prefix stripped
+        public string TargetPath { get; set; }     // resolved shortcut target
+        public string LinkPath { get; set; }        // full path of the .lnk on disk
+        public int Order { get; set; }              // from the NNN_ prefix
+        public bool Exists { get; set; }            // target currently resolvable
+        public bool IsFile { get; set; }            // recent item that is a file, not a folder
+    }
+
+    /// <summary>One tab inside a group. Backed by a subfolder of the group folder; its pins are the
+    /// .lnk files in that subfolder.</summary>
+    public sealed class PinnedTab
+    {
+        public string Name { get; set; }            // subfolder name, TT_ prefix stripped
+        public string FolderPath { get; set; }      // full path of the tab subfolder
+        public int Order { get; set; }              // from the TT_ prefix
+        public List<PinnedFolder> Items { get; set; } = new List<PinnedFolder>();
+    }
+
+    /// <summary>One group. Backed by a real folder under the groups root. A group holds one or more
+    /// tabs; with a single tab it renders like a plain group, with several it shows a tab row.</summary>
+    public sealed class PinnedGroup
+    {
+        public string Name { get; set; }            // folder name, NN_ prefix stripped (ordering label)
+        public string FolderPath { get; set; }      // full path of the group folder
+        public int Order { get; set; }              // from the NN_ prefix
+        public bool Expanded { get; set; } = true;
+        public int ActiveTab { get; set; }          // index of the visible tab
+        public List<PinnedTab> Tabs { get; set; } = new List<PinnedTab>();
+
+        public PinnedTab Active
+        {
+            get
+            {
+                if (Tabs.Count == 0) return null;
+                int i = ActiveTab;
+                if (i < 0) i = 0;
+                if (i >= Tabs.Count) i = Tabs.Count - 1;
+                return Tabs[i];
+            }
+        }
+    }
+
+    /// <summary>Visibility and ordering for one sidebar section.</summary>
+    [DataContract]
+    public sealed class SectionSetting
+    {
+        [DataMember(Name = "type", Order = 0)]
+        public string Type { get; set; }            // "groups" | "recents" | "computer"
+
+        [DataMember(Name = "visible", Order = 1)]
+        public bool Visible { get; set; } = true;
+
+        [DataMember(Name = "order", Order = 2)]
+        public int Order { get; set; }
+
+        // Optional custom header text. When null the section uses its default name.
+        [DataMember(Name = "title", Order = 3, EmitDefaultValue = false)]
+        public string Title { get; set; }
+    }
+
+    /// <summary>Whether one built-in quick action (quick actions, first version) shows in the pane's Quick
+    /// actions section and the pinned-row submenu. The action's display name and description live in
+    /// QuickActionLibrary, keyed by <see cref="Id"/>, so a later release can rename or re-describe a
+    /// built-in without touching anyone's settings.json. Unlike <see cref="SectionSetting"/>, there is
+    /// no separate Order field: this entry's position inside AppSettings.QuickActions is its order in
+    /// the pane, so reordering is a plain list move with nothing left to renumber afterwards.</summary>
+    [DataContract]
+    public sealed class QuickActionSetting
+    {
+        [DataMember(Name = "id", Order = 0)]
+        public string Id { get; set; }
+
+        [DataMember(Name = "enabled", Order = 1)]
+        public bool Enabled { get; set; } = true;
+    }
+
+    /// <summary>A quick action the user wrote (#190): a name and a command template. It appears in
+    /// AppSettings.QuickActions under the same <see cref="Id"/>, which carries its on/off state and its
+    /// place in the order, the same as a built-in action. CustomCommandTemplate reads the template.</summary>
+    [DataContract]
+    public sealed class CustomCommand
+    {
+        [DataMember(Name = "id", Order = 0)]
+        public string Id { get; set; }
+
+        [DataMember(Name = "name", Order = 1)]
+        public string Name { get; set; }
+
+        [DataMember(Name = "template", Order = 2)]
+        public string Template { get; set; }
+    }
+
+    /// <summary>One profile: an independent workspace with its own groups folder and pane settings.
+    /// The active profile's values are mirrored into the top-level AppSettings fields so the rest of the
+    /// app keeps reading GroupsPath / RecentsMaxCount / SidebarWidthPx unchanged.</summary>
+    [DataContract]
+    public sealed class Profile
+    {
+        [DataMember(Name = "name", Order = 0)]
+        public string Name { get; set; } = "Profile";
+
+        [DataMember(Name = "groupsPath", Order = 1)]
+        public string GroupsPath { get; set; } = @"%APPDATA%\PowerPane\Groups";
+
+        [DataMember(Name = "recentsMaxCount", Order = 2)]
+        public int RecentsMaxCount { get; set; } = 15;
+
+        [DataMember(Name = "sidebarWidthPx", Order = 3)]
+        public int SidebarWidthPx { get; set; } = 220;
+    }
+
+    /// <summary>One saved SSH/SFTP connection, mounted as a real drive via SSHFS-Win. Field layout
+    /// mirrors PuTTY/KiTTY (host, port, username, private key path) plus WinSCP's keepalive settings.</summary>
+    [DataContract]
+    public sealed class SshProfile
+    {
+        [DataMember(Name = "name", Order = 0)]
+        public string Name { get; set; } = "New connection";
+
+        [DataMember(Name = "hostname", Order = 1)]
+        public string Hostname { get; set; } = "";
+
+        [DataMember(Name = "port", Order = 2)]
+        public int Port { get; set; } = 22;
+
+        [DataMember(Name = "username", Order = 3)]
+        public string Username { get; set; } = "";
+
+        // "key" or "password", same split as PuTTY's auth panel.
+        [DataMember(Name = "authMethod", Order = 4)]
+        public string AuthMethod { get; set; } = "key";
+
+        [DataMember(Name = "privateKeyPath", Order = 5, EmitDefaultValue = false)]
+        public string PrivateKeyPath { get; set; } = "";
+
+        // Stored in plain text in settings.json, same as a saved WinSCP/PuTTY session password.
+        // Key auth avoids this entirely and is the recommended path.
+        [DataMember(Name = "password", Order = 6, EmitDefaultValue = false)]
+        public string Password { get; set; } = "";
+
+        [DataMember(Name = "remotePath", Order = 7)]
+        public string RemotePath { get; set; } = "/";
+
+        [DataMember(Name = "driveLetter", Order = 8)]
+        public string DriveLetter { get; set; } = "S:";
+
+        // WinSCP's "Seconds between keepalive packets", passed through as ServerAliveInterval.
+        [DataMember(Name = "keepAliveInterval", Order = 9)]
+        public int KeepAliveInterval { get; set; } = 10;
+
+        [DataMember(Name = "keepAliveCountMax", Order = 10)]
+        public int KeepAliveCountMax { get; set; } = 3;
+
+        [DataMember(Name = "reconnect", Order = 11)]
+        public bool Reconnect { get; set; } = true;
+    }
+
+    /// <summary>Serialized to %APPDATA%\PowerPane\settings.json.</summary>
+    [DataContract]
+    public sealed class AppSettings
+    {
+        [DataMember(Name = "groupsPath", Order = 0)]
+        public string GroupsPath { get; set; } = @"%APPDATA%\PowerPane\Groups";
+
+        [DataMember(Name = "sections", Order = 1)]
+        public List<SectionSetting> Sections { get; set; }
+
+        // Keyboard navigation of the pane inside a file dialog. Off unless asked for, because it takes a
+        // system-wide hotkey and steals a key combination from whatever else wants it.
+        [DataMember(Name = "keyboardNav", Order = 40, EmitDefaultValue = false)]
+        public bool KeyboardNav { get; set; }
+
+        // The combination that moves focus into the pane. Modifiers are "ctrl", "alt", "shift", "win",
+        // joined with "+" and ending in a key name, e.g. "ctrl+shift+Q".
+        [DataMember(Name = "keyboardNavHotkey", Order = 41, EmitDefaultValue = false)]
+        public string KeyboardNavHotkey { get; set; } = "ctrl+shift+Q";
+
+        // The quick switcher (#226): a shortcut that opens a search over pins, Recent, drives, and
+        // actions. Off by default, like the shortcut above, because a global hotkey takes its
+        // combination from every other program.
+        [DataMember(Name = "quickSwitcher", Order = 53, EmitDefaultValue = false)]
+        public bool QuickSwitcher { get; set; }
+
+        [DataMember(Name = "quickSwitcherHotkey", Order = 54, EmitDefaultValue = false)]
+        public string QuickSwitcherHotkey { get; set; } = DefaultQuickSwitcherHotkey;
+
+        public const string DefaultQuickSwitcherHotkey = "ctrl+alt+Space";
+
+        // Which apps the Recent Apps section lists: "open" for the ones brought to the front, "dialogs"
+        // for the ones whose Save and Open dialogs were used, "both" for either.
+        [DataMember(Name = "recentAppsSource", Order = 42, EmitDefaultValue = false)]
+        public string RecentAppsSource { get; set; } = "both";
+
+        // Quick actions (quick actions, first version): the master switch is the "quickactions" section's
+        // own Visible flag above, so turning it on from this list or from the Pane sections page is
+        // the same setting. This is only which built-in actions show and in what order; Normalize
+        // seeds it with every built-in, in QuickActionLibrary's own default order and default state,
+        // the first time it sees a null list.
+        [DataMember(Name = "quickActions", Order = 43, EmitDefaultValue = false)]
+        public List<QuickActionSetting> QuickActions { get; set; }
+
+        // Commands the user added on the Quick actions page (#190).
+        [DataMember(Name = "customCommands", Order = 50, EmitDefaultValue = false)]
+        public List<CustomCommand> CustomCommands { get; set; }
+
+        // The automatic update check (#176). Stored as "off" rather than "on", so a settings file
+        // from before this setting existed reads as the default without an OnDeserializing hook.
+        [DataMember(Name = "updateCheckOff", Order = 47, EmitDefaultValue = false)]
+        public bool UpdateCheckOff { get; set; }
+
+        // When the automatic check last ran, as UpdateNotifier.FormatTime writes it.
+        [DataMember(Name = "lastUpdateCheckUtc", Order = 48, EmitDefaultValue = false)]
+        public string LastUpdateCheckUtc { get; set; }
+
+        // The newest version the user has been told about, so the notice shows once per version.
+        [DataMember(Name = "updateNoticeVersion", Order = 49, EmitDefaultValue = false)]
+        public string UpdateNoticeVersion { get; set; }
+
+        [DataMember(Name = "recentsMaxCount", Order = 2)]
+        public int RecentsMaxCount { get; set; } = 15;
+
+        // Folders Recent never shows or records, with everything inside them (#224). Shared by every
+        // profile, because a folder kept private in one profile should not appear in another. The
+        // Recent scan reads this from the work lane, so a change replaces the list rather than editing
+        // it in place: the scan then keeps reading the list it started with.
+        [DataMember(Name = "recentHiddenFolders", Order = 51, EmitDefaultValue = false)]
+        public List<string> RecentHiddenFolders { get; set; }
+
+        // When Clear Recent was last pressed, in UTC ticks. Windows' own Recent shortcuts written at or
+        // before this moment stay hidden, without deleting them: those shortcuts are also Windows'
+        // own Recent list and Quick Access. A later visit rewrites a shortcut, so it shows again.
+        [DataMember(Name = "recentClearedTicks", Order = 52, EmitDefaultValue = false)]
+        public long RecentClearedTicks { get; set; }
+
+        [DataMember(Name = "sidebarWidthPx", Order = 3)]
+        public int SidebarWidthPx { get; set; } = 220;
+
+        // Window attach mode: "inside" embeds the pane inside each Explorer window (shifts content);
+        // "beside" floats a pane at the left of each Explorer window (no shift, no flicker).
+        [DataMember(Name = "mode", Order = 4, EmitDefaultValue = false)]
+        public string Mode { get; set; } = "inside";
+
+        // How the pane attaches to Open/Save file dialogs, independent of Mode above. "same" (default)
+        // keeps today's behavior and follows Mode; "beside" and "off" override it for dialogs only.
+        // Off also hides App Folders and "Always start here", which exist only in dialog panes.
+        [DataMember(Name = "dialogMode", Order = 13, EmitDefaultValue = false)]
+        public string DialogMode { get; set; } = "same";
+
+        // A background tint for the pane, applied over every open pane live, with no rebuild
+        // (#134). "Default" keeps the theme's own SidebarBackground. The lookup from this name to an
+        // actual color lives in ThemeService, next to the theme it overrides.
+        [DataMember(Name = "paneColor", Order = 14, EmitDefaultValue = false)]
+        public string PaneColor { get; set; } = "Default";
+
+        // Optional extra: a screen-edge dock (AppBar) independent of the window pane.
+        [DataMember(Name = "desktopDock", Order = 5, EmitDefaultValue = false)]
+        public bool DesktopDock { get; set; }
+
+        // When docked, collapse to a 1px strip and slide out on hover.
+        [DataMember(Name = "desktopDockAutoHide", Order = 6, EmitDefaultValue = false)]
+        public bool DesktopDockAutoHide { get; set; } = true;
+
+        // Show the dock on every virtual desktop instead of only the one it was opened on.
+        [DataMember(Name = "desktopDockAllDesktops", Order = 7, EmitDefaultValue = false)]
+        public bool DesktopDockAllDesktops { get; set; }
+
+        // Which monitor the desktop dock sits on, stored as MonitorPicker's stable device-interface
+        // id. Null or empty means "Primary display": AppBarHost tracks whichever monitor Windows
+        // currently calls primary, live, rather than pinning to whichever one happened to be primary
+        // when this was chosen. A non-empty id that no longer matches a connected monitor (#146) also
+        // falls back to the primary display -- MonitorPicker.ResolveMonitor is where that happens.
+        [DataMember(Name = "desktopDockDisplay", Order = 15, EmitDefaultValue = false)]
+        public string DesktopDockDisplay { get; set; }
+
+        // Which edge of that display the desktop dock sits on: "left" or "right" (#177). Null, blank,
+        // or anything unrecognized means left, so a settings file from before this setting keeps its
+        // placement and a default file does not gain the key. AppBarHost reads it live.
+        [DataMember(Name = "desktopDockEdge", Order = 44, EmitDefaultValue = false)]
+        public string DesktopDockEdge { get; set; }
+
+        // Profiles: independent workspaces. The active one's folder/recents/width are mirrored into the
+        // top-level fields above. Groups, sections, and dock settings stay global across profiles.
+        [DataMember(Name = "profiles", Order = 8, EmitDefaultValue = false)]
+        public List<Profile> Profiles { get; set; }
+
+        [DataMember(Name = "activeProfile", Order = 9, EmitDefaultValue = false)]
+        public int ActiveProfileIndex { get; set; }
+
+        // Saved SSH/SFTP connections, mounted as real drives via SSHFS-Win.
+        [DataMember(Name = "sshProfiles", Order = 12, EmitDefaultValue = false)]
+        public List<SshProfile> SshProfiles { get; set; }
+
+        // A row of profile tabs under the PowerPane title that switches the shown profile.
+        [DataMember(Name = "showProfileTabs", Order = 10)]
+        public bool ShowProfileTabs { get; set; } = true;
+
+        // When on, the profile tab row collapses and slides out when the cursor is over the header.
+        [DataMember(Name = "profileTabsAutoHide", Order = 11, EmitDefaultValue = false)]
+        public bool ProfileTabsAutoHide { get; set; }
+
+        // GetUninitializedObject skips field initializers, so default the tab row on before members load.
+        [OnDeserializing]
+        private void OnDeserializing(StreamingContext c) { ShowProfileTabs = true; }
+
+        public Profile ActiveProfile
+        {
+            get
+            {
+                if (Profiles == null || Profiles.Count == 0) return null;
+                int i = ActiveProfileIndex;
+                if (i < 0) i = 0;
+                if (i >= Profiles.Count) i = Profiles.Count - 1;
+                return Profiles[i];
+            }
+        }
+
+        /// <summary>Copy the active profile's values into the top-level fields the app reads.</summary>
+        public void LoadActiveToTop()
+        {
+            var a = ActiveProfile;
+            if (a == null) return;
+            GroupsPath = a.GroupsPath;
+            RecentsMaxCount = a.RecentsMaxCount;
+            SidebarWidthPx = a.SidebarWidthPx;
+        }
+
+        /// <summary>Persist live top-level edits back into the active profile before saving/switching.</summary>
+        public void SyncTopToActive()
+        {
+            var a = ActiveProfile;
+            if (a == null) return;
+            a.GroupsPath = GroupsPath;
+            a.RecentsMaxCount = RecentsMaxCount;
+            a.SidebarWidthPx = SidebarWidthPx;
+        }
+
+        public static AppSettings CreateDefault()
+        {
+            return new AppSettings
+            {
+                GroupsPath = @"%APPDATA%\PowerPane\Groups",
+                RecentsMaxCount = 15,
+                SidebarWidthPx = 220,
+                Sections = new List<SectionSetting>
+                {
+                    new SectionSetting { Type = "groups",   Visible = true, Order = 0 },
+                    new SectionSetting { Type = "recents",  Visible = true, Order = 1 },
+                    new SectionSetting { Type = "computer", Visible = true, Order = 2 },
+                    new SectionSetting { Type = "network",  Visible = true, Order = 3 },
+                    new SectionSetting { Type = "linux",    Visible = true, Order = 4 },
+                    new SectionSetting { Type = "ssh",      Visible = true, Order = 5 },
+                    new SectionSetting { Type = "search",      Visible = true, Order = -2 },
+                    new SectionSetting { Type = "appdefaults", Visible = true, Order = -1 },
+                    new SectionSetting { Type = "recentapps",  Visible = true, Order = 6 },
+                    // Off by default (quick actions, first version): the pane matches Explorer until the
+                    // user opts in, unlike every other built-in section above.
+                    new SectionSetting { Type = "quickactions", Visible = false, Order = 7 }
+                },
+                SshProfiles = new List<SshProfile>()
+            };
+        }
+
+        /// <summary>Make sure all three sections exist exactly once, preserving stored order/visibility.</summary>
+        public void Normalize()
+        {
+            if (Sections == null) Sections = new List<SectionSetting>();
+            EnsureSection("groups", 0);
+            EnsureSection("recents", 1);
+            EnsureSection("computer", 2);
+            EnsureSection("network", 3);
+            EnsureSection("linux", 4);
+            EnsureSection("ssh", 5);
+            // The search box and the per-app folders belong above the pinned groups, so they default to
+            // negative orders and sort to the top for anyone whose settings predate them.
+            EnsureSection("search", -2);
+            EnsureSection("appdefaults", -1);
+            EnsureSection("recentapps", 6);
+            EnsureSection("quickactions", 7, defaultVisible: false);
+            NormalizeQuickActions();
+            if (SshProfiles == null) SshProfiles = new List<SshProfile>();
+            foreach (var sp in SshProfiles)
+            {
+                if (string.IsNullOrWhiteSpace(sp.Name)) sp.Name = sp.Hostname;
+                if (sp.Port <= 0) sp.Port = 22;
+                if (string.IsNullOrWhiteSpace(sp.RemotePath)) sp.RemotePath = "/";
+                if (string.IsNullOrWhiteSpace(sp.DriveLetter)) sp.DriveLetter = "S:";
+                if (sp.KeepAliveInterval <= 0) sp.KeepAliveInterval = 10;
+                if (sp.KeepAliveCountMax <= 0) sp.KeepAliveCountMax = 3;
+                var am = (sp.AuthMethod ?? "key").Trim().ToLowerInvariant();
+                sp.AuthMethod = am == "password" ? "password" : "key";
+            }
+            if (string.IsNullOrWhiteSpace(KeyboardNavHotkey)) KeyboardNavHotkey = "ctrl+shift+Q";
+            if (string.IsNullOrWhiteSpace(QuickSwitcherHotkey)) QuickSwitcherHotkey = DefaultQuickSwitcherHotkey;
+            var ras = (RecentAppsSource ?? "").Trim().ToLowerInvariant();
+            RecentAppsSource = (ras == "open" || ras == "dialogs") ? ras : "both";
+            if (RecentsMaxCount < 5) RecentsMaxCount = 5;
+            if (RecentsMaxCount > 50) RecentsMaxCount = 50;
+            if (SidebarWidthPx < 160) SidebarWidthPx = 160;
+            if (SidebarWidthPx > 400) SidebarWidthPx = 400;
+            if (string.IsNullOrWhiteSpace(GroupsPath)) GroupsPath = @"%APPDATA%\PowerPane\Groups";
+            var m = (Mode ?? "").Trim().ToLowerInvariant();
+            Mode = (m == "beside") ? "beside" : (m == "off") ? "off" : "inside"; // migrate old "inwindow" to "inside"
+            var dm = (DialogMode ?? "").Trim().ToLowerInvariant();
+            DialogMode = (dm == "beside") ? "beside" : (dm == "off") ? "off" : "same";
+            PaneColor = ThemeService.NormalizePaneColorName(PaneColor);
+            // Blank and whitespace both mean "Primary display" (MonitorPicker.PrimaryDisplayId);
+            // normalizing a stray blank to null keeps the field out of a saved settings.json
+            // (EmitDefaultValue = false above only skips an actual null).
+            if (string.IsNullOrWhiteSpace(DesktopDockDisplay)) DesktopDockDisplay = null;
+            // Only "right" is a real choice; left is the default, stored as null so it stays out of the file (#177).
+            DesktopDockEdge = string.Equals((DesktopDockEdge ?? "").Trim(), "right", StringComparison.OrdinalIgnoreCase) ? "right" : null;
+
+            // Profiles: migrate a pre-profiles settings file into one profile built from the top fields.
+            if (Profiles == null) Profiles = new List<Profile>();
+            if (Profiles.Count == 0)
+                Profiles.Add(new Profile { Name = "Profile 1", GroupsPath = GroupsPath, RecentsMaxCount = RecentsMaxCount, SidebarWidthPx = SidebarWidthPx });
+            foreach (var p in Profiles)
+            {
+                if (string.IsNullOrWhiteSpace(p.Name)) p.Name = "Profile";
+                if (string.IsNullOrWhiteSpace(p.GroupsPath)) p.GroupsPath = @"%APPDATA%\PowerPane\Groups";
+                if (p.RecentsMaxCount < 5) p.RecentsMaxCount = 5;
+                if (p.RecentsMaxCount > 50) p.RecentsMaxCount = 50;
+                if (p.SidebarWidthPx < 160) p.SidebarWidthPx = 160;
+                if (p.SidebarWidthPx > 400) p.SidebarWidthPx = 400;
+            }
+            if (ActiveProfileIndex < 0) ActiveProfileIndex = 0;
+            if (ActiveProfileIndex >= Profiles.Count) ActiveProfileIndex = Profiles.Count - 1;
+        }
+
+        private void EnsureSection(string type, int fallbackOrder)
+        {
+            EnsureSection(type, fallbackOrder, defaultVisible: true);
+        }
+
+        private void EnsureSection(string type, int fallbackOrder, bool defaultVisible)
+        {
+            if (!Sections.Exists(s => s.Type == type))
+                Sections.Add(new SectionSetting { Type = type, Visible = defaultVisible, Order = fallbackOrder });
+        }
+
+        /// <summary>Drops an id with no matching built-in (e.g. a removed action after a downgrade),
+        /// keeps only the first occurrence of a duplicate id, then appends every built-in missing from
+        /// the list so far -- at the end, in QuickActionLibrary's own order, and in the state its
+        /// definition asks for -- which is how a later release can add a new built-in action to the
+        /// Settings page of everyone already on an older settings.json, without adding it to their
+        /// pane.</summary>
+        private void NormalizeQuickActions()
+        {
+            NormalizeCustomCommands();
+
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var cleaned = new List<QuickActionSetting>();
+            if (QuickActions != null)
+            {
+                foreach (var a in QuickActions)
+                {
+                    if (a == null || string.IsNullOrEmpty(a.Id)) continue;
+                    if (QuickActionLibrary.Resolve(this, a.Id) == null) continue;
+                    if (!seen.Add(a.Id)) continue;
+                    cleaned.Add(a);
+                }
+            }
+            foreach (var def in QuickActionLibrary.All)
+                if (seen.Add(def.Id)) cleaned.Add(new QuickActionSetting { Id = def.Id, Enabled = def.DefaultEnabled });
+
+            // A command with no entry came from outside the Settings page, which always adds one. Off
+            // is the safe reading of that: nothing should start running because a file said so.
+            foreach (var command in CustomCommands)
+                if (seen.Add(command.Id)) cleaned.Add(new QuickActionSetting { Id = command.Id, Enabled = false });
+            QuickActions = cleaned;
+        }
+
+        /// <summary>Drops entries that could never run or be found again: a missing or foreign id, a
+        /// repeated id, or a blank template. A blank name falls back to the template, so the row is
+        /// never empty.</summary>
+        private void NormalizeCustomCommands()
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            var cleaned = new List<CustomCommand>();
+            if (CustomCommands != null)
+            {
+                foreach (var c in CustomCommands)
+                {
+                    if (c == null || !CustomCommandTemplate.IsCustomId(c.Id)) continue;
+                    if (string.IsNullOrWhiteSpace(c.Template) || !seen.Add(c.Id)) continue;
+                    if (string.IsNullOrWhiteSpace(c.Name)) c.Name = c.Template;
+                    cleaned.Add(c);
+                }
+            }
+            CustomCommands = cleaned;
+        }
+
+        /// <summary>Turns every custom command off. A restored backup calls this, because a settings
+        /// file can come from someone else, and its commands should not run until the user has read
+        /// them on the Quick actions page.</summary>
+        public void TurnOffCustomCommands()
+        {
+            if (QuickActions == null) return;
+            foreach (var a in QuickActions)
+                if (CustomCommandTemplate.IsCustomId(a.Id)) a.Enabled = false;
+        }
+    }
+}

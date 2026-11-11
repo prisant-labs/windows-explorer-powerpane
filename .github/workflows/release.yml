@@ -77,11 +77,11 @@ jobs:
       - name: Keep the packaged build
         uses: actions/upload-artifact@v7
         with:
-          name: QuickPane-release
+          name: PowerPane-release
           path: dist/
 
       # Covers every file SHA256SUMS.txt lists: the installer, the zip, and each file inside the zip. Anyone can then
-      # check a download with: gh attestation verify <file> -R prisant-labs/windows-explorer-quickpane
+      # check a download with: gh attestation verify <file> -R prisant-labs/windows-explorer-powerpane
       - name: Attest where the files came from
         if: github.ref_type == 'tag'
         uses: actions/attest-build-provenance@v4
@@ -97,7 +97,7 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
           REPO: ${{ github.repository }}
         run: |
-          $title = "QuickPane $env:VERSION (fork)"
+          $title = "PowerPane $env:VERSION (fork)"
           $assets = @((Get-ChildItem dist/*-setup.exe, dist/*.zip).FullName) + (Resolve-Path dist/SHA256SUMS.txt).Path
           # `release list` exits 0 whether or not the tag has a release, and it includes drafts.
           $all = gh release list -R $env:REPO --limit 1000 --json tagName,isDraft

@@ -40,5 +40,5 @@ jobs:
       - name: Keep the packaged build
         uses: actions/upload-artifact@v7
         with:
-          name: QuickPane-x64-Release
+          name: PowerPane-x64-Release
           path: dist/

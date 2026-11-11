@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Windows Performance Recorder profile for PowerPane's own trace events (PerfTrace.cs).
+  It records PowerPane's events together with CPU samples, context switches, and window
+  messages, so a stall shows which thread waited on which. See "Recording a performance trace"
+  in docs/DEVELOPMENT.md.
+
+  The provider is named by GUID because WPR accepts a GUID or a registered name, and an
+  EventSource is not registered. The GUID is derived from the name "PowerPane", and
+  PerfTraceTests.ProviderGuid_MatchesTheRecordingProfile fails if the two drift apart.
+-->
+<WindowsPerformanceRecorder Version="1.0" Author="PowerPane" Comments="PowerPane stall trace">
+  <Profiles>
+    <SystemCollector Id="SystemCollector_PowerPane" Name="NT Kernel Logger">
+      <BufferSize Value="1024" />
+      <Buffers Value="256" />
+    </SystemCollector>
+
+    <EventCollector Id="EventCollector_PowerPane" Name="PowerPane Event Collector">
+      <BufferSize Value="1024" />
+      <Buffers Value="64" />
+    </EventCollector>
+
+    <SystemProvider Id="SystemProvider_PowerPane">
+      <Keywords>
+        <Keyword Value="ProcessThread" />
+        <Keyword Value="Loader" />
+        <Keyword Value="SampledProfile" />
+        <Keyword Value="CSwitch" />
+        <Keyword Value="ReadyThread" />
+      </Keywords>
+      <Stacks>
+        <Stack Value="SampledProfile" />
+        <Stack Value="CSwitch" />
+        <Stack Value="ReadyThread" />
+      </Stacks>
+    </SystemProvider>
+
+    <EventProvider Id="EventProvider_PowerPane" Name="fc252778-1bf6-528a-95dd-a5d921cdc8e5" Level="5" />
+    <EventProvider Id="EventProvider_Win32k" Name="Microsoft-Windows-Win32k" NonPagedMemory="true" Level="4" />
+
+    <Profile Id="PowerPane.Verbose.File" Name="PowerPane" Description="PowerPane events with CPU, waits, and window messages" LoggingMode="File" DetailLevel="Verbose">
+      <Collectors>
+        <SystemCollectorId Value="SystemCollector_PowerPane">
+          <SystemProviderId Value="SystemProvider_PowerPane" />
+        </SystemCollectorId>
+        <EventCollectorId Value="EventCollector_PowerPane">
+          <EventProviders>
+            <EventProviderId Value="EventProvider_PowerPane" />
+            <EventProviderId Value="EventProvider_Win32k" />
+          </EventProviders>
+        </EventCollectorId>
+      </Collectors>
+    </Profile>
+  </Profiles>
+</WindowsPerformanceRecorder>
