@@ -370,9 +370,36 @@ namespace PowerPane.Models
             };
         }
 
+        /// <summary>The data folder's name before the rename to PowerPane. A settings file copied over
+        /// from QuickPane, and every backup it made, still names this folder in <c>groupsPath</c>.</summary>
+        internal const string FormerDataFolderName = "QuickPane";
+
+        /// <summary>Points a groups path inside QuickPane's old data folder at the same place inside
+        /// PowerPane's, and leaves every other path exactly as it is (rename decision D6). Without it, a
+        /// copied settings file or a restored old backup would keep reading %APPDATA%\QuickPane\Groups,
+        /// and once that folder is gone the pane looks empty. Both the stored form ("%APPDATA%\...") and
+        /// an expanded one under <paramref name="appData"/> count; a folder that merely starts with the
+        /// same letters, or a QuickPane folder anywhere else, is someone's own choice and stays.</summary>
+        internal static string MapFormerDataPath(string path, string appData)
+        {
+            if (string.IsNullOrEmpty(path)) return path;
+            foreach (var candidate in new[] { "%APPDATA%", appData })
+            {
+                if (string.IsNullOrEmpty(candidate)) continue;
+                var root = candidate.TrimEnd('\\', '/');
+                var oldPrefix = root + "\\" + FormerDataFolderName;
+                if (!path.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase)) continue;
+                if (path.Length > oldPrefix.Length && path[oldPrefix.Length] != '\\' && path[oldPrefix.Length] != '/') continue;
+                return path.Substring(0, root.Length) + "\\PowerPane" + path.Substring(oldPrefix.Length);
+            }
+            return path;
+        }
+
         /// <summary>Make sure all three sections exist exactly once, preserving stored order/visibility.</summary>
         public void Normalize()
         {
+            var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            GroupsPath = MapFormerDataPath(GroupsPath, appData);
             if (Sections == null) Sections = new List<SectionSetting>();
             EnsureSection("groups", 0);
             EnsureSection("recents", 1);
@@ -427,6 +454,7 @@ namespace PowerPane.Models
             foreach (var p in Profiles)
             {
                 if (string.IsNullOrWhiteSpace(p.Name)) p.Name = "Profile";
+                p.GroupsPath = MapFormerDataPath(p.GroupsPath, appData);
                 if (string.IsNullOrWhiteSpace(p.GroupsPath)) p.GroupsPath = @"%APPDATA%\PowerPane\Groups";
                 if (p.RecentsMaxCount < 5) p.RecentsMaxCount = 5;
                 if (p.RecentsMaxCount > 50) p.RecentsMaxCount = 50;
