@@ -1,6 +1,6 @@
 ; PowerPane one-click installer script for Inno Setup (https://jrsoftware.org/isinfo.php).
 ;
-; This produces a single PowerPane-<version>-x64-setup.exe. Because PowerPane is a user-mode app that
+; This produces a single PowerPane-<version>-x64-setup.exe, listed as "Explorer PowerPane". Because PowerPane is a user-mode app that
 ; only writes HKCU keys, the installer runs without administrator rights (PrivilegesRequired=lowest).
 ; It installs the executable, creates a Start menu shortcut and an optional desktop shortcut, registers
 ; the "Pin to PowerPane" folder verb, adds a startup entry, and launches the app. Uninstall preserves
@@ -18,20 +18,24 @@
 #ifndef MyAppVersion
   #define MyAppVersion GetVersionNumbersString(MyBinDir + "\PowerPane.exe")
 #endif
-#define MyAppName "PowerPane"
+; Two names, because MyAppName is what people see and MyAppFolder is where files go (rename decision D9):
+; the Add/Remove Programs entry and the Start menu shortcut say "Explorer PowerPane", while the program
+; folder, the setup file, and every other internal name stay plain "PowerPane".
+#define MyAppName "Explorer PowerPane"
+#define MyAppFolder "PowerPane"
 #define MyAppPublisher "Prisant Labs"
 #define MyAppURL "https://github.com/prisant-labs/windows-explorer-powerpane"
 #define MyAppExe "PowerPane.exe"
 
 [Setup]
-; Deliberately the same AppId as the original project's installer. Both install into the same folder
-; and write the same registry keys, so they are one product to Windows: running this installer over an
-; existing PowerPane upgrades that install and its Add/Remove Programs entry in place. A new AppId
-; would add a second entry, and uninstalling either one would remove the files both rely on.
-AppId={{A1C3E5F7-2B4D-6E8F-0A1C-3E5F7B9D1A2C}
+; A new AppId for the rename to PowerPane (rename decision D5). QuickPane's installers, this fork's and
+; the original project's, used {A1C3E5F7-2B4D-6E8F-0A1C-3E5F7B9D1A2C} and a different program folder,
+; so PowerPane is a separate product to Windows. PrepareToInstall below refuses to install while
+; QuickPane is still there, because the two would attach two panes to every Explorer window.
+AppId={{6EFF7253-4671-4EAB-AACF-28AAE07F0CA3}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
-; Without this, Inno Setup names the Add/Remove Programs entry "PowerPane version <version>".
+; Without this, Inno Setup names the Add/Remove Programs entry "Explorer PowerPane version <version>".
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
@@ -39,11 +43,11 @@ AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
 VersionInfoVersion={#MyAppVersion}
 UninstallDisplayIcon={app}\{#MyAppExe}
-DefaultDirName={localappdata}\{#MyAppName}
+DefaultDirName={localappdata}\{#MyAppFolder}
 DisableProgramGroupPage=yes
 DisableDirPage=yes
 PrivilegesRequired=lowest
-OutputBaseFilename={#MyAppName}-{#MyAppVersion}-x64-setup
+OutputBaseFilename={#MyAppFolder}-{#MyAppVersion}-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -72,7 +76,8 @@ Source: "LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversi
 ; PowerPane spends its life in the tray, so without a launcher here the only way back in after the app
 ; is closed is to run the installer again. The Start menu entry goes straight into {userprograms}
 ; rather than a program group, which is the same path the app repairs at every start, so the installer
-; and the app maintain one shortcut between them instead of two competing ones.
+; and the app maintain one shortcut between them instead of two competing ones. Its name, MyAppName,
+; must match ShortcutRepair.LinkName ("Explorer PowerPane.lnk").
 Name: "{userprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Comment: "PowerPane sidebar for File Explorer"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Comment: "PowerPane sidebar for File Explorer"; Tasks: desktopicon
 
@@ -104,11 +109,32 @@ Filename: "{app}\{#MyAppExe}"; Parameters: "--exit"; Flags: runhidden waituntilt
 [Code]
 { Same reasoning on the way in: an upgrade over a running copy has to stop it before the executable can
   be replaced, and Inno's own force-close would look like a crash to the watchdog. }
+
+{ QuickPane, the name before the rename, installed under its own AppId, folder, mutex, and exit signal,
+  so PowerPane cannot stop it or replace it. Both running would attach two panes to one Explorer window,
+  so setup stops until QuickPane is uninstalled. The uninstall key covers both installers that used the
+  old AppId; the Run value covers a copy installed by the zip's Install.ps1, which writes no uninstall key. }
+function QuickPaneInstalled: Boolean;
+var
+  Key: String;
+begin
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{A1C3E5F7-2B4D-6E8F-0A1C-3E5F7B9D1A2C}_is1';
+  Result := RegKeyExists(HKCU, Key) or RegKeyExists(HKLM, Key) or
+    RegValueExists(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', 'QuickPane');
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
   Exe: String;
 begin
+  if QuickPaneInstalled then
+  begin
+    Result := 'QuickPane is still installed. Explorer PowerPane replaces it, and the two cannot run ' +
+      'side by side. Uninstall QuickPane from Settings, Apps, then run this setup again. Uninstalling ' +
+      'QuickPane keeps your pins and settings in %APPDATA%\QuickPane.';
+    exit;
+  end;
   Result := '';
   Exe := ExpandConstant('{app}\{#MyAppExe}');
   if FileExists(Exe) then

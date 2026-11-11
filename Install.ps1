@@ -27,6 +27,14 @@ function Find-SourceExe {
     throw "Could not find $ExeName. Build the solution in Visual Studio first (Ctrl+Shift+B), or place $ExeName next to this script."
 }
 
+# QuickPane, the name before the rename, runs under its own mutex and exit signal, so both copies would
+# attach two panes to every Explorer window. Stop until it is removed, as the setup program does.
+$quickPaneRun = Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'QuickPane' -ErrorAction SilentlyContinue
+$quickPaneKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{A1C3E5F7-2B4D-6E8F-0A1C-3E5F7B9D1A2C}_is1'
+if ($quickPaneRun -or (Test-Path $quickPaneKey)) {
+    throw 'QuickPane is still installed. Uninstall it from Settings, Apps (or run its Uninstall.ps1), then run this script again. Your pins and settings in %APPDATA%\QuickPane are kept.'
+}
+
 Write-Host 'Installing PowerPane...' -ForegroundColor Cyan
 
 # 1. Stop any running instance so the file is not locked.
