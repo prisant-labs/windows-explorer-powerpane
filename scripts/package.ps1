@@ -78,7 +78,7 @@ if (-not $NoNotes) {
         $installSteps = @'
 ## Install
 
-Download `PowerPane-<version>-x64-setup.exe` and run it. It installs for the current user, with no administrator rights. Over an existing PowerPane, including one installed by the original project's installer, it closes PowerPane, replaces the program, and updates the same Add/Remove Programs entry. Your settings, groups, and pins in `%APPDATA%\PowerPane` stay where they are.
+Download `PowerPane-<version>-x64-setup.exe` and run it. It installs for the current user, with no administrator rights. Over an existing PowerPane, it closes PowerPane, replaces the program, and updates the same Add/Remove Programs entry. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first. Your settings, groups, and pins in `%APPDATA%\PowerPane` stay where they are.
 
 The zip holds the same program, for replacing the files by hand instead:
 

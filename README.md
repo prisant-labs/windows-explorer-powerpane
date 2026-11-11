@@ -1,4 +1,4 @@
-# PowerPane
+# Explorer PowerPane
 
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6.svg?logo=windows&logoColor=white)
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4.svg?logo=dotnet&logoColor=white)
@@ -7,9 +7,9 @@
 ![Version](https://img.shields.io/github/v/release/prisant-labs/windows-explorer-powerpane?label=Version&color=success)
 ![License](https://img.shields.io/badge/License-MIT-orange.svg)
 
-> **About this fork.** This is a fork of [lso2/QuickPane](https://github.com/lso2/QuickPane). It adds fixes that were first reported upstream as issues, plus unit tests and CI. Fork versions carry a fourth number (for example 3.10.0.1), and [CHANGELOG.md](CHANGELOG.md) lists what each one changes. To build from source, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). The in-app update notice checks this fork's releases, not upstream's. Everything below this note is upstream's README.
+> **Based on QuickPane.** Explorer PowerPane began in October 2026 as a fork of [QuickPane by lso2](https://github.com/lso2/QuickPane) (PlexPixel), released under the MIT license, and its releases from 3.10.0.2 to 3.13.0.1 were published as "QuickPane (fork)". Version 4.0.0.0 renamed it; [Moving from QuickPane](#moving-from-quickpane) describes the switch. Versions carry four numbers, and [CHANGELOG.md](CHANGELOG.md) lists what each one changes. To build from source, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). The sections below began as the original project's README.
 >
-> **What this fork adds.** Each item links to the release notes for the published release that first shipped it. Downloads are on the [Releases](https://github.com/prisant-labs/windows-explorer-powerpane/releases) page.
+> **What changed since QuickPane.** Each item links to the release notes for the published release that first shipped it. Downloads are on the [Releases](https://github.com/prisant-labs/windows-explorer-powerpane/releases) page.
 >
 > - **Windows 11 tabs:** every tab in an Explorer window makes room for the pane, including tabs opened later, so the pane no longer covers Explorer's sidebar or hides under a tab. [3.10.0.2](docs/releases/3.10.0.2.md) ([#4](https://github.com/prisant-labs/windows-explorer-powerpane/issues/4), [lso2/QuickPane#3](https://github.com/lso2/QuickPane/issues/3))
 > - **Add to a tab:** a tab's right-click menu has "Add folder..." and "Add file...", and the pin lands in that tab. [3.10.0.2](docs/releases/3.10.0.2.md) ([lso2/QuickPane#1](https://github.com/lso2/QuickPane/issues/1))
@@ -18,10 +18,10 @@
 > - **File dialogs setting:** the pane in Open and Save dialogs can follow Explorer windows, sit beside the dialog, or stay off. [3.10.0.2](docs/releases/3.10.0.2.md)
 > - **Browse in "Edit path":** the "Edit path" prompt has a "Browse..." button that opens a picker at the pin's current location. [3.10.0.2](docs/releases/3.10.0.2.md)
 > - **Modern folder picker:** choosing a folder opens the Explorer-style picker instead of the old "Browse For Folder" tree. [3.10.0.2](docs/releases/3.10.0.2.md) ([lso2/QuickPane#2](https://github.com/lso2/QuickPane/issues/2))
-> - **Update notice follows this fork:** the Settings footer checks this fork's releases and shows the full four-part version. [3.10.0.2](docs/releases/3.10.0.2.md) ([#2](https://github.com/prisant-labs/windows-explorer-powerpane/pull/2))
+> - **Update notice follows this project:** the Settings footer checks this project's releases and shows the full four-part version. [3.10.0.2](docs/releases/3.10.0.2.md) ([#2](https://github.com/prisant-labs/windows-explorer-powerpane/pull/2))
 > - **Tested, verifiable builds:** unit tests and a build on every pull request, and releases built from the tagged commit with checksums and a provenance attestation. [3.10.0.2](docs/releases/3.10.0.2.md)
-> - **Installer:** each release includes a per-user installer that upgrades an existing PowerPane in place, so Add/Remove Programs keeps one entry with the right version. [3.10.0.3](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.3) ([#15](https://github.com/prisant-labs/windows-explorer-powerpane/issues/15))
-> - **No donation button:** the "Buy me a coffee" button is gone, because it funded the original author rather than this fork, and Add/Remove Programs names the app "PowerPane <version>". [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#18](https://github.com/prisant-labs/windows-explorer-powerpane/issues/18))
+> - **Installer:** each release includes a per-user installer that upgrades an existing install in place, so Add/Remove Programs keeps one entry with the right version. [3.10.0.3](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.3) ([#15](https://github.com/prisant-labs/windows-explorer-powerpane/issues/15))
+> - **No donation button:** the "Buy me a coffee" button is gone, because it funded the original author rather than this project, and Add/Remove Programs names the app "Explorer PowerPane <version>". [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#18](https://github.com/prisant-labs/windows-explorer-powerpane/issues/18))
 > - **Windows accent color:** the active tab, the drop line, and accent-colored Settings controls follow the accent chosen in Windows, including changes made while PowerPane runs. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#20](https://github.com/prisant-labs/windows-explorer-powerpane/issues/20))
 > - **Contrast themes:** with a Windows contrast theme on, the pane and Settings take its colors, and switch back when it is turned off. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#30](https://github.com/prisant-labs/windows-explorer-powerpane/issues/30))
 > - **Settings for screen readers:** every Settings control is reachable by accessibility tools, and icon buttons carry names that say what they do. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#28](https://github.com/prisant-labs/windows-explorer-powerpane/issues/28))
@@ -176,7 +176,7 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 
 ## Requirements
 
-- **Windows 11 or Windows 10**, 64-bit. This fork is developed and tested on Windows 11, including in Windows Sandbox. Windows 10 is expected to work, but the fork does not test it regularly. See [Compatibility](#compatibility).
+- **Windows 11 or Windows 10**, 64-bit. PowerPane is developed and tested on Windows 11, including in Windows Sandbox. Windows 10 is expected to work, but it is not tested regularly. See [Compatibility](#compatibility).
 - **.NET Framework 4.8** runtime (preinstalled on current Windows)
 - To build from source: **Visual Studio 2019/2022** with the .NET Framework 4.8 targeting pack
 - To build the installer: **[Inno Setup](https://jrsoftware.org/isinfo.php)** 6+
@@ -186,8 +186,20 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 ### Option A: Run a release build
 
 1. Download the latest `PowerPane-<version>-x64-setup.exe` from the [Releases page](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest) (or build it yourself below)
-2. Run the installer. It installs per-user with no administrator rights, registers the **Pin to PowerPane** folder verb, adds a startup entry, and launches PowerPane. Over an existing PowerPane, it upgrades that install in place
+2. Run the installer. It installs per-user with no administrator rights, registers the **Pin to PowerPane** folder verb, adds a startup entry, and launches PowerPane. Over an existing PowerPane, it upgrades that install in place. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first
 3. Open any Explorer window and the pane appears inside it
+
+### Moving from QuickPane
+
+QuickPane and Explorer PowerPane are separate installs, with their own program and data folders, and they must not run together. To move your groups, pins, and settings across:
+
+1. Copy `%APPDATA%\QuickPane` somewhere safe, as a backup
+2. Uninstall QuickPane from Settings, Apps. Its data folder stays
+3. Install Explorer PowerPane, and untick "Launch PowerPane" on the installer's last page
+4. In PowerShell, run `robocopy "$env:APPDATA\QuickPane" "$env:APPDATA\PowerPane" /E`
+5. Start Explorer PowerPane from the Start menu
+
+The copied settings still name `%APPDATA%\QuickPane\Groups`, and PowerPane reads any path inside the old data folder as the same place inside `%APPDATA%\PowerPane`. Backups made by QuickPane restore the same way. The [4.0.0.0 release notes](docs/releases/4.0.0.0.md) have the details and the way back.
 
 ### Option B: Build from source
 
@@ -289,7 +301,7 @@ Groups are stored as ordinary folders: a **group** is a folder under `Groups\`, 
 
 PowerPane makes one network request of its own, an update check:
 
-- **What it sends**: an HTTPS GET to `api.github.com` for this fork's latest release, with the header `User-Agent: PowerPane/<version>`. Like any web request, it shows GitHub your IP address. It sends nothing else.
+- **What it sends**: an HTTPS GET to `api.github.com` for the latest release of `prisant-labs/windows-explorer-powerpane`, with the header `User-Agent: PowerPane/<version>`. Like any web request, it shows GitHub your IP address. It sends nothing else.
 - **When it runs**: at most once a day, a few minutes after PowerPane starts, and also when you open the About page in Settings or press "Check for updates" there. To stop the daily check, turn off "Check for updates automatically" on the About page. Opening About still checks.
 - **What it does with the answer**: when a newer version exists, it shows one notice per version, adds an item to the tray menu, and puts a dot on About in Settings. It never downloads or installs anything. The notice opens the release page in your browser.
 
@@ -330,7 +342,7 @@ Two other features reach the network only when you use them:
 | OS | Supported | Notes |
 |----|-----------|-------|
 | Windows 11 x64 | ✅ | Developed and tested on, including in Windows Sandbox |
-| Windows 10 x64 (incl. LTSC) | ✅ | Expected to work. The original project was developed on Windows 10 LTSC, but this fork does not test Windows 10 regularly. Windows 11-only features, such as tabs, are skipped there. |
+| Windows 10 x64 (incl. LTSC) | ✅ | Expected to work. The original project was developed on Windows 10 LTSC, but PowerPane does not test Windows 10 regularly. Windows 11-only features, such as tabs, are skipped there. |
 | Windows 11 on Arm | ⚠️ | The installer accepts it from 3.13.0.0, and Windows runs the x64 build through emulation. Nobody has run PowerPane on an Arm computer yet. |
 | Windows 8.1 and Windows 7 | ❌ | Not supported. Both are past Microsoft's end of support, and the Explorer window classes differ. |
 | macOS / Linux | ❌ | Windows-only (Win32 + WPF) |
@@ -442,7 +454,7 @@ PowerPane/
 
 ## License
 
-MIT, see the [LICENSE](LICENSE) file for details.
+MIT, see the [LICENSE](LICENSE) file for details. The license keeps the original project's copyright notice, as MIT requires.
 
 ### Third-party code
 

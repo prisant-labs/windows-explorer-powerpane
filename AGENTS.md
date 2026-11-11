@@ -4,7 +4,7 @@ This file is for AI coding agents working in this repository, such as Claude Cod
 
 ## What this repository is
 
-PowerPane is a Windows tray app in C# 7.3, .NET Framework 4.8, and WPF, built for x64 only. It embeds a pinned-folders pane inside File Explorer windows and Open/Save dialogs. This repository is a fork of `lso2/QuickPane`: the `upstream` remote is the original, and `origin` is the fork.
+PowerPane is a Windows tray app in C# 7.3, .NET Framework 4.8, and WPF, built for x64 only. It embeds a pinned-folders pane inside File Explorer windows and Open/Save dialogs. The app is listed as Explorer PowerPane and called PowerPane inside Explorer. It began as a fork of `lso2/QuickPane` and was renamed in 4.0.0.0; `LICENSE`, the About page's credit line, and `lso2/QuickPane` citations keep the old name on purpose.
 
 ## Commands
 
@@ -42,10 +42,10 @@ A change is not done until the build succeeds with no errors and every test pass
 ## How to make a change
 
 1. Read the code around the change, and match its naming, idioms, and comment style. Comments explain why, often citing the bug that forced a choice.
-2. Keep one change per commit, so it can be cherry-picked onto a branch cut from `upstream/main`.
+2. Keep one change per commit, so it can be reviewed and reverted on its own.
 3. Put testable decisions in `internal static` methods, and cover them in `tests/PowerPane.Tests`.
 4. Run `scripts/test.ps1` before each commit.
-5. Record user-visible changes in `CHANGELOG.md` under the next fork version.
+5. Record user-visible changes in `CHANGELOG.md` under the next version.
 
 ## Where things are
 
