@@ -24,7 +24,7 @@ namespace PowerPane.Tests
         public void TryParseTag_VersionBuriedInInstallerName_Parses()
         {
             Version v;
-            bool ok = UpdateService.TryParseTag("PowerPaneSetup-3.7.0-release", out v);
+            bool ok = UpdateService.TryParseTag("QuickPaneSetup-3.7.0-release", out v);
 
             Assert.That(ok, Is.True);
             Assert.That(v, Is.EqualTo(new Version(3, 7, 0)));
