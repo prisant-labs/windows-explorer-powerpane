@@ -22,12 +22,14 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "3.13.0.1";
+        public const string Version = "4.0.0.0";
 
         public static readonly Item[] Items =
         {
-            new Item("Pins in PowerPane's pickers",
-                "Browse, Add folder, and PowerPane's other pickers list your pins in their own navigation pane, so nothing trails behind when you move or resize them."),
+            new Item("QuickPane is now Explorer PowerPane",
+                "A new name, with its own program and data folders. Settings and backups copied from QuickPane find your pins in the new folder."),
+            new Item("\"Remove pin\"",
+                "A pin's menu says \"Remove pin\" instead of \"Remove Shortcut\", the word the rest of the app uses."),
         };
     }
 }

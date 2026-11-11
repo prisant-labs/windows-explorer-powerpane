@@ -44,7 +44,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+\.\d+)$') {
-              throw "Tag $env:TAG is not v<major>.<minor>.<patch>.<fork>, such as v3.10.0.3."
+              throw "Tag $env:TAG is not v<major>.<minor>.<patch>.<revision>, such as v4.0.0.1."
           }
           $version = $Matches[1]
           git merge-base --is-ancestor HEAD origin/main
@@ -97,7 +97,7 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
           REPO: ${{ github.repository }}
         run: |
-          $title = "PowerPane $env:VERSION (fork)"
+          $title = "Explorer PowerPane $env:VERSION"
           $assets = @((Get-ChildItem dist/*-setup.exe, dist/*.zip).FullName) + (Resolve-Path dist/SHA256SUMS.txt).Path
           # `release list` exits 0 whether or not the tag has a release, and it includes drafts.
           $all = gh release list -R $env:REPO --limit 1000 --json tagName,isDraft
