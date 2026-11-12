@@ -117,7 +117,11 @@ namespace PowerPane.Explorer
             };
             _sweep.Start();
 
-            if (App.Settings != null) App.Settings.Changed += OnSettings;
+            if (App.Settings != null)
+            {
+                App.Settings.Changed += OnSettings;
+                App.Settings.WidthChangedLive += OnWidthLive;
+            }
 
             Log.Info("DialogPaneWatcher started. mode=" + _mode);
             Rescan();
@@ -149,10 +153,40 @@ namespace PowerPane.Explorer
         private void OnSettings(object sender, EventArgs e)
         {
             string m = CurrentMode();
-            if (m == _mode) return; // width and other changes are handled by the panes themselves
+            if (m == _mode)
+            {
+                // A saved width reaches the inside panes here, once, at the end of a grip drag or from
+                // Settings. They read the width only when they attached, so a drag in one dialog used
+                // to resize every Explorer window's pane but not the dialog's own (#239).
+                ApplyWidth();
+                return;
+            }
             _mode = m;
             TeardownAll();          // the next sweep rebuilds every open dialog under the new mode
             Rescan();
+        }
+
+        private void ApplyWidth()
+        {
+            int w = WidthPx(IntPtr.Zero);
+            foreach (var kv in new List<KeyValuePair<IntPtr, DialogInsidePane>>(_inside))
+            {
+                kv.Value.SetWidth(w);
+                if (kv.Value.Failed) DemoteToBeside(kv.Key);
+            }
+            PositionAllBeside();
+        }
+
+        /// <summary>A beside pane is PowerPane's own window and moving it disturbs nothing, so it follows
+        /// the grip live, as the Explorer follower panes do.</summary>
+        private void OnWidthLive(object sender, EventArgs e)
+        {
+            PositionAllBeside();
+        }
+
+        private void PositionAllBeside()
+        {
+            foreach (var kv in new List<KeyValuePair<IntPtr, FollowerPane>>(_beside)) PositionBeside(kv.Key, kv.Value);
         }
 
         private bool IsOwnPane(IntPtr h)
@@ -484,7 +518,11 @@ namespace PowerPane.Explorer
         public void Dispose()
         {
             try { _sweep?.Stop(); } catch { }
-            if (App.Settings != null) App.Settings.Changed -= OnSettings;
+            if (App.Settings != null)
+            {
+                App.Settings.Changed -= OnSettings;
+                App.Settings.WidthChangedLive -= OnWidthLive;
+            }
             try { _life?.Dispose(); } catch { }
             try { _loc?.Dispose(); } catch { }
             try { _fg?.Dispose(); } catch { }

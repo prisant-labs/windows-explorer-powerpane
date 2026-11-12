@@ -309,6 +309,8 @@ namespace PowerPane.Interop
         public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
 
         public const uint GW_HWNDPREV = 3;
+        public const uint GW_HWNDNEXT = 2;
+        public const uint GW_CHILD = 5;
 
         // Batched moves avoid intermediate repaints, which is the main flicker source.
         [DllImport("user32.dll", SetLastError = true)]

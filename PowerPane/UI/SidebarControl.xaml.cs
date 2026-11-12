@@ -689,6 +689,8 @@ namespace PowerPane.UI
         private int _resizeStartPx;
         private double _resizeAccum;
         private bool _resizeFromLeft;
+        private int _resizeStartCursorX;
+        private bool _resizeByCursor;
 
         /// <summary>Place the resize grip on the left edge (used in beside mode, where the right edge is
         /// held flush against the Explorer window, and on a right-edge dock, #184). Dragging the left
@@ -742,11 +744,32 @@ namespace PowerPane.UI
         {
             _resizeStartPx = App.Settings != null ? App.Settings.Current.SidebarWidthPx : 220;
             _resizeAccum = 0;
+            PowerPane.Interop.NativeMethods.POINT pt;
+            _resizeByCursor = PowerPane.Interop.NativeMethods.GetCursorPos(out pt);
+            _resizeStartCursorX = pt.X;
+        }
+
+        /// <summary>The width a grip drag asks for, from how far the cursor has moved on screen since the
+        /// drag began. Screen pixels are device pixels, the unit the width setting is kept in.</summary>
+        internal static int WidthFromCursor(int startPx, int startCursorX, int cursorX, bool fromLeft)
+        {
+            return startPx + ResizeSign(fromLeft) * (cursorX - startCursorX);
         }
 
         private void OnResizeDelta(object sender, DragDeltaEventArgs e)
         {
             if (App.Settings == null) return;
+            // The width comes from the cursor, not from the thumb's reports. A Thumb reports each move
+            // relative to where the thumb began, which is a small step only while the pane widens under
+            // the mouse. A pane inside a file dialog takes the new width when the drag ends, so its thumb
+            // stays put, every report repeats the whole distance so far, and adding them up sent the
+            // width to its limit within a few pixels of movement (#239).
+            PowerPane.Interop.NativeMethods.POINT pt;
+            if (_resizeByCursor && PowerPane.Interop.NativeMethods.GetCursorPos(out pt))
+            {
+                App.Settings.NotifyWidthLive(WidthFromCursor(_resizeStartPx, _resizeStartCursorX, pt.X, _resizeFromLeft));
+                return;
+            }
             _resizeAccum += e.HorizontalChange;
             double scale = 1.0;
             try { scale = VisualTreeHelper.GetDpi(this).DpiScaleX; } catch { }

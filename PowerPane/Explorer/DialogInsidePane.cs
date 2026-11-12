@@ -252,6 +252,48 @@ namespace PowerPane.Explorer
                 NM.SetWindowPos(kv.Key, IntPtr.Zero, tx, ty, r.Width, r.Height,
                     NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
             }
+            FitOverhangs();
+        }
+
+        /// <summary>Bring back inside its parent any control one level below a shifted control that now
+        /// sticks out past that control's right edge.
+        ///
+        /// Widening the dialog makes it lay out its top bar for the wider size, and the shift then gives
+        /// the bar's container back its own width. The band container inside it keeps the wider size,
+        /// so its last band, the search box, sat past the container's edge and was clipped away (#238).
+        /// The dialog never sizes that band container again on its own, so resizing it here is what makes
+        /// it lay its bands out for the width they now have. Only visible controls that begin inside
+        /// their parent are touched, and one that already fits is left alone, so a pass that changes
+        /// nothing moves nothing.</summary>
+        private void FitOverhangs()
+        {
+            foreach (var parent in _orig.Keys)
+            {
+                if (!NM.IsWindow(parent) || !NM.IsWindowVisible(parent)) continue;
+                NM.RECT pr;
+                if (!NM.GetWindowRect(parent, out pr)) continue;
+                for (var c = NM.GetWindow(parent, NM.GW_CHILD); c != IntPtr.Zero; c = NM.GetWindow(c, NM.GW_HWNDNEXT))
+                {
+                    if (!NM.IsWindowVisible(c)) continue;
+                    NM.RECT cr;
+                    if (!NM.GetWindowRect(c, out cr)) continue;
+                    int fitted = FittedWidth(cr.Left, cr.Right, pr.Left, pr.Right);
+                    if (fitted == cr.Width) continue;
+                    NM.SetWindowPos(c, IntPtr.Zero, 0, 0, fitted, cr.Height,
+                        NM.SWP_NOMOVE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                }
+            }
+        }
+
+        /// <summary>The width a child spanning childLeft to childRight should have to end at its parent's
+        /// right edge, in screen pixels. A child that already fits keeps its width, and one that starts
+        /// outside the parent is not the overhang this fixes, so it keeps its width too.</summary>
+        internal static int FittedWidth(int childLeft, int childRight, int parentLeft, int parentRight)
+        {
+            int width = childRight - childLeft;
+            if (childRight <= parentRight) return width;
+            if (childLeft < parentLeft || childLeft >= parentRight) return width;
+            return parentRight - childLeft;
         }
 
         /// <summary>Reapply the shift and keep the pane full height. The dialog is widened once at attach
@@ -472,6 +514,55 @@ namespace PowerPane.Explorer
             Log.Info("dialog " + _dlg.ToString("X") + " resized itself to " + wr.Width + "x" + wr.Height +
                 ", too narrow to share; it was widened for the inside pane.");
             return true;
+        }
+
+        /// <summary>Take a new pane width, set by the pane's grip or by Settings. The dialog keeps its
+        /// outer size and its content gives up or takes back the difference, the way FitInside fits the
+        /// pane after a resize. The watcher calls this when the width is saved, at the end of a grip
+        /// drag, not on every pixel: moving another process's controls that often is what fought
+        /// dialogs before (#103). A width that would leave the content narrower than MinContentPx is
+        /// cut down to what fits, and a dialog that will not shrink keeps the old width (#239).</summary>
+        public void SetWidth(int widthPx)
+        {
+            int w = ClampWidth(widthPx);
+            if (!_attached || _disposed || _host == null || !NM.IsWindow(_dlg)) return;
+            if (_userSizing) { _width = w; return; } // EndUserResize fits the pane at this width
+
+            NM.RECT wr;
+            if (!NM.GetWindowRect(_dlg, out wr)) return;
+            int minContent = MinContentPx * NM.DpiForWindow(_dlg) / 96;
+            w = FitWidth(w, wr.Width, minContent);
+            if (w == _width) return;
+
+            int old = _width;
+            _width = w;
+            if (FitInside(wr))
+            {
+                _attachTick = Environment.TickCount; // controls placed late settle as they do after attach
+                Log.Info("dialog " + _dlg.ToString("X") + " inside pane width " + old + " -> " + w + ".");
+                return;
+            }
+
+            // FitInside left the dialog at its size and the captured positions alone, so shifting by
+            // the old width again puts every control back where it was.
+            _width = old;
+            _applying = true;
+            try { ShiftChildren(); }
+            finally { _applying = false; }
+            Repaint();
+            Log.Info("dialog " + _dlg.ToString("X") + " would not shrink for a " + w +
+                "px inside pane, so it keeps " + old + "px.");
+        }
+
+        /// <summary>The pane width a dialog of a given outer width can give: the requested width, cut
+        /// down so the content keeps at least minContent, and never below the pane's own minimum of
+        /// 160. Returns the request unchanged when it already fits.</summary>
+        internal static int FitWidth(int requested, int dialogWidth, int minContent)
+        {
+            int w = ClampWidth(requested);
+            int room = dialogWidth - minContent;
+            if (w > room) w = room;
+            return w < 160 ? 160 : w;
         }
 
         /// <summary>The user started dragging the dialog's border. The dialog lays its controls out at
