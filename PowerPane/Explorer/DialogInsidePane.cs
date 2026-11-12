@@ -516,6 +516,55 @@ namespace PowerPane.Explorer
             return true;
         }
 
+        /// <summary>Take a new pane width, set by the pane's grip or by Settings. The dialog keeps its
+        /// outer size and its content gives up or takes back the difference, the way FitInside fits the
+        /// pane after a resize. The watcher calls this when the width is saved, at the end of a grip
+        /// drag, not on every pixel: moving another process's controls that often is what fought
+        /// dialogs before (#103). A width that would leave the content narrower than MinContentPx is
+        /// cut down to what fits, and a dialog that will not shrink keeps the old width (#239).</summary>
+        public void SetWidth(int widthPx)
+        {
+            int w = ClampWidth(widthPx);
+            if (!_attached || _disposed || _host == null || !NM.IsWindow(_dlg)) return;
+            if (_userSizing) { _width = w; return; } // EndUserResize fits the pane at this width
+
+            NM.RECT wr;
+            if (!NM.GetWindowRect(_dlg, out wr)) return;
+            int minContent = MinContentPx * NM.DpiForWindow(_dlg) / 96;
+            w = FitWidth(w, wr.Width, minContent);
+            if (w == _width) return;
+
+            int old = _width;
+            _width = w;
+            if (FitInside(wr))
+            {
+                _attachTick = Environment.TickCount; // controls placed late settle as they do after attach
+                Log.Info("dialog " + _dlg.ToString("X") + " inside pane width " + old + " -> " + w + ".");
+                return;
+            }
+
+            // FitInside left the dialog at its size and the captured positions alone, so shifting by
+            // the old width again puts every control back where it was.
+            _width = old;
+            _applying = true;
+            try { ShiftChildren(); }
+            finally { _applying = false; }
+            Repaint();
+            Log.Info("dialog " + _dlg.ToString("X") + " would not shrink for a " + w +
+                "px inside pane, so it keeps " + old + "px.");
+        }
+
+        /// <summary>The pane width a dialog of a given outer width can give: the requested width, cut
+        /// down so the content keeps at least minContent, and never below the pane's own minimum of
+        /// 160. Returns the request unchanged when it already fits.</summary>
+        internal static int FitWidth(int requested, int dialogWidth, int minContent)
+        {
+            int w = ClampWidth(requested);
+            int room = dialogWidth - minContent;
+            if (w > room) w = room;
+            return w < 160 ? 160 : w;
+        }
+
         /// <summary>The user started dragging the dialog's border. The dialog lays its controls out at
         /// every step, which used to read as the dialog fighting the shift and sent the dialog, and every
         /// later dialog of its app, beside (#103). The pane hides and the dialog is left to lay itself out

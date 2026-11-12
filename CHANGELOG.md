@@ -4,6 +4,7 @@
 
 ### Fixed
 - An Open, Save As, or Select Folder dialog with the pane inside keeps its search box. Making room for the pane pushed the search box past the dialog's right edge, where it was cut off ([#238](https://github.com/prisant-labs/windows-explorer-powerpane/issues/238)).
+- Dragging the pane's width grip inside a file dialog resizes that dialog's pane when the drag ends. It used to resize every Explorer window's pane but not the dialog's own. The dialog keeps its size, and its content gives up or takes back the difference. A pane beside a dialog follows the grip as it moves ([#239](https://github.com/prisant-labs/windows-explorer-powerpane/issues/239)).
 
 ## [4.0.0.0] - 2026-11-11
 
