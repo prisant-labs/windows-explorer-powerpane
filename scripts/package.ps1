@@ -1,11 +1,11 @@
-# Packages a built QuickPane for release: the installer QuickPane-<version>-x64-setup.exe, built
-# from Installer.iss with Inno Setup 6; QuickPane-<version>-x64.zip holding the program and its
+# Packages a built PowerPane for release: the installer PowerPane-<version>-x64-setup.exe, built
+# from Installer.iss with Inno Setup 6; PowerPane-<version>-x64.zip holding the program and its
 # license; SHA256SUMS.txt for both and for each file in the zip; and notes.md for the release page.
 # CI runs it on every build, so packaging is proven before anyone pushes a tag; the release
 # workflow runs it on the tagged commit. Run scripts/build.ps1 first.
 #
 # Usage:  pwsh -File scripts/package.ps1 [-Version 3.10.0.3] [-Configuration Release] [-OutDir dist] [-NoNotes] [-NoInstaller]
-# Output: <OutDir>\QuickPane-<version>-x64-setup.exe unless -NoInstaller, QuickPane-<version>-x64.zip,
+# Output: <OutDir>\PowerPane-<version>-x64-setup.exe unless -NoInstaller, PowerPane-<version>-x64.zip,
 #         SHA256SUMS.txt, and notes.md unless -NoNotes
 param(
     [string]$Version,
@@ -16,9 +16,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$bin = Join-Path $repo "QuickPane\bin\x64\$Configuration"
-$exe = Join-Path $bin 'QuickPane.exe'
-$config = Join-Path $bin 'QuickPane.exe.config'
+$bin = Join-Path $repo "PowerPane\bin\x64\$Configuration"
+$exe = Join-Path $bin 'PowerPane.exe'
+$config = Join-Path $bin 'PowerPane.exe.config'
 $license = Join-Path $repo 'LICENSE'
 foreach ($f in $exe, $config) {
     if (-not (Test-Path $f)) { throw "Missing $f. Run scripts/build.ps1 -Configuration $Configuration first." }
@@ -29,14 +29,14 @@ foreach ($f in $exe, $config) {
 # to the in-app update check.
 $built = (Get-Item $exe).VersionInfo.FileVersion
 if (-not $Version) { $Version = $built }
-if ($built -ne $Version) { throw "Built version is $built, expected $Version. Bump QuickPane\Properties\AssemblyInfo.cs." }
+if ($built -ne $Version) { throw "Built version is $built, expected $Version. Bump PowerPane\Properties\AssemblyInfo.cs." }
 
 if (-not [System.IO.Path]::IsPathRooted($OutDir)) { $OutDir = Join-Path $repo $OutDir }
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 
 # LICENSE ships inside the zip because MIT requires the copyright notice to travel with copies.
-$zip = Join-Path $OutDir "QuickPane-$Version-x64.zip"
+$zip = Join-Path $OutDir "PowerPane-$Version-x64.zip"
 Compress-Archive -Path $exe, $config, $license -DestinationPath $zip
 
 $packaged = @($exe, $config, $license, $zip)
@@ -51,7 +51,7 @@ if (-not $NoInstaller) {
     # configuration, rather than whatever Installer.iss would find on its own.
     & $iscc /Qp "/DMyAppVersion=$Version" "/DMyBinDir=$bin" "/O$OutDir" (Join-Path $repo 'Installer.iss')
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
-    $setup = Join-Path $OutDir "QuickPane-$Version-x64-setup.exe"
+    $setup = Join-Path $OutDir "PowerPane-$Version-x64-setup.exe"
     if (-not (Test-Path $setup)) { throw "Inno Setup did not produce $setup." }
     $packaged += $setup
 }
@@ -78,16 +78,16 @@ if (-not $NoNotes) {
         $installSteps = @'
 ## Install
 
-Download `QuickPane-<version>-x64-setup.exe` and run it. It installs for the current user, with no administrator rights. Over an existing QuickPane, including one installed by the original project's installer, it closes QuickPane, replaces the program, and updates the same Add/Remove Programs entry. Your settings, groups, and pins in `%APPDATA%\QuickPane` stay where they are.
+Download `PowerPane-<version>-x64-setup.exe` and run it. It installs for the current user, with no administrator rights. Over an existing PowerPane, it closes PowerPane, replaces the program, and updates the same Add/Remove Programs entry. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first. Your settings, groups, and pins in `%APPDATA%\PowerPane` stay where they are.
 
 The zip holds the same program, for replacing the files by hand instead:
 
-1. Close QuickPane, and wait for it to finish: `Start-Process "$env:LOCALAPPDATA\QuickPane\QuickPane.exe" -ArgumentList '--exit' -Wait`
-2. Keep a copy of the current `QuickPane.exe` in `%LOCALAPPDATA%\QuickPane`, so you can go back.
-3. Unzip the download, and copy `QuickPane.exe` and `QuickPane.exe.config` into `%LOCALAPPDATA%\QuickPane`, replacing the files there.
-4. Start `%LOCALAPPDATA%\QuickPane\QuickPane.exe` again.
+1. Close PowerPane, and wait for it to finish: `Start-Process "$env:LOCALAPPDATA\PowerPane\PowerPane.exe" -ArgumentList '--exit' -Wait`
+2. Keep a copy of the current `PowerPane.exe` in `%LOCALAPPDATA%\PowerPane`, so you can go back.
+3. Unzip the download, and copy `PowerPane.exe` and `PowerPane.exe.config` into `%LOCALAPPDATA%\PowerPane`, replacing the files there.
+4. Start `%LOCALAPPDATA%\PowerPane\PowerPane.exe` again.
 
-`SHA256SUMS.txt` lists the SHA-256 hash of the installer, the zip, and each file inside the zip. The files are not code-signed, so Windows SmartScreen may warn before the installer first runs. This release also carries a GitHub build provenance attestation, which `gh attestation verify <file> -R prisant-labs/windows-explorer-quickpane` checks.
+`SHA256SUMS.txt` lists the SHA-256 hash of the installer, the zip, and each file inside the zip. The files are not code-signed, so Windows SmartScreen may warn before the installer first runs. This release also carries a GitHub build provenance attestation, which `gh attestation verify <file> -R prisant-labs/windows-explorer-powerpane` checks.
 '@
         $installSteps = $installSteps.Replace('<version>', $Version)
         ($m.Groups[1].Value.Trim() + "`n`n" + $installSteps) | Set-Content $notes -Encoding utf8

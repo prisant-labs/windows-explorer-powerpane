@@ -1,9 +1,9 @@
 # Tries a development build on your own desktop, then puts the installed copy back.
 #
-# Only one copy of QuickPane runs at a time, so a development build has to replace the installed copy
+# Only one copy of PowerPane runs at a time, so a development build has to replace the installed copy
 # while it runs. This script does the four manual steps in docs/DEVELOPMENT.md in order:
-#   1. Builds QuickPane.exe, unless -NoBuild is given.
-#   2. Backs up %APPDATA%\QuickPane, because a development build reads and writes the same settings.
+#   1. Builds PowerPane.exe, unless -NoBuild is given.
+#   2. Backs up %APPDATA%\PowerPane, because a development build reads and writes the same settings.
 #   3. Closes whatever copy is running with --exit, and starts the development build.
 #   4. Waits until the development build has exited, then starts the installed copy again if it was
 #      running before. Starting it also points the Start menu shortcut back at it.
@@ -28,9 +28,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$installed = Join-Path $env:LOCALAPPDATA 'QuickPane\QuickPane.exe'
-$dataDir = Join-Path $env:APPDATA 'QuickPane'
-$backupRoot = Join-Path $env:LOCALAPPDATA 'QuickPane-dev-backups'
+$installed = Join-Path $env:LOCALAPPDATA 'PowerPane\PowerPane.exe'
+$dataDir = Join-Path $env:APPDATA 'PowerPane'
+$backupRoot = Join-Path $env:LOCALAPPDATA 'PowerPane-dev-backups'
 $keepBackups = 10
 # The watchdog relaunches a crashed copy 2.5 seconds after it exits, so a copy counts as gone only
 # after this long with no process from its folder.
@@ -38,8 +38,8 @@ $goneAfterSec = 6
 
 function Get-FullPath([string]$path) { [IO.Path]::GetFullPath($path) }
 
-# Every running QuickPane process, the tray app and its watchdog alike, with a readable path.
-function Get-Copies { @(Get-Process QuickPane -ErrorAction SilentlyContinue | Where-Object { $_.Path }) }
+# Every running PowerPane process, the tray app and its watchdog alike, with a readable path.
+function Get-Copies { @(Get-Process PowerPane -ErrorAction SilentlyContinue | Where-Object { $_.Path }) }
 
 function Get-CopiesOf([string]$path) {
     $full = Get-FullPath $path
@@ -57,7 +57,7 @@ function Close-Running {
     $deadline = (Get-Date).AddSeconds(15)
     while ((Get-Copies).Count -gt 0 -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 250 }
     if ((Get-Copies).Count -gt 0) {
-        throw 'QuickPane is still running after --exit. Close it from its tray icon, then run this again.'
+        throw 'PowerPane is still running after --exit. Close it from its tray icon, then run this again.'
     }
 }
 
@@ -75,7 +75,7 @@ if ($RestoreInstalled) {
 
 if (-not $Exe) {
     if (-not $NoBuild) { & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration }
-    $Exe = Join-Path $repo "QuickPane\bin\x64\$Configuration\QuickPane.exe"
+    $Exe = Join-Path $repo "PowerPane\bin\x64\$Configuration\PowerPane.exe"
 }
 if (-not (Test-Path $Exe)) { throw "No build at $Exe. Build it first, or drop -NoBuild." }
 $Exe = Get-FullPath $Exe
@@ -88,7 +88,7 @@ $installedWasRunning = (Test-Path $installed) -and (Get-CopiesOf $installed).Cou
 if (Test-Path $dataDir) {
     $backup = Join-Path $backupRoot (Get-Date -Format 'yyyyMMdd-HHmmss')
     New-Item -ItemType Directory -Force $backup | Out-Null
-    Copy-Item $dataDir (Join-Path $backup 'QuickPane') -Recurse
+    Copy-Item $dataDir (Join-Path $backup 'PowerPane') -Recurse
     Write-Host "Backed up your settings and groups to $backup"
     Get-ChildItem $backupRoot -Directory | Sort-Object Name -Descending | Select-Object -Skip $keepBackups |
         Remove-Item -Recurse -Force
@@ -116,7 +116,7 @@ if (-not $installedWasRunning) {
         Write-Host 'The installed copy was not running before, so it was not started. Start it once to point the Start menu shortcut back at it.'
     }
 } elseif ((Get-Copies).Count -gt 0) {
-    Write-Host 'Another copy of QuickPane is running now, so the installed copy was not started.'
+    Write-Host 'Another copy of PowerPane is running now, so the installed copy was not started.'
 } else {
     Start-Installed
 }

@@ -17,25 +17,25 @@ function Get-RelativePath([System.IO.FileInfo]$file) {
     [System.IO.Path]::GetRelativePath($root, $file.FullName).Replace('\', '/')
 }
 
-# 1. QuickPane.csproj is a legacy project that lists every file, so a .cs file missing from it is
+# 1. PowerPane.csproj is a legacy project that lists every file, so a .cs file missing from it is
 #    silently left out of the build. The build still succeeds when nothing references the file yet.
-$csproj = Get-Content (Join-Path $root 'QuickPane/QuickPane.csproj') -Raw
+$csproj = Get-Content (Join-Path $root 'PowerPane/PowerPane.csproj') -Raw
 $listed = @{}
 foreach ($m in [regex]::Matches($csproj, '<Compile\s+Include="([^"]+)"')) {
     $listed[$m.Groups[1].Value.Replace('\', '/').ToLowerInvariant()] = $true
 }
-$appDir = Join-Path $root 'QuickPane'
-foreach ($f in Get-SourceFiles 'QuickPane' @('*.cs')) {
+$appDir = Join-Path $root 'PowerPane'
+foreach ($f in Get-SourceFiles 'PowerPane' @('*.cs')) {
     $rel = [System.IO.Path]::GetRelativePath($appDir, $f.FullName).Replace('\', '/')
     if (-not $listed.ContainsKey($rel.ToLowerInvariant())) {
-        $failures.Add("QuickPane/$rel is not listed in QuickPane/QuickPane.csproj. Add <Compile Include=""$($rel.Replace('/', '\'))"" />.")
+        $failures.Add("PowerPane/$rel is not listed in PowerPane/PowerPane.csproj. Add <Compile Include=""$($rel.Replace('/', '\'))"" />.")
     }
 }
 
 # 2. WinEventHook shares one native hook per event range. A direct SetWinEventHook call elsewhere
 #    adds a second hook that the shared one cannot see or release.
-$hookAllowed = @('QuickPane/Interop/WinEventHook.cs', 'QuickPane/Interop/NativeMethods.cs')
-foreach ($f in Get-SourceFiles 'QuickPane' @('*.cs')) {
+$hookAllowed = @('PowerPane/Interop/WinEventHook.cs', 'PowerPane/Interop/NativeMethods.cs')
+foreach ($f in Get-SourceFiles 'PowerPane' @('*.cs')) {
     $rel = Get-RelativePath $f
     if ($hookAllowed -contains $rel) { continue }
     $n = 0
@@ -51,7 +51,7 @@ foreach ($f in Get-SourceFiles 'QuickPane' @('*.cs')) {
 # 3. Icon glyphs are private-use characters (U+E000 to U+F8FF). Some editors and tools drop them
 #    without a trace, which once emptied every icon on the Settings Pane page. Source files must
 #    spell them as escapes:  in C#, &#xE713; in XAML.
-$glyphFiles = @(Get-SourceFiles 'QuickPane' @('*.cs', '*.xaml')) + @(Get-SourceFiles 'tests' @('*.cs'))
+$glyphFiles = @(Get-SourceFiles 'PowerPane' @('*.cs', '*.xaml')) + @(Get-SourceFiles 'tests' @('*.cs'))
 foreach ($f in $glyphFiles) {
     $rel = Get-RelativePath $f
     $n = 0
@@ -67,7 +67,7 @@ foreach ($f in $glyphFiles) {
 }
 
 # 4. Tests touch only their own temporary directory. SettingsStore's default constructor points at
-#    the real %APPDATA%\QuickPane folder.
+#    the real %APPDATA%\PowerPane folder.
 foreach ($f in Get-SourceFiles 'tests' @('*.cs')) {
     $rel = Get-RelativePath $f
     $n = 0

@@ -1,0 +1,443 @@
+using System.Collections.Generic;
+using System.Linq;
+using NUnit.Framework;
+using PowerPane.Models;
+using PowerPane.Services;
+using PowerPane.UI.Settings.Pages;
+
+namespace PowerPane.Tests
+{
+    /// <summary>Covers AppSettings.Normalize's handling of QuickActions (quick actions, first version):
+    /// unknown ids dropped, duplicates collapsed to their first occurrence, every missing built-in
+    /// appended enabled at the end, and a null list seeded from scratch -- plus the master switch's
+    /// default and QuickActionsPage.MoveAction, the Move up/down logic Settings92SectionsPageTests
+    /// already covers for SectionsPage's own list.</summary>
+    [TestFixture]
+    public class QuickActionsSettingsTests
+    {
+        // ---- the master switch: off by default, a real section like every other ----------------
+
+        [Test]
+        public void CreateDefault_QuickActionsSection_IsOffByDefault()
+        {
+            var s = AppSettings.CreateDefault();
+            var section = s.Sections.Single(x => x.Type == "quickactions");
+            Assert.That(section.Visible, Is.False);
+        }
+
+        [Test]
+        public void Normalize_FreshSettings_AddsTheQuickActionsSectionStillOff()
+        {
+            var s = new AppSettings { Sections = new List<SectionSetting>() };
+            s.Normalize();
+            var section = s.Sections.Single(x => x.Type == "quickactions");
+            Assert.That(section.Visible, Is.False);
+        }
+
+        [Test]
+        public void Normalize_ExistingQuickActionsSection_KeepsItsStoredVisibility()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Sections.Single(x => x.Type == "quickactions").Visible = true;
+            s.Normalize();
+            Assert.That(s.Sections.Single(x => x.Type == "quickactions").Visible, Is.True);
+        }
+
+        // ---- NormalizeQuickActions, through AppSettings.Normalize ------------------------------
+
+        [Test]
+        public void Normalize_NullQuickActions_SeedsEveryBuiltInInLibraryOrderAndDefaultState()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = null;
+            s.Normalize();
+
+            Assert.That(s.QuickActions.Select(a => a.Id),
+                Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
+            Assert.That(s.QuickActions.Select(a => a.Enabled),
+                Is.EqualTo(QuickActionLibrary.All.Select(d => d.DefaultEnabled)));
+        }
+
+        [Test]
+        public void Normalize_UnknownId_IsDropped()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = new List<QuickActionSetting> { new QuickActionSetting { Id = "not-a-real-action", Enabled = true } };
+            s.Normalize();
+
+            Assert.That(s.QuickActions.Any(a => a.Id == "not-a-real-action"), Is.False);
+        }
+
+        [Test]
+        public void Normalize_DuplicateId_KeepsOnlyTheFirstOccurrence()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = new List<QuickActionSetting>
+            {
+                new QuickActionSetting { Id = "copy-path", Enabled = false },
+                new QuickActionSetting { Id = "copy-path", Enabled = true },
+            };
+            s.Normalize();
+
+            var copies = s.QuickActions.Where(a => a.Id == "copy-path").ToList();
+            Assert.That(copies, Has.Count.EqualTo(1));
+            Assert.That(copies[0].Enabled, Is.False); // the first occurrence's own value survives
+        }
+
+        [Test]
+        public void Normalize_MissingBuiltIn_IsAppendedInItsDefaultStateAtTheEnd()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = new List<QuickActionSetting> { new QuickActionSetting { Id = "copy-path", Enabled = false } };
+            s.Normalize();
+
+            Assert.That(s.QuickActions[0].Id, Is.EqualTo("copy-path"));
+            Assert.That(s.QuickActions[0].Enabled, Is.False); // the stored entry's own value is kept
+            Assert.That(s.QuickActions.Select(a => a.Id), Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
+            Assert.That(s.QuickActions.Skip(1).Select(a => a.Enabled),
+                Is.EqualTo(QuickActionLibrary.All.Skip(1).Select(d => d.DefaultEnabled)));
+        }
+
+        [Test]
+        public void Normalize_PreservesStoredOrderOfKnownActions()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = new List<QuickActionSetting>
+            {
+                new QuickActionSetting { Id = "open-terminal", Enabled = true },
+                new QuickActionSetting { Id = "copy-path", Enabled = true },
+            };
+            s.Normalize();
+
+            int terminalIndex = s.QuickActions.FindIndex(a => a.Id == "open-terminal");
+            int copyIndex = s.QuickActions.FindIndex(a => a.Id == "copy-path");
+            Assert.That(terminalIndex, Is.LessThan(copyIndex));
+        }
+
+        [Test]
+        public void Normalize_IsIdempotent()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var firstPass = s.QuickActions.Select(a => a.Id).ToList();
+            s.Normalize();
+            Assert.That(s.QuickActions.Select(a => a.Id).ToList(), Is.EqualTo(firstPass));
+        }
+
+        // ---- per-action defaults ----------------------------------------------------------------
+
+        // The first ten shipped on. Anyone with an older settings file has already seen them, so they
+        // keep that default. An id does not belong here unless it shipped before per-action defaults.
+        private static readonly string[] OriginalActions =
+        {
+            "copy-path", "copy-path-quoted", "copy-path-forward", "copy-path-wsl", "copy-markdown-link",
+            "new-text-file", "new-markdown-file", "new-dated-folder", "open-terminal", "open-vscode",
+        };
+
+        [Test]
+        public void EveryActionAddedAfterTheOriginalTen_DefaultsToOff()
+        {
+            foreach (var def in QuickActionLibrary.All)
+                Assert.That(def.DefaultEnabled, Is.EqualTo(OriginalActions.Contains(def.Id)), def.Id);
+        }
+
+        [Test]
+        public void Normalize_SettingsFromBeforeNewActions_LeavesThePaneUnchanged()
+        {
+            var s = AppSettings.CreateDefault();
+            s.QuickActions = OriginalActions.Select(id => new QuickActionSetting { Id = id, Enabled = true }).ToList();
+            s.Normalize();
+
+            Assert.That(s.QuickActions.Where(a => a.Enabled).Select(a => a.Id), Is.EqualTo(OriginalActions));
+            Assert.That(s.QuickActions, Has.Count.EqualTo(QuickActionLibrary.All.Length));
+        }
+
+        // ---- custom commands (#190) ---------------------------------------------------------------
+
+        private static AppSettings WithCommand(out string id)
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            id = QuickActionsPage.AddCustomCommand(s, "  Demo  ", "  demo {path}  ");
+            return s;
+        }
+
+        [Test]
+        public void AddCustomCommand_TrimsAndAppendsItOn()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(id, Does.StartWith(CustomCommandTemplate.IdPrefix));
+            Assert.That(s.CustomCommands.Single().Name, Is.EqualTo("Demo"));
+            Assert.That(s.CustomCommands.Single().Template, Is.EqualTo("demo {path}"));
+            Assert.That(s.QuickActions.Last().Id, Is.EqualTo(id));
+            Assert.That(s.QuickActions.Last().Enabled, Is.True);
+        }
+
+        [Test]
+        public void Normalize_KeepsACustomCommandsStateAndPlace()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(QuickActionsPage.MoveActionByIdTo(s, id, 0), Is.True);
+            s.Normalize();
+            Assert.That(s.QuickActions[0].Id, Is.EqualTo(id));
+            Assert.That(s.QuickActions[0].Enabled, Is.True);
+        }
+
+        [Test]
+        public void Normalize_EntryWhoseCommandIsGone_IsDropped()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            s.QuickActions.Add(new QuickActionSetting { Id = CustomCommandTemplate.IdPrefix + "gone", Enabled = true });
+            s.Normalize();
+            Assert.That(s.QuickActions.Any(a => CustomCommandTemplate.IsCustomId(a.Id)), Is.False);
+        }
+
+        [Test]
+        public void Normalize_CommandWithNoEntry_IsAddedOff()
+        {
+            var s = AppSettings.CreateDefault();
+            s.CustomCommands = new List<CustomCommand>
+            {
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "a", Name = "A", Template = "calc" },
+            };
+            s.Normalize();
+            Assert.That(s.QuickActions.Single(a => a.Id == CustomCommandTemplate.IdPrefix + "a").Enabled, Is.False);
+        }
+
+        [Test]
+        public void Normalize_DropsUnusableCommands_AndNamesABlankOne()
+        {
+            var s = AppSettings.CreateDefault();
+            s.CustomCommands = new List<CustomCommand>
+            {
+                null,
+                new CustomCommand { Id = "no-prefix", Name = "A", Template = "calc" },
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "blank", Name = "B", Template = "  " },
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "dup", Name = "", Template = "calc" },
+                new CustomCommand { Id = CustomCommandTemplate.IdPrefix + "dup", Name = "D", Template = "calc" },
+            };
+            s.Normalize();
+            Assert.That(s.CustomCommands, Has.Count.EqualTo(1));
+            Assert.That(s.CustomCommands[0].Name, Is.EqualTo("calc"));
+        }
+
+        [Test]
+        public void TurnOffCustomCommands_LeavesBuiltInsAlone()
+        {
+            string id;
+            var s = WithCommand(out id);
+            s.TurnOffCustomCommands();
+            Assert.That(s.QuickActions.Single(a => a.Id == id).Enabled, Is.False);
+            Assert.That(s.QuickActions.Single(a => a.Id == "copy-path").Enabled, Is.True);
+        }
+
+        [Test]
+        public void ImportFrom_TurnsCustomCommandsOff()
+        {
+            using (var temp = new TempDir())
+            {
+                var source = new SettingsStore(System.IO.Path.Combine(temp.Path, "source"));
+                source.Load();
+                string id = QuickActionsPage.AddCustomCommand(source.Current, "Demo", "demo {path}");
+                string backup = System.IO.Path.Combine(temp.Path, "backup.json");
+                source.ExportTo(backup);
+
+                var target = new SettingsStore(System.IO.Path.Combine(temp.Path, "target"));
+                target.Load();
+                Assert.That(target.ImportFrom(backup), Is.True);
+                target.Flush();
+
+                Assert.That(target.Current.CustomCommands.Single().Template, Is.EqualTo("demo {path}"));
+                Assert.That(target.Current.QuickActions.Single(a => a.Id == id).Enabled, Is.False);
+            }
+        }
+
+        [Test]
+        public void RestoredMessageFor_MentionsCommandsOnlyWhenThereAreSome()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(BackupPage.RestoredMessageFor(s), Does.Contain("turned off"));
+            s.CustomCommands.Clear();
+            Assert.That(BackupPage.RestoredMessageFor(s), Is.EqualTo(BackupPage.RestoredMessage));
+        }
+
+        [Test]
+        public void DeleteCustomCommand_RemovesBothEntries()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(QuickActionsPage.DeleteCustomCommand(s, id), Is.True);
+            Assert.That(s.CustomCommands, Is.Empty);
+            Assert.That(s.QuickActions.Any(a => a.Id == id), Is.False);
+            Assert.That(QuickActionsPage.DeleteCustomCommand(s, id), Is.False);
+        }
+
+        [Test]
+        public void ResetActions_KeepsCustomCommandsAfterTheBuiltIns()
+        {
+            string id;
+            var s = WithCommand(out id);
+            s.QuickActions.Single(a => a.Id == id).Enabled = false;
+            Assert.That(QuickActionsPage.MoveActionByIdTo(s, id, 0), Is.True);
+
+            var reset = QuickActionsPage.ResetActions(s);
+            Assert.That(reset.Take(QuickActionLibrary.All.Length).Select(a => a.Id), Is.EqualTo(QuickActionLibrary.All.Select(d => d.Id)));
+            Assert.That(reset.Last().Id, Is.EqualTo(id));
+            Assert.That(reset.Last().Enabled, Is.False);
+        }
+
+        [Test]
+        public void Resolve_FindsBuiltInsAndCustomCommands()
+        {
+            string id;
+            var s = WithCommand(out id);
+            Assert.That(QuickActionLibrary.Resolve(s, "copy-path").Template, Is.Null);
+            var custom = QuickActionLibrary.Resolve(s, id);
+            Assert.That(custom.Kind, Is.EqualTo(QuickActionKind.Custom));
+            Assert.That(custom.Template, Is.EqualTo("demo {path}"));
+            Assert.That(QuickActionLibrary.Resolve(s, CustomCommandTemplate.IdPrefix + "gone"), Is.Null);
+            Assert.That(QuickActionLibrary.Resolve(s, "not-real"), Is.Null);
+        }
+
+        // ---- QuickActionsPage.MoveAction (the Settings page's Move up/down) --------------------
+
+        private static List<QuickActionSetting> Actions(params string[] ids)
+        {
+            return ids.Select(id => new QuickActionSetting { Id = id, Enabled = true }).ToList();
+        }
+
+        [Test]
+        public void MoveAction_Up_SwapsWithPreviousNeighbour()
+        {
+            var list = Actions("copy-path", "new-text-file", "open-terminal");
+            Assert.That(QuickActionsPage.MoveAction(list, 1, -1), Is.True);
+            Assert.That(list.Select(a => a.Id), Is.EqualTo(new[] { "new-text-file", "copy-path", "open-terminal" }));
+        }
+
+        [Test]
+        public void MoveAction_Down_SwapsWithNextNeighbour()
+        {
+            var list = Actions("copy-path", "new-text-file", "open-terminal");
+            Assert.That(QuickActionsPage.MoveAction(list, 0, 1), Is.True);
+            Assert.That(list.Select(a => a.Id), Is.EqualTo(new[] { "new-text-file", "copy-path", "open-terminal" }));
+        }
+
+        [Test]
+        public void MoveAction_FirstRowUp_DoesNothing()
+        {
+            var list = Actions("copy-path", "new-text-file");
+            Assert.That(QuickActionsPage.MoveAction(list, 0, -1), Is.False);
+            Assert.That(list.Select(a => a.Id), Is.EqualTo(new[] { "copy-path", "new-text-file" }));
+        }
+
+        [Test]
+        public void MoveAction_LastRowDown_DoesNothing()
+        {
+            var list = Actions("copy-path", "new-text-file");
+            Assert.That(QuickActionsPage.MoveAction(list, 1, 1), Is.False);
+        }
+
+        [Test]
+        public void MoveAction_OutOfRangeIndex_ReturnsFalse()
+        {
+            var list = Actions("copy-path", "new-text-file");
+            Assert.That(QuickActionsPage.MoveAction(list, -1, 1), Is.False);
+            Assert.That(QuickActionsPage.MoveAction(list, 5, -1), Is.False);
+            Assert.That(QuickActionsPage.MoveAction(null, 0, 1), Is.False);
+        }
+
+        [Test]
+        public void ActionList_NullQuickActions_ReturnsEmpty()
+        {
+            var s = new AppSettings { QuickActions = null };
+            Assert.That(QuickActionsPage.ActionList(s), Is.Empty);
+        }
+
+        // ---- FindActionById / MoveActionById: survive a Normalize() that swapped the list ------
+        // (reproduces the real bug: AppSettings.Normalize, which every SettingsStore.Save() call
+        // runs -- including the master switch's own save -- always reassigns QuickActions to a new
+        // List instance, even when nothing in it changed. A handler built from an earlier Populate()
+        // that closed over that old list, rather than re-reading the id, would silently move or
+        // toggle nothing once that other save had already happened.)
+
+        [Test]
+        public void FindActionById_AfterNormalizeReplacedTheList_StillFindsTheCurrentObject()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var before = s.QuickActions;
+
+            s.Normalize(); // simulates an unrelated Save() elsewhere, e.g. the master switch
+            Assert.That(s.QuickActions, Is.Not.SameAs(before)); // sanity: confirms the premise
+
+            var found = QuickActionsPage.FindActionById(s, "open-terminal");
+            Assert.That(found, Is.Not.Null);
+            Assert.That(found, Is.SameAs(s.QuickActions.First(a => a.Id == "open-terminal")));
+        }
+
+        [Test]
+        public void FindActionById_UnknownId_ReturnsNull()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            Assert.That(QuickActionsPage.FindActionById(s, "not-a-real-action"), Is.Null);
+        }
+
+        [Test]
+        public void MoveActionById_AfterNormalizeReplacedTheList_StillMovesTheCurrentList()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var before = s.QuickActions;
+
+            s.Normalize(); // simulates an unrelated Save() elsewhere, e.g. the master switch
+            Assert.That(s.QuickActions, Is.Not.SameAs(before)); // sanity: confirms the premise
+
+            int originalIndex = s.QuickActions.FindIndex(a => a.Id == "open-terminal");
+            bool moved = QuickActionsPage.MoveActionById(s, "open-terminal", -1);
+
+            Assert.That(moved, Is.True);
+            Assert.That(s.QuickActions.FindIndex(a => a.Id == "open-terminal"), Is.EqualTo(originalIndex - 1));
+        }
+
+        [Test]
+        public void MoveActionById_UnknownId_ReturnsFalseAndChangesNothing()
+        {
+            var s = AppSettings.CreateDefault();
+            s.Normalize();
+            var idsBefore = s.QuickActions.Select(a => a.Id).ToList();
+
+            Assert.That(QuickActionsPage.MoveActionById(s, "not-a-real-action", -1), Is.False);
+            Assert.That(s.QuickActions.Select(a => a.Id), Is.EqualTo(idsBefore));
+        }
+
+        // ---- round-trips through settings.json, same shape as PaneColorTests ------------------
+
+        [Test]
+        public void SaveThenLoad_RoundTripsQuickActionsAndTheMasterSwitch()
+        {
+            using (var temp = new TempDir())
+            {
+                var store = new SettingsStore(temp.Path);
+                store.Load();
+                store.Current.Sections.Single(x => x.Type == "quickactions").Visible = true;
+                store.Current.QuickActions[0].Enabled = false;
+                QuickActionsPage.MoveAction(store.Current.QuickActions, 1, -1);
+                store.Save();
+
+                var reloaded = new SettingsStore(temp.Path);
+                reloaded.Load();
+
+                Assert.That(reloaded.Current.Sections.Single(x => x.Type == "quickactions").Visible, Is.True);
+                Assert.That(reloaded.Current.QuickActions.Select(a => a.Id),
+                    Is.EqualTo(store.Current.QuickActions.Select(a => a.Id)));
+                Assert.That(reloaded.Current.QuickActions.First(a => a.Id == store.Current.QuickActions[0].Id).Enabled,
+                    Is.EqualTo(store.Current.QuickActions[0].Enabled));
+            }
+        }
+    }
+}

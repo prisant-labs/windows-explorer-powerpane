@@ -1,0 +1,630 @@
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+namespace PowerPane.Interop
+{
+    /// <summary>
+    /// Win32 P/Invoke surface used to find Explorer's child windows, hide the native
+    /// navigation pane, reparent the WPF sidebar into the Explorer window, and keep
+    /// the layout in sync. Everything here is cross-process but read/move only, so no
+    /// code is injected into explorer.exe.
+    /// </summary>
+    internal static class NativeMethods
+    {
+        // ---- structs ----
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left, Top, Right, Bottom;
+            public int Width { get { return Right - Left; } }
+            public int Height { get { return Bottom - Top; } }
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct POINT
+        {
+            public int X, Y;
+        }
+
+        // ---- window enumeration / identity ----
+        public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string lpszClass, string lpszWindow);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+        // ---- file-dialog navigation (drive the dialog's File name box + Open button) ----
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, string lParam);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
+        // Timeout variants for driving other apps' dialogs. A plain SendMessage to a busy target
+        // (Photoshop mid-save) blocks the caller indefinitely, and our caller shares Explorer's
+        // input queue, so every cross-process send must be able to give up.
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr SendMessageTimeout(IntPtr hWnd, int Msg, IntPtr wParam, string lParam,
+            uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SendMessageTimeout(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam,
+            uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+        public const uint SMTO_NORMAL = 0x0000;
+        public const uint SMTO_ABORTIFHUNG = 0x0002;
+
+        // Reading a control's text back after writing it turns a silent misfire into something the
+        // journal can name. WM_GETTEXT is a system-defined message, so USER32 marshals the buffer for
+        // standard control classes and the call works across processes.
+        [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr SendMessageTimeoutBuffer(IntPtr hWnd, int Msg, IntPtr wParam,
+            StringBuilder lParam, uint fuFlags, uint uTimeout, out IntPtr lpdwResult);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowEnabled(IntPtr hWnd);
+
+        public const int WM_GETTEXT = 0x000D;
+        public const int WM_GETTEXTLENGTH = 0x000E;
+
+        public const int WM_SETTEXT = 0x000C;
+        public const int WM_COMMAND = 0x0111;
+        public const int BM_CLICK = 0x00F5;
+        public const int IDOK = 1;
+        public const int WM_KEYDOWN = 0x0100;
+        public const int WM_KEYUP = 0x0101;
+        public const int WM_CHAR = 0x0102;
+        public const int VK_RETURN = 0x0D;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+        // Whether a window's thread is still running a move or size loop (GUI_INMOVESIZE), read
+        // through GetGUIThreadInfo. The drag-safety sweep uses this, rather than the physical left
+        // mouse button, to tell a drag still in progress from one whose MOVESIZEEND never arrived:
+        // a keyboard move (Alt+Space, Move, then the arrow keys) and a drag with the mouse buttons
+        // swapped both keep the loop running with the physical left button up (#147, #161).
+        [StructLayout(LayoutKind.Sequential)]
+        public struct GUITHREADINFO
+        {
+            public int cbSize;
+            public uint flags;
+            public IntPtr hwndActive;
+            public IntPtr hwndFocus;
+            public IntPtr hwndCapture;
+            public IntPtr hwndMenuOwner;
+            public IntPtr hwndMoveSize;
+            public IntPtr hwndCaret;
+            public RECT rcCaret;
+        }
+
+        public const uint GUI_INMOVESIZE = 0x2;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetParent(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        // The window active on the calling thread's own message queue. WinForms' CommonDialog uses this
+        // (not GetForegroundWindow) to pick an owner when none is given explicitly, which is what makes
+        // a modal dialog raised from our own top-level window come up owned by that window.
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetActiveWindow();
+
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        // The window's visible bounds, excluding the invisible DWM resize border, so a pane can sit
+        // flush against the real edge instead of leaving a gap.
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out RECT pvAttribute, int cbAttribute);
+
+        public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
+
+        // A dark title bar for a window with a standard frame. Windows 10 builds before 20H1 used 19
+        // for the same switch.
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19;
+
+        // The Mica backdrop (Windows 11 22H2+). DwmSetWindowAttribute returns a non-zero HRESULT on
+        // Windows 10 or any build that does not support it, which is how SettingsWindow picks the
+        // flat-colour fallback.
+        public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+        public const int DWMSBT_MAINWINDOW = 2;   // "Mica": the backdrop the Settings app itself uses
+
+        // One buffer per thread, because ClassOf runs on the UI thread for every create and show event on
+        // the desktop, and on the workers and the layout enforcer too. A new 256-character buffer per
+        // call was garbage on the hottest path (prisant-labs/windows-explorer-powerpane#44).
+        [ThreadStatic] private static StringBuilder _classBuffer;
+
+        public static string ClassOf(IntPtr hWnd)
+        {
+            var sb = _classBuffer ?? (_classBuffer = new StringBuilder(256));
+            sb.Length = 0;
+            GetClassName(hWnd, sb, sb.Capacity);
+            return sb.ToString();
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern int GetWindowTextW(IntPtr hWnd, StringBuilder text, int count);
+
+        /// <summary>A window's title text, used to recognize our own hosted pane, whose name is set
+        /// through HwndSourceParameters while its class is one WPF generates.</summary>
+        public static string TextOf(IntPtr hWnd)
+        {
+            var sb = new StringBuilder(256);
+            GetWindowTextW(hWnd, sb, sb.Capacity);
+            return sb.ToString();
+        }
+
+        // ---- geometry ----
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
+
+        [DllImport("user32.dll")]
+        public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetCursorPos(out POINT lpPoint);
+
+        // ---- shell icon extraction ----
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct SHFILEINFO
+        {
+            public IntPtr hIcon;
+            public int iIcon;
+            public uint dwAttributes;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szDisplayName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 80)] public string szTypeName;
+        }
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        public static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes,
+            ref SHFILEINFO psfi, uint cbSizeFileInfo, uint uFlags);
+
+        [DllImport("user32.dll")]
+        public static extern bool DestroyIcon(IntPtr hIcon);
+
+        public const uint SHGFI_ICON = 0x000000100;
+        public const uint SHGFI_SMALLICON = 0x000000001;
+        public const uint SHGFI_USEFILEATTRIBUTES = 0x000000010;
+        public const uint SHGFI_PIDL = 0x000000008;
+        public const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
+
+        /// <summary>Pull one numbered icon out of a file, for a program whose recognizable icon is not
+        /// the first one inside it.</summary>
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        public static extern int ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, int count);
+
+        [DllImport("shell32.dll", EntryPoint = "SHGetFileInfo")]
+        public static extern IntPtr SHGetFileInfoPidl(IntPtr pidl, uint dwFileAttributes,
+            ref SHFILEINFO psfi, uint cbSizeFileInfo, uint uFlags);
+
+        [DllImport("shell32.dll")]
+        public static extern int SHGetSpecialFolderLocation(IntPtr hwnd, int nFolder, out IntPtr ppidl);
+
+        [DllImport("shell32.dll", EntryPoint = "ILFree")]
+        public static extern void ILFreePidl(IntPtr pidl);
+
+        public const int CSIDL_DRIVES  = 0x0011;   // This PC
+        public const int CSIDL_NETWORK = 0x0012;
+
+        // ---- shell file operations (move/copy with native progress, undo, conflict UI) ----
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct SHFILEOPSTRUCT
+        {
+            public IntPtr hwnd;
+            public uint wFunc;
+            public IntPtr pFrom;
+            public IntPtr pTo;
+            public ushort fFlags;
+            public int fAnyOperationsAborted;
+            public IntPtr hNameMappings;
+            [MarshalAs(UnmanagedType.LPWStr)] public string lpszProgressTitle;
+        }
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+        public static extern int SHFileOperation(ref SHFILEOPSTRUCT lpFileOp);
+
+        public const uint FO_MOVE = 0x0001;
+        public const uint FO_COPY = 0x0002;
+        public const uint FO_DELETE = 0x0003;
+        public const ushort FOF_NOCONFIRMATION = 0x0010;
+        public const ushort FOF_ALLOWUNDO = 0x0040;
+        public const ushort FOF_NOERRORUI = 0x0400;
+        public const ushort FOF_SILENT = 0x0004;
+        public const ushort FOF_NOCONFIRMMKDIR = 0x0200;
+
+        // ---- parenting / positioning ----
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+
+        [DllImport("user32.dll")]
+        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        public static extern bool RedrawWindow(IntPtr hWnd, IntPtr lprcUpdate, IntPtr hrgnUpdate, uint flags);
+
+        public const uint RDW_INVALIDATE = 0x0001;
+        public const uint RDW_ERASE = 0x0004;
+        public const uint RDW_ALLCHILDREN = 0x0080;
+        public const uint RDW_UPDATENOW = 0x0100;
+
+        [DllImport("user32.dll")]
+        public static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern bool IsZoomed(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+        [DllImport("user32.dll")]
+        public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr SetFocus(IntPtr hWnd);
+
+        [DllImport("kernel32.dll")]
+        public static extern uint GetCurrentThreadId();
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+        public const uint GW_HWNDPREV = 3;
+
+        // Batched moves avoid intermediate repaints, which is the main flicker source.
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr BeginDeferWindowPos(int nNumWindows);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr DeferWindowPos(IntPtr hWinPosInfo, IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool EndDeferWindowPos(IntPtr hWinPosInfo);
+
+        // ---- window styles (64-bit safe) ----
+        public static IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex)
+        {
+            return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : new IntPtr(GetWindowLong32(hWnd, nIndex));
+        }
+
+        public static IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
+        {
+            return IntPtr.Size == 8
+                ? SetWindowLongPtr64(hWnd, nIndex, dwNewLong)
+                : new IntPtr(SetWindowLong32(hWnd, nIndex, dwNewLong.ToInt32()));
+        }
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
+        private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr")]
+        private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLong")]
+        private static extern int SetWindowLong32(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
+        private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        // ---- WinEvent hooks ----
+        public delegate void WinEventDelegate(
+            IntPtr hWinEventHook, uint eventType, IntPtr hwnd,
+            int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetWinEventHook(
+            uint eventMin, uint eventMax, IntPtr hmodWinEventProc,
+            WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        public static extern bool UnhookWinEvent(IntPtr hWinEventHook);
+
+        // ---- constants ----
+        public const int GWL_STYLE = -16;
+        public const int GWL_EXSTYLE = -20;
+        public const int GWLP_HWNDPARENT = -8; // sets the owner window (not a parent/child relationship)
+
+        public const long WS_CHILD = 0x40000000L;
+        public const long WS_VISIBLE = 0x10000000L;
+        public const long WS_CLIPSIBLINGS = 0x04000000L;
+        public const long WS_CLIPCHILDREN = 0x02000000L;
+        public const long WS_POPUP = unchecked((long)0x80000000L);
+        public const long WS_EX_COMPOSITED = 0x02000000L; // double-buffers the child, kills tear/flicker
+        public const long WS_EX_NOACTIVATE = 0x08000000L;
+        public const long WS_EX_TOOLWINDOW = 0x00000080L;
+
+        public const uint SWP_NOSIZE = 0x0001;
+        public const uint SWP_NOMOVE = 0x0002;
+        public const uint SWP_NOZORDER = 0x0004;
+        public const uint SWP_NOACTIVATE = 0x0010;
+        public const uint SWP_SHOWWINDOW = 0x0040;
+        public const uint SWP_NOOWNERZORDER = 0x0200;
+        public const uint SWP_DEFERERASE = 0x2000;
+        public const uint SWP_FRAMECHANGED = 0x0020;
+        // Post the move to the target window's thread instead of sending it synchronously. Essential when
+        // moving Explorer's content host from our process, so a busy Explorer thread never blocks ours.
+        public const uint SWP_ASYNCWINDOWPOS = 0x4000;
+
+        public const int SW_HIDE = 0;
+        public const int SW_SHOW = 5;
+        public const int SW_SHOWNA = 8;
+
+        public const uint EVENT_OBJECT_CREATE = 0x8000;
+        public const uint EVENT_OBJECT_DESTROY = 0x8001;
+        public const uint EVENT_OBJECT_SHOW = 0x8002;
+        public const uint EVENT_OBJECT_HIDE = 0x8003;
+        public const uint EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
+        public const uint EVENT_OBJECT_NAMECHANGE = 0x800C;
+        public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
+        public const uint EVENT_SYSTEM_MOVESIZESTART = 0x000A;
+        public const uint EVENT_SYSTEM_MOVESIZEEND = 0x000B;
+
+        // ---- which program owns a window ----
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool CloseHandle(IntPtr h);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool QueryFullProcessImageName(IntPtr proc, uint flags,
+            System.Text.StringBuilder name, ref int size);
+
+        /// <summary>Enough rights to read a program's path, and no more, so this answers for elevated
+        /// programs too instead of failing the way a full-information open would.</summary>
+        public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        /// <summary>The full path of the program that owns a window, or null.</summary>
+        public static string ExePathOf(IntPtr hwnd)
+        {
+            if (hwnd == IntPtr.Zero) return null;
+            uint pid;
+            GetWindowThreadProcessId(hwnd, out pid);
+            if (pid == 0) return null;
+
+            IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (h == IntPtr.Zero) return null;
+            try
+            {
+                int size = 1024;
+                var sb = new System.Text.StringBuilder(size);
+                return QueryFullProcessImageName(h, 0, sb, ref size) ? sb.ToString() : null;
+            }
+            finally { CloseHandle(h); }
+        }
+        public const uint EVENT_OBJECT_REORDER = 0x8004;
+
+        public const uint WINEVENT_OUTOFCONTEXT = 0x0000;
+        public const uint WINEVENT_SKIPOWNPROCESS = 0x0002;
+
+        public const int OBJID_WINDOW = 0;
+        public const int CHILDID_SELF = 0;
+        public const int OBJID_CLIENT = unchecked((int)0xFFFFFFFC);
+
+        public static readonly IntPtr HWND_TOP = IntPtr.Zero;
+
+        // ---- AppBar (docked mode) ----
+        [StructLayout(LayoutKind.Sequential)]
+        public struct APPBARDATA
+        {
+            public int cbSize;
+            public IntPtr hWnd;
+            public uint uCallbackMessage;
+            public uint uEdge;
+            public RECT rc;
+            public IntPtr lParam;
+        }
+
+        [DllImport("shell32.dll")]
+        public static extern UIntPtr SHAppBarMessage(uint dwMessage, ref APPBARDATA pData);
+
+        [DllImport("user32.dll")]
+        public static extern uint RegisterWindowMessage(string lpString);
+
+        [DllImport("user32.dll")]
+        public static extern int GetSystemMetrics(int nIndex);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SystemParametersInfo(uint uiAction, uint uiParam, ref RECT pvParam, uint fWinIni);
+
+        public const int SM_CXSCREEN = 0;
+        public const int SM_CYSCREEN = 1;
+        public const uint SPI_GETWORKAREA = 0x0030;
+
+        public const uint ABM_NEW = 0x0;
+        public const uint ABM_REMOVE = 0x1;
+        public const uint ABM_QUERYPOS = 0x2;
+        public const uint ABM_SETPOS = 0x3;
+        public const uint ABM_WINDOWPOSCHANGED = 0x9;
+
+        public const uint ABE_LEFT = 0;
+        public const uint ABE_TOP = 1;
+        public const uint ABE_RIGHT = 2;
+        public const uint ABE_BOTTOM = 3;
+
+        public const int ABN_POSCHANGED = 0x1;
+        public const int ABN_FULLSCREENAPP = 0x2;
+
+        // ---- monitors and scaling -------------------------------------------
+        // Placement has to be judged against the monitor a window is actually on. The primary screen's
+        // metrics say nothing about a window on a second display, and a monitor left of the primary one
+        // has negative coordinates that a clamp to zero throws away.
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        public const uint MONITOR_DEFAULTTONEAREST = 0x2;
+
+        [DllImport("user32.dll")]
+        private static extern uint GetDpiForWindow(IntPtr hwnd);
+
+        [DllImport("gdi32.dll")]
+        private static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        private static extern int ReleaseDC(IntPtr hwnd, IntPtr hdc);
+
+        private const int LOGPIXELSX = 88;
+
+        /// <summary>Work area of the monitor holding hwnd, falling back to the primary screen. Work area
+        /// rather than full bounds, so a placement never lands under the taskbar.</summary>
+        public static RECT WorkAreaFor(IntPtr hwnd)
+        {
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+            IntPtr mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (mon != IntPtr.Zero && GetMonitorInfo(mon, ref mi)) return mi.rcWork;
+
+            RECT wa = new RECT();
+            if (SystemParametersInfo(SPI_GETWORKAREA, 0, ref wa, 0)) return wa;
+            wa.Left = 0; wa.Top = 0;
+            wa.Right = GetSystemMetrics(SM_CXSCREEN);
+            wa.Bottom = GetSystemMetrics(SM_CYSCREEN);
+            return wa;
+        }
+
+        /// <summary>Full bounds of the monitor holding hwnd, taskbar and appbars included, falling
+        /// back to the primary screen. An appbar must size its strip from this, not from the work
+        /// area: the work area already has the appbar's own strip taken out (#145).</summary>
+        public static RECT MonitorRectFor(IntPtr hwnd)
+        {
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+            IntPtr mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (mon != IntPtr.Zero && GetMonitorInfo(mon, ref mi)) return mi.rcMonitor;
+
+            return new RECT { Left = 0, Top = 0, Right = GetSystemMetrics(SM_CXSCREEN), Bottom = GetSystemMetrics(SM_CYSCREEN) };
+        }
+
+        // ---- enumerating every monitor (the desktop dock's Display picker, #146) --------------
+        // MonitorRectFor/WorkAreaFor above answer "which monitor is hwnd on"; the dock's Display
+        // setting needs the opposite question, "list every monitor so the user can pick one", which
+        // needs EnumDisplayMonitors plus the extended MONITORINFOEX (its szDevice names the monitor's
+        // adapter, e.g. "\\.\DISPLAY2") rather than the plain MONITORINFO above.
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct MONITORINFOEX
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string szDevice;
+        }
+
+        public const uint MONITORINFOF_PRIMARY = 0x1;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFOEX lpmi);
+
+        public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
+
+        [DllImport("user32.dll")]
+        public static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+        // MONITORINFOEX.szDevice ("\\.\DISPLAY2") is only an adapter name and can renumber across a
+        // reboot or a display change, so it is a label, never a stored identity. Asking
+        // EnumDisplayDevices about that adapter, with EDD_GET_DEVICE_INTERFACE_NAME, gives the
+        // monitor's own device-interface path in DeviceID instead, which is what MonitorPicker
+        // stores. DeviceString on the same call is the monitor's friendly name, for the label.
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public struct DISPLAY_DEVICE
+        {
+            public int cb;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string DeviceName;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceString;
+            public uint StateFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceID;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string DeviceKey;
+        }
+
+        public const uint EDD_GET_DEVICE_INTERFACE_NAME = 0x1;
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        public static extern bool EnumDisplayDevices(string lpDevice, uint iDevNum, ref DISPLAY_DEVICE lpDisplayDevice, uint dwFlags);
+
+        // Sent to every top-level window when a monitor is connected, disconnected, rearranged, or
+        // changes resolution. AppBarHost's WndProc hook re-places the dock on it (#146).
+        public const int WM_DISPLAYCHANGE = 0x007E;
+
+        // Sent to a window as its own move or size loop begins and ends. StaleSourceGuard checks on
+        // both, because the shared WinEvent hook never sees a move of a window in this process (#159).
+        public const int WM_ENTERSIZEMOVE = 0x0231;
+        public const int WM_EXITSIZEMOVE = 0x0232;
+
+        /// <summary>Pixels per inch of the monitor holding hwnd. GetDpiForWindow needs Windows 10, so
+        /// older builds fall back to the desktop DC, which reports the system DPI.</summary>
+        public static int DpiForWindow(IntPtr hwnd)
+        {
+            try
+            {
+                uint dpi = GetDpiForWindow(hwnd);
+                if (dpi >= 48 && dpi <= 960) return (int)dpi;
+            }
+            catch { }
+            IntPtr dc = GetDC(IntPtr.Zero);
+            if (dc == IntPtr.Zero) return 96;
+            try
+            {
+                int dpi = GetDeviceCaps(dc, LOGPIXELSX);
+                return dpi >= 48 && dpi <= 960 ? dpi : 96;
+            }
+            finally { ReleaseDC(IntPtr.Zero, dc); }
+        }
+
+    }
+}

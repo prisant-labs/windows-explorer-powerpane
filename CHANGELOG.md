@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.0.0] - 2026-11-11
+
+QuickPane is now Explorer PowerPane. This release changes the name, the icon, and where the program and its data live, and it installs beside QuickPane rather than over it. See the [release notes](docs/releases/4.0.0.0.md), which describe moving your groups, pins, and settings across.
+
+### Changed
+- The app is Explorer PowerPane in the Start menu, Add/Remove Programs, the installer, and About, and PowerPane in the pane header, the tray, and window titles. The program lives in `%LOCALAPPDATA%\PowerPane`, settings and pins in `%APPDATA%\PowerPane`, and the folder verb is "Pin to PowerPane". The repository is now `prisant-labs/windows-explorer-powerpane`, and the old address redirects.
+- A new icon, a window with a lightning bolt in its side pane, replaces QuickPane's star in the tray, the pane header, Settings, the Start menu, and Add/Remove Programs.
+- The installer has its own Add/Remove Programs identity, and it stops with a message while QuickPane is still installed, because both running would attach two panes to every Explorer window.
+- A groups folder inside QuickPane's old data folder, in copied settings or in a backup QuickPane made, is read as the same place inside `%APPDATA%\PowerPane`. A groups folder chosen anywhere else is left as it is.
+- A pin's menu item "Remove Shortcut" is now "Remove pin", the word the rest of the app uses.
+
 ## [3.13.0.1] - 2026-11-09
 
 Pins inside QuickPane's own pickers. See the [release notes](docs/releases/3.13.0.1.md).

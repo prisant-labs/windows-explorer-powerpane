@@ -1,13 +1,13 @@
-# Builds QuickPane.exe (x64) with MSBuild. Works with or without the .NET Framework 4.8 targeting
+# Builds PowerPane.exe (x64) with MSBuild. Works with or without the .NET Framework 4.8 targeting
 # pack installed: when the pack is missing, MSBuild is pointed at the reference assemblies from the
 # Microsoft.NETFramework.ReferenceAssemblies.net48 NuGet package instead, which needs no admin rights.
 #
-# It builds QuickPane.csproj rather than QuickPane.sln. Visual Studio 2019's MSBuild cannot load the
+# It builds PowerPane.csproj rather than PowerPane.sln. Visual Studio 2019's MSBuild cannot load the
 # SDK-style test project, so the test project is kept out of the solution and built by `dotnet test`
 # (see scripts/test.ps1).
 #
 # Usage:  pwsh -File scripts/build.ps1 [-Configuration Release|Debug]
-# Output: QuickPane\bin\x64\<Configuration>\QuickPane.exe
+# Output: PowerPane\bin\x64\<Configuration>\PowerPane.exe
 param([ValidateSet('Release', 'Debug')][string]$Configuration = 'Release')
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
@@ -25,7 +25,7 @@ $props = @("/p:Configuration=$Configuration", '/p:Platform=x64')
 # Reference assemblies: the installed targeting pack if present, otherwise the NuGet package.
 $native = Join-Path ${env:ProgramFiles(x86)} 'Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8'
 if (-not (Test-Path (Join-Path $native 'mscorlib.dll'))) {
-    $cache = Join-Path $env:LOCALAPPDATA 'QuickPaneBuild'
+    $cache = Join-Path $env:LOCALAPPDATA 'PowerPaneBuild'
     $extract = Join-Path $cache 'refasm-net48'
     if (-not (Test-Path (Join-Path $extract 'build\.NETFramework\v4.8\mscorlib.dll'))) {
         New-Item -ItemType Directory -Force $cache | Out-Null
@@ -44,11 +44,11 @@ if (-not (Test-Path (Join-Path $native 'mscorlib.dll'))) {
     'Targeting pack not installed; using the reference-assembly package.'
 }
 
-$csproj = Join-Path $repo 'QuickPane\QuickPane.csproj'
+$csproj = Join-Path $repo 'PowerPane\PowerPane.csproj'
 & $msbuild $csproj /restore @props /m /nologo /v:minimal /clp:Summary
 if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE" }
 
-$exe = Join-Path $repo "QuickPane\bin\x64\$Configuration\QuickPane.exe"
+$exe = Join-Path $repo "PowerPane\bin\x64\$Configuration\PowerPane.exe"
 "Built: $exe"
 "Version: $((Get-Item $exe).VersionInfo.FileVersion)"
 "SHA-256: $((Get-FileHash $exe -Algorithm SHA256).Hash)"

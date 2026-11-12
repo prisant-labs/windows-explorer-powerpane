@@ -1,0 +1,88 @@
+<UserControl x:Class="PowerPane.UI.SidebarControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False" UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <Grid>
+        <Border x:Name="MainBorder" Background="{DynamicResource SidebarBackground}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Title header -->
+                <StackPanel Grid.Row="0" x:Name="HeaderPanel">
+                    <Grid x:Name="TitleRow" Margin="10,8,6,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" x:Name="TitleContent" Orientation="Horizontal">
+                            <Image Source="/PowerPane;component/powerpane.ico" Width="16" Height="16"
+                                   VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBlock Text="PowerPane" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimary}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Button Grid.Column="1" x:Name="TitleToggleButton" Width="22" Height="22"
+                                Background="Transparent" BorderThickness="0" Cursor="Hand" Opacity="0.6"
+                                ToolTip="Collapse" AutomationProperties.Name="Collapse pane" Click="OnTitleToggle">
+                            <TextBlock x:Name="TitleToggleGlyph" Text="&#xE76B;" FontFamily="{DynamicResource IconFont}"
+                                       FontSize="11" Foreground="{DynamicResource TextSecondary}" />
+                        </Button>
+                    </Grid>
+                    <Border Height="1" Background="{DynamicResource SeparatorColor}" Margin="8,0,8,0" />
+
+                    <!-- Profile tabs row (auto-hide optional) -->
+                    <ScrollViewer x:Name="ProfileTabsHost" Tag="tabscroll" HorizontalScrollBarVisibility="Hidden"
+                                  VerticalScrollBarVisibility="Disabled" Visibility="Collapsed">
+                        <StackPanel x:Name="ProfileTabsBar" Orientation="Horizontal" Margin="6,3,6,3" />
+                    </ScrollViewer>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" x:Name="Scroller" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled" Padding="0,6,0,44">
+                    <StackPanel x:Name="SectionsPanel" />
+                </ScrollViewer>
+
+                <!-- Settings gear, bottom-left. The 4 px margin centres it under the title icon, which is
+                     also the centre of the 36 px collapsed strip, so it stays put when the pane collapses. -->
+                <Button Grid.Row="1" x:Name="GearButton" Width="28" Height="28" Opacity="0.4"
+                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4,0,0,8"
+                        Background="Transparent" BorderThickness="0" Cursor="Hand"
+                        ToolTip="Settings" AutomationProperties.Name="Settings" Click="OnGearClick">
+                    <TextBlock Text="&#xE713;" FontFamily="{DynamicResource IconFont}" FontSize="15"
+                               Foreground="{DynamicResource TextSecondary}" />
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{TemplateBinding Background}" CornerRadius="4">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Opacity" Value="1" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Resize grip, drag to set sidebar width -->
+                <Thumb Grid.Row="0" Grid.RowSpan="2" x:Name="ResizeThumb" Width="6"
+                       HorizontalAlignment="Right" Cursor="SizeWE"
+                       DragStarted="OnResizeStarted" DragDelta="OnResizeDelta" DragCompleted="OnResizeCompleted">
+                    <Thumb.Template>
+                        <ControlTemplate TargetType="Thumb">
+                            <Border Background="Transparent" />
+                        </ControlTemplate>
+                    </Thumb.Template>
+                </Thumb>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

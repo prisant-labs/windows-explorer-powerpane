@@ -1,0 +1,5 @@
+# Commits that only renamed things, skipped by `git blame --ignore-revs-file .git-blame-ignore-revs`.
+# Set it once with: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Rename QuickPane to PowerPane: mechanical pass
+e4982e7f74806066b2fbb6cbc9074d1697792656
