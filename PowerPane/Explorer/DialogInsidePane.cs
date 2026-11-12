@@ -252,6 +252,48 @@ namespace PowerPane.Explorer
                 NM.SetWindowPos(kv.Key, IntPtr.Zero, tx, ty, r.Width, r.Height,
                     NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
             }
+            FitOverhangs();
+        }
+
+        /// <summary>Bring back inside its parent any control one level below a shifted control that now
+        /// sticks out past that control's right edge.
+        ///
+        /// Widening the dialog makes it lay out its top bar for the wider size, and the shift then gives
+        /// the bar's container back its own width. The band container inside it keeps the wider size,
+        /// so its last band, the search box, sat past the container's edge and was clipped away (#238).
+        /// The dialog never sizes that band container again on its own, so resizing it here is what makes
+        /// it lay its bands out for the width they now have. Only visible controls that begin inside
+        /// their parent are touched, and one that already fits is left alone, so a pass that changes
+        /// nothing moves nothing.</summary>
+        private void FitOverhangs()
+        {
+            foreach (var parent in _orig.Keys)
+            {
+                if (!NM.IsWindow(parent) || !NM.IsWindowVisible(parent)) continue;
+                NM.RECT pr;
+                if (!NM.GetWindowRect(parent, out pr)) continue;
+                for (var c = NM.GetWindow(parent, NM.GW_CHILD); c != IntPtr.Zero; c = NM.GetWindow(c, NM.GW_HWNDNEXT))
+                {
+                    if (!NM.IsWindowVisible(c)) continue;
+                    NM.RECT cr;
+                    if (!NM.GetWindowRect(c, out cr)) continue;
+                    int fitted = FittedWidth(cr.Left, cr.Right, pr.Left, pr.Right);
+                    if (fitted == cr.Width) continue;
+                    NM.SetWindowPos(c, IntPtr.Zero, 0, 0, fitted, cr.Height,
+                        NM.SWP_NOMOVE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                }
+            }
+        }
+
+        /// <summary>The width a child spanning childLeft to childRight should have to end at its parent's
+        /// right edge, in screen pixels. A child that already fits keeps its width, and one that starts
+        /// outside the parent is not the overhang this fixes, so it keeps its width too.</summary>
+        internal static int FittedWidth(int childLeft, int childRight, int parentLeft, int parentRight)
+        {
+            int width = childRight - childLeft;
+            if (childRight <= parentRight) return width;
+            if (childLeft < parentLeft || childLeft >= parentRight) return width;
+            return parentRight - childLeft;
         }
 
         /// <summary>Reapply the shift and keep the pane full height. The dialog is widened once at attach

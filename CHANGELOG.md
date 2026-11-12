@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- An Open, Save As, or Select Folder dialog with the pane inside keeps its search box. Making room for the pane pushed the search box past the dialog's right edge, where it was cut off ([#238](https://github.com/prisant-labs/windows-explorer-powerpane/issues/238)).
+
 ## [4.0.0.0] - 2026-11-11
 
 QuickPane is now Explorer PowerPane. This release changes the name, the icon, and where the program and its data live, and it installs beside QuickPane rather than over it. See the [release notes](docs/releases/4.0.0.0.md), which describe moving your groups, pins, and settings across.
