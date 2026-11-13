@@ -518,6 +518,9 @@ namespace PowerPane.Services
 
         public PinnedGroup CreateGroupAfter(PinnedGroup reference, string name)
         {
+            // The prompt that asked for the name stayed open while a profile switch could happen, and
+            // PostEdit reads the root only after it closes, so check the group this one goes below.
+            if (reference != null && StaleGroup(reference.FolderPath)) return null;
             var created = CreateGroup(name);
             if (created == null || reference == null) return created;
             var ordered = _groups.Where(g => !ReferenceEquals(g, created)).ToList();
