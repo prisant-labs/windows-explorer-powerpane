@@ -492,6 +492,27 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void CopyGroupFolder_KeepsEachShortcutsCreationTime_SoARecentTabKeepsItsOrder()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var t = new System.DateTime(2026, 3, 1, 12, 0, 0, System.DateTimeKind.Utc);
+                Touch(MainDir(f), "001_Apollo.lnk", t);
+                Touch(MainDir(f), "002_Zephyr.lnk", t.AddDays(3));
+                Mark(MainDir(f), "recent");
+                var destRoot = Path.Combine(f.Temp.Path, "CopyTarget");
+
+                GroupStore.CopyGroupFolder(f.GroupA, destRoot);
+
+                var copied = Directory.GetDirectories(destRoot).Single();
+                var main = Path.Combine(copied, "01_Main");
+                Assert.That(File.GetCreationTimeUtc(Path.Combine(main, "001_Apollo.lnk")), Is.EqualTo(t));
+                Assert.That(File.GetCreationTimeUtc(Path.Combine(main, "002_Zephyr.lnk")), Is.EqualTo(t.AddDays(3)));
+                Assert.That(HasMarker(main), Is.True);
+            }
+        }
+
+        [Test]
         public void Touch_CreatesAShortcutThatResolvesToItsTargetFolder()
         {
             using (var f = new TwoProfiles())

@@ -1094,7 +1094,14 @@ namespace PowerPane.Services
         private static void CopyDir(string src, string dst)
         {
             Directory.CreateDirectory(dst);
-            foreach (var f in Directory.GetFiles(src)) File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
+            foreach (var f in Directory.GetFiles(src))
+            {
+                var copy = Path.Combine(dst, Path.GetFileName(f));
+                File.Copy(f, copy, true);
+                // A copy gets a new creation time, which would reorder a tab kept in Recent mode.
+                try { File.SetCreationTimeUtc(copy, File.GetCreationTimeUtc(f)); }
+                catch (Exception ex) { Log.Error("keep creation time of a copied file", ex); }
+            }
             foreach (var d in Directory.GetDirectories(src)) CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
         }
 
