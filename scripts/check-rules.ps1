@@ -80,6 +80,47 @@ foreach ($f in Get-SourceFiles 'tests' @('*.cs')) {
     }
 }
 
+# 5. The "Add to PowerPane" verb is registered by three files that no compiler links: Installer.iss
+#    (the installer), Install.ps1 (the zip install), and Uninstall.ps1 (the zip uninstall). A verb
+#    added to one and not the others leaves a menu entry that installs but never uninstalls, or the
+#    reverse. Each file must name the same set of PowerPanePin class keys, and none may keep the old
+#    "Pin to PowerPane" text.
+function Get-VerbKeys([string]$file, [string]$pattern) {
+    $text = Get-Content (Join-Path $root $file) -Raw
+    $keys = @()
+    foreach ($m in [regex]::Matches($text, $pattern)) { $keys += $m.Groups[1].Value }
+    return @($keys | Sort-Object -Unique)
+}
+$verbSets = [ordered]@{
+    'Installer.iss' = Get-VerbKeys 'Installer.iss' 'Software\\Classes\\(.+?)\\shell\\PowerPanePin"'
+    'Install.ps1'   = Get-VerbKeys 'Install.ps1' "Register-AddVerb\s+'([^']+)'"
+}
+$uninstallText = Get-Content (Join-Path $root 'Uninstall.ps1') -Raw
+$uninstallList = [regex]::Match($uninstallText, '\$classKey\s+in\s+@\(([^)]*)\)')
+$uninstallKeys = @()
+if ($uninstallList.Success) {
+    foreach ($m in [regex]::Matches($uninstallList.Groups[1].Value, "'([^']+)'")) { $uninstallKeys += $m.Groups[1].Value }
+}
+$verbSets['Uninstall.ps1'] = @($uninstallKeys | Sort-Object -Unique)
+$reference = ($verbSets['Installer.iss'] -join ', ')
+foreach ($name in $verbSets.Keys) {
+    $found = ($verbSets[$name] -join ', ')
+    if ($verbSets[$name].Count -eq 0) {
+        $failures.Add("$name registers no PowerPanePin verb keys, or check-rules cannot read them.")
+    } elseif ($found -ne $reference) {
+        $failures.Add("$name names the PowerPanePin keys [$found], but Installer.iss names [$reference]. The three files must register and remove the same keys.")
+    }
+}
+foreach ($name in @('Installer.iss', 'Install.ps1', 'Uninstall.ps1')) {
+    $n = 0
+    foreach ($line in Get-Content (Join-Path $root $name)) {
+        $n++
+        if ($line -match 'Pin to PowerPane') {
+            $failures.Add("${name}:$n still says ""Pin to PowerPane"". The verb is ""Add to PowerPane"".")
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "check-rules: $($failures.Count) violation(s) of the rules in AGENTS.md"
     $failures | ForEach-Object { Write-Host "  $_" }
