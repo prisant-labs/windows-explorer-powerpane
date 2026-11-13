@@ -1178,6 +1178,9 @@ namespace PowerPane.Services
             order = int.MaxValue; name = raw;
         }
 
+        /// <summary>What the store would write for a typed name, so the prompt compares names the way the store does.</summary>
+        internal static string SanitizeName(string name) { return Sanitize(name); }
+
         private static string Sanitize(string name)
         {
             if (name == null) return null;
