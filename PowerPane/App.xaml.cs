@@ -17,7 +17,7 @@ namespace PowerPane
     ///
     /// Two run modes:
     ///   normal      -> system tray app that watches Explorer windows and embeds a sidebar in each.
-    ///   --pin PATH  -> short-lived popup that pins PATH into a chosen group, then exits.
+    ///   --pin PATH... -> short-lived popup ("Add to PowerPane") that adds the items to a chosen group and tab, then exits.
     /// The running tray instance notices the new .lnk through GroupStore's FileSystemWatcher,
     /// so a pin made from the context menu shows up in every open sidebar within a few hundred ms.
     /// </summary>
@@ -94,7 +94,7 @@ namespace PowerPane
 
                 if (e.Args.Length >= 2 && string.Equals(e.Args[0], PinVerb, StringComparison.OrdinalIgnoreCase))
                 {
-                    RunPinMode(e.Args[1]);
+                    RunPinMode(e.Args);
                     return;
                 }
 
@@ -453,26 +453,156 @@ namespace PowerPane
             _settingsWindow.Activate();
         }
 
-        // ---- Pin mode (context menu verb) ------------------------------------
+        // ---- Pin mode (the "Add to PowerPane" context menu verb) -------------
 
-        private void RunPinMode(string targetPath)
+        // Explorer may start the verb once per selected item, each in its own process. Every launch
+        // writes its paths to PinQueue, and one launch (the one that claims the picker mutex) waits for
+        // the burst to end, drains the queue, and shows a single picker. The others exit at once. The
+        // owner keeps draining while its picker is open, and checks the queue once more after it
+        // releases the mutex, so a launch that arrives late is shown a second picker, never dropped.
+        private PinQueue _pinQueue;
+        private Mutex _pinMutex;
+        private GroupStore _pinGroups;
+        private System.Windows.Threading.DispatcherTimer _pinWait;
+        private System.Windows.Threading.DispatcherTimer _pinPoll;
+        private PowerPane.Interop.NativeMethods.POINT _pinPointer;
+        private bool _havePinPointer;
+
+        private void RunPinMode(string[] args)
         {
             try
             {
+                var own = PinRequest.ParseArguments(args);
+                if (own.Count == 0)
+                {
+                    Log.Info("Add to PowerPane got no usable path. args=[" + string.Join(" ", args) + "]");
+                    Shutdown();
+                    return;
+                }
+
+                // The pointer is read now, because the picker may open up to three seconds later.
+                _havePinPointer = PowerPane.Interop.NativeMethods.GetCursorPos(out _pinPointer);
+
+                _pinQueue = PinQueue.Default;
+                bool queued = true;
+                try { _pinQueue.Enqueue(own); }
+                catch (Exception ex)
+                {
+                    queued = false;   // the picker still shows this launch's own items
+                    Log.Error("Add to PowerPane could not write the queue", ex);
+                }
+
+                if (!ClaimPinPicker())
+                {
+                    Shutdown();   // another launch owns the picker and will drain this launch's files
+                    return;
+                }
+
                 var settings = new SettingsStore();
                 settings.Load();
-                var groups = new GroupStore(settings);
-                groups.ScanOnce();   // no watcher needed for a one-shot popup
-
-                var picker = new GroupPickerWindow(groups, targetPath);
-                picker.Closed += (s, a) => Shutdown();
-                picker.ShowNearCursor();
+                _pinGroups = new GroupStore(settings);
+                BeginPinRound(queued ? null : own);
             }
             catch (Exception ex)
             {
-                Log.Error("Pin mode failed for '" + targetPath + "'", ex);
+                Log.Error("Pin mode failed", ex);
+                ReleasePinPicker();
                 Shutdown();
             }
+        }
+
+        private bool ClaimPinPicker()
+        {
+            bool createdNew;
+            var m = new Mutex(true, PinQueue.PickerMutexName, out createdNew);
+            if (!createdNew) { m.Dispose(); return false; }
+            _pinMutex = m;
+            return true;
+        }
+
+        private void ReleasePinPicker()
+        {
+            var m = _pinMutex;
+            _pinMutex = null;
+            if (m == null) return;
+            try { m.ReleaseMutex(); } catch (Exception) { }
+            m.Dispose();
+        }
+
+        /// <summary>Waits until no new queue file has arrived for a moment (or the cap is reached),
+        /// then shows the picker.</summary>
+        private void BeginPinRound(System.Collections.Generic.List<string> fallback)
+        {
+            DateTime started = DateTime.UtcNow;
+            _pinWait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _pinWait.Tick += (s, a) =>
+            {
+                DateTime last = _pinQueue.LatestArrivalUtc() ?? started;
+                if (!PinQueue.QuietWindowOver(started, last, DateTime.UtcNow)) return;
+                _pinWait.Stop();
+                ShowPinPicker(fallback);
+            };
+            _pinWait.Start();
+        }
+
+        private void ShowPinPicker(System.Collections.Generic.List<string> fallback)
+        {
+            try
+            {
+                var items = _pinQueue.Drain();
+                if (items.Count == 0 && fallback != null) items = fallback;
+                if (items.Count == 0) { FinishPinRound(); return; }
+
+                _pinGroups.ScanOnce();   // no watcher needed for a one-shot popup
+                var picker = new GroupPickerWindow(_pinGroups, items, PinMemory.Load(PinMemory.DefaultPath), !CrashGuard.InstanceHeld());
+
+                _pinPoll = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                _pinPoll.Tick += (s, a) =>
+                {
+                    var more = _pinQueue.Drain();
+                    if (more.Count == 0) return;
+                    picker.AddPaths(more);
+                    picker.FlashForAttention();
+                };
+                picker.Closed += (s, a) =>
+                {
+                    _pinPoll.Stop();
+                    FinishPinRound();
+                };
+                _pinPoll.Start();
+
+                PowerPane.Interop.NativeMethods.POINT pt = _pinPointer;
+                if (!_havePinPointer) _havePinPointer = PowerPane.Interop.NativeMethods.GetCursorPos(out pt);
+                picker.ShowAt(pt);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Pin picker failed", ex);
+                FinishPinRound();
+            }
+        }
+
+        /// <summary>Releases the picker mutex and looks at the queue one last time. A file that arrived
+        /// in between means a launch lost the mutex race while this picker was closing, so a second
+        /// round starts for it.</summary>
+        private void FinishPinRound()
+        {
+            try
+            {
+                ReleasePinPicker();
+                if (_pinQueue.PendingCount() > 0 && ClaimPinPicker())
+                {
+                    _havePinPointer = PowerPane.Interop.NativeMethods.GetCursorPos(out _pinPointer);
+                    BeginPinRound(null);
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Pin mode final queue check failed", ex);
+                ReleasePinPicker();
+            }
+            Shutdown();
         }
 
         // ---- Teardown --------------------------------------------------------
