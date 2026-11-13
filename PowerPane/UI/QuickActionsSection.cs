@@ -160,10 +160,12 @@ namespace PowerPane.UI
                 Focusable = true,
             };
             UiHelpers.Named(row, def.Name);
-            row.MouseEnter += (s, e) => row.Background = UiHelpers.AppBrush("ItemHoverBackground");
-            row.MouseLeave += (s, e) => row.Background = Brushes.Transparent;
-            row.GotKeyboardFocus += (s, e) => row.Background = UiHelpers.AppBrush("ItemHoverBackground");
-            row.LostKeyboardFocus += (s, e) => row.Background = Brushes.Transparent;
+            var press = new PressFeedback(row);
+            row.MouseEnter += (s, e) => press.Rest();
+            row.MouseLeave += (s, e) => press.Rest();
+            row.GotKeyboardFocus += (s, e) => press.Rest();
+            row.LostKeyboardFocus += (s, e) => press.Rest();
+            row.MouseLeftButtonDown += (s, e) => press.Down();
 
             var hostWindow = _hostWindow;
             Action run = () => WorkQueue.Post(() =>
@@ -177,14 +179,98 @@ namespace PowerPane.UI
                     ?? QuickActionRunner.Run(def, folder, selection);
                 if (message != null) WorkQueue.PostUI(() => ShowMessage(row, text, def, message));
             });
-            row.MouseLeftButtonUp += (s, e) => run();
+            row.MouseLeftButtonUp += (s, e) => { press.Up(); run(); };
             row.KeyDown += (s, e) =>
             {
                 if (e.Key != Key.Enter && e.Key != Key.Space) return;
+                press.Flash();
                 run();
                 e.Handled = true;
             };
             return row;
+        }
+
+        /// <summary>Darkens a row while it is pressed, so a click shows it landed even when the action
+        /// itself shows nothing, such as a copy. A real click lasts well under a tenth of a second, so
+        /// the pressed look is held for <see cref="MinPressMs"/> after the button goes down, and the
+        /// keyboard gets the same flash. Afterwards the row goes back to the hover look while the
+        /// pointer or keyboard focus is still on it.</summary>
+        private sealed class PressFeedback
+        {
+            private const int MinPressMs = 140;
+            private readonly Border _row;
+            private System.Windows.Threading.DispatcherTimer _timer;
+            private bool _down;
+            private int _downTick;
+
+            public PressFeedback(Border row) { _row = row; }
+
+            public void Down()
+            {
+                _down = true;
+                _downTick = Environment.TickCount;
+                StopTimer();
+                _row.Background = PressedBrush();
+            }
+
+            public void Up()
+            {
+                if (!_down) return;
+                _down = false;
+                int held = unchecked(Environment.TickCount - _downTick);
+                if (held >= 0 && held < MinPressMs) RestAfter(MinPressMs - held);
+                else Rest();
+            }
+
+            public void Flash()
+            {
+                _row.Background = PressedBrush();
+                RestAfter(MinPressMs);
+            }
+
+            /// <summary>The look with no press in progress: hover while the pointer or keyboard focus is
+            /// on the row, clear otherwise. A pointer that leaves mid-press drops the press.</summary>
+            public void Rest()
+            {
+                if (_down && !_row.IsMouseOver) _down = false;
+                if (_down || (_timer != null && _timer.IsEnabled)) return;
+                _row.Background = _row.IsMouseOver || _row.IsKeyboardFocused
+                    ? UiHelpers.AppBrush("ItemHoverBackground")
+                    : Brushes.Transparent;
+            }
+
+            private void RestAfter(int ms)
+            {
+                StopTimer();
+                _timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };
+                _timer.Tick += (s, e) => { StopTimer(); Rest(); };
+                _timer.Start();
+            }
+
+            private void StopTimer()
+            {
+                if (_timer == null) return;
+                _timer.Stop();
+                _timer = null;
+            }
+
+            private static Brush PressedBrush()
+            {
+                var hover = UiHelpers.AppBrush("ItemHoverBackground") as SolidColorBrush;
+                if (hover == null) return UiHelpers.AppBrush("ItemActiveBackground");
+                var brush = new SolidColorBrush(PressedColor(hover.Color));
+                brush.Freeze();
+                return brush;
+            }
+        }
+
+        /// <summary>The pressed color: the hover color at twice its opacity. Every theme's hover brush is
+        /// a translucent accent (15% normally, 25% in high contrast), so doubling it is a step anyone
+        /// can see, where the 20% ItemActiveBackground is too close to hover to notice in a click.</summary>
+        internal static Color PressedColor(Color hover)
+        {
+            int alpha = Math.Min(255, hover.A * 2);
+            return Color.FromArgb((byte)alpha, hover.R, hover.G, hover.B);
         }
 
         /// <summary>Puts a short message in the row for a few seconds, because an action that could not

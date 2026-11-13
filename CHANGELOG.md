@@ -15,6 +15,7 @@
 - The right-click verb is renamed from "Pin to PowerPane" to "Add to PowerPane", because Explorer already uses "pin" for its own verbs. The window's title reads "Add to PowerPane" and its confirm button reads "Add". Inside the pane, pins are still called pins. On Windows 11 the verb is under "Show more options".
 
 ### Fixed
+- A Quick actions row darkens when you click it or press Enter or Space on it, so a click shows it landed even for an action with nothing else to show, such as a copy.
 - The name box for a new tab, a new group, a rename, or a pin's path now opens next to the control you used, on the pane's own monitor, instead of at the bottom of the screen. The box for a new tab says which group it goes into ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
 - A tab or group name is checked as you type. An invalid character, a trailing dot or space, or a tab name already in the group shows a message and turns off OK, where the name used to be changed without a word ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
 - An item added from the right-click verb lands in the tab you choose. The old window offered groups only and pinned into the group's active tab as its separate process saw it.
