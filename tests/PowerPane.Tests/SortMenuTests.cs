@@ -60,6 +60,17 @@ namespace PowerPane.Tests
             }
         }
 
+        [TestCase(PinSortMode.Manual, 0)]
+        [TestCase(PinSortMode.Name, 1)]
+        [TestCase(PinSortMode.Recent, 2)]
+        public void Submenu_ReportsTheActiveModeAsCheckedToAutomation(PinSortMode current, int checkedIndex)
+        {
+            var items = Choices(Build(current));
+
+            for (int i = 0; i < 3; i++) Assert.That(items[i].IsChecked, Is.EqualTo(i == checkedIndex), items[i].Header.ToString());
+            Assert.That(items[3].IsChecked, Is.False);
+        }
+
         [Test]
         public void SortOnceItem_IsNeverChecked()
         {

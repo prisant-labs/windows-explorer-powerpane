@@ -839,6 +839,10 @@ namespace PowerPane.UI
         private static MenuItem SortChoice(string header, PinSortMode mode, PinSortMode current, Action<PinSortMode> setMode)
         {
             var mi = Item(header, () => setMode(mode));
+            // The pane's template draws no check of its own, so the glyph below is what people see.
+            // IsChecked is what UI Automation reports, so a screen reader can tell which mode is on.
+            mi.IsCheckable = true;
+            mi.IsChecked = mode == current;
             if (mode == current)
                 mi.Icon = new TextBlock { Text = "\uE73E", FontFamily = UiHelpers.IconFont(), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
             return mi;
