@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
@@ -189,7 +190,6 @@ namespace PowerPane.UI
                     MinHeight = 30,
                     Margin = new Thickness(0, 6, 0, 0)
                 };
-                AutomationProperties.SetName(message, "Name problem");
                 AutomationProperties.SetLiveSetting(message, AutomationLiveSetting.Polite);
                 stack.Children.Add(message);
             }
@@ -245,7 +245,15 @@ namespace PowerPane.UI
             {
                 if (validate == null) return;
                 string problem = string.IsNullOrWhiteSpace(box.Text) ? null : Problem(validate, box.Text);
-                message.Text = problem ?? string.Empty;
+                string shown = problem ?? string.Empty;
+                bool changed = message.Text != shown;
+                message.Text = shown;
+                // A live region only announces if the element says it changed, so tell it.
+                if (changed && shown.Length > 0)
+                {
+                    var peer = UIElementAutomationPeer.FromElement(message) ?? UIElementAutomationPeer.CreatePeerForElement(message);
+                    if (peer != null) peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+                }
                 ok.IsEnabled = acceptable();
                 ok.Opacity = ok.IsEnabled ? 1.0 : 0.5;
             };
@@ -293,8 +301,9 @@ namespace PowerPane.UI
             catch (Exception ex) { Log.Error("TextPrompt validator", ex); return null; }
         }
 
-        /// <summary>Put the window below its anchor in device pixels, from an estimated size, before it
-        /// is shown. Pixels, not WPF units, so the monitor's scale cannot shift it by rounding.</summary>
+        /// <summary>Move the window below its anchor, in device pixels, working from an estimated size,
+        /// before it is shown. Pixels, not WPF units, so the monitor's scale cannot shift it by
+        /// rounding.</summary>
         private static void PlaceNextToAnchor(Window win, FrameworkElement shell, PixelRect anchor, IntPtr anchorHwnd)
         {
             try
@@ -310,8 +319,11 @@ namespace PowerPane.UI
                 int height = PromptPlacement.ScaleDip(shell.DesiredSize.Height, dpi);
                 var spot = PromptPlacement.Compute(anchor, width, height, work, PromptPlacement.ScaleDip(GapDip, dpi));
 
-                NM.SetWindowPos(hwnd, IntPtr.Zero, spot.Left, spot.Top, spot.Width, spot.Height,
-                    NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                // Move only. The size is left to WPF: the window starts at the primary monitor's scale,
+                // and forcing a pixel size here could be scaled a second time if it lands on a monitor
+                // with another scale. CorrectPlacement settles the position from the real size.
+                NM.SetWindowPos(hwnd, IntPtr.Zero, spot.Left, spot.Top, 0, 0,
+                    NM.SWP_NOSIZE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
             }
             catch (Exception ex) { Log.Error("TextPrompt placement", ex); }
         }
