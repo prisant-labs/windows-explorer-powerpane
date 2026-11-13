@@ -119,6 +119,7 @@
     <Compile Include="UI\FolderPicker.cs" />
     <Compile Include="UI\PickerPlaces.cs" />
     <Compile Include="UI\PinPickerModel.cs" />
+    <Compile Include="UI\PickerPlacement.cs" />
     <Compile Include="UI\FolderTreeNode.cs" />
     <Compile Include="UI\IconRequests.cs" />
     <Compile Include="UI\LazyContextMenu.cs" />
