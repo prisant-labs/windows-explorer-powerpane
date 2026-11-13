@@ -290,7 +290,9 @@ namespace PowerPane.UI
 
             var addTab = new Button
             {
-                Content = "+",
+                // A TextBlock, not the string "+": WPF strips the first underscore from the automation
+                // name of a button whose content is a string, so "my_notes" was announced as "mynotes".
+                Content = new TextBlock { Text = "+" },
                 FontSize = 13,
                 FontWeight = FontWeights.Bold,
                 Background = Brushes.Transparent,
@@ -1013,7 +1015,9 @@ namespace PowerPane.UI
         {
             var plus = new Button
             {
-                Content = "+",
+                // A TextBlock, not the string "+": WPF strips the first underscore from the automation
+                // name of a button whose content is a string, so "my_notes" was announced as "mynotes".
+                Content = new TextBlock { Text = "+" },
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Opacity = 0,
