@@ -116,6 +116,7 @@
     <Compile Include="Services\UiState.cs" />
     <Compile Include="UI\TextPrompt.cs" />
     <Compile Include="UI\PromptPlacement.cs" />
+    <Compile Include="UI\GroupAddMenu.cs" />
     <Compile Include="UI\AddMenuLabels.cs" />
     <Compile Include="Services\TabNameRules.cs" />
     <Compile Include="UI\FolderPicker.cs" />

@@ -35,6 +35,72 @@ namespace PowerPane.UI
         public Func<string, string> Validate { get; set; }
     }
 
+    /// <summary>Where a control is on screen, taken on the UI thread before anything that could rebuild
+    /// the pane and detach the control.</summary>
+    internal struct PromptAnchor
+    {
+        public PixelRect Rect;
+        public IntPtr Hwnd;
+
+        /// <summary>The control's screen rectangle in device pixels and the window it is in, or null
+        /// when it is not in a window any more, as after a pane rebuild. A null anchor makes the prompt
+        /// open centred, as before.</summary>
+        internal static PromptAnchor? Capture(FrameworkElement element)
+        {
+            try
+            {
+                if (element == null) return null;
+                var source = PresentationSource.FromVisual(element) as HwndSource;
+                if (source == null || source.IsDisposed || source.Handle == IntPtr.Zero) return null;
+
+                // WPF reports screen points in device pixels, so no scale conversion is needed.
+                Point a = element.PointToScreen(new Point(0, 0));
+                Point b = element.PointToScreen(new Point(element.ActualWidth, element.ActualHeight));
+                int left = (int)Math.Round(Math.Min(a.X, b.X)), right = (int)Math.Round(Math.Max(a.X, b.X));
+                int top = (int)Math.Round(Math.Min(a.Y, b.Y)), bottom = (int)Math.Round(Math.Max(a.Y, b.Y));
+                return new PromptAnchor { Rect = new PixelRect(left, top, right, bottom), Hwnd = source.Handle };
+            }
+            catch (Exception ex)
+            {
+                Log.Error("capture prompt anchor", ex);
+                return null;
+            }
+        }
+
+        /// <summary>The control a context menu opened from, found from the menu item that was clicked.</summary>
+        internal static FrameworkElement MenuOwner(object menuItem)
+        {
+            var mi = menuItem as MenuItem;
+            var menu = mi == null ? null : mi.Parent as ContextMenu;
+            return menu == null ? null : menu.PlacementTarget as FrameworkElement;
+        }
+    }
+
+    /// <summary>A prompt opened from a pane control (#243).</summary>
+    internal static class AnchoredPrompt
+    {
+        /// <summary>Opens the prompt next to <paramref name="anchor"/>, or centred when it is null. The
+        /// dock stays open while the prompt is up, because a drag or a menu is not what holds it.</summary>
+        internal static string Ask(PromptAnchor? anchor, PromptOptions options)
+        {
+            if (anchor.HasValue)
+            {
+                options.Anchor = anchor.Value.Rect;
+                options.AnchorHwnd = anchor.Value.Hwnd;
+            }
+            bool prior = SidebarControl.SuppressAutoHide;
+            SidebarControl.SuppressAutoHide = true;
+            try { return TextPrompt.Ask(options); }
+            finally { SidebarControl.SuppressAutoHide = prior; }
+        }
+
+        /// <summary>The same, anchored to a control read now.</summary>
+        internal static string Ask(FrameworkElement control, PromptOptions options)
+        {
+            return Ask(PromptAnchor.Capture(control), options);
+        }
+    }
+
     /// <summary>
     /// Small top-level prompt for a single line of text. The embedded sidebar lives in Explorer's
     /// process and cannot take keyboard focus, so any typing has to happen in a real top-level window

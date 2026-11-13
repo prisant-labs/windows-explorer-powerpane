@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using PowerPane.Interop;
 using PowerPane.Models;
 using PowerPane.Services;
@@ -88,7 +89,7 @@ namespace PowerPane.UI
                 var captured = rec;
                 var node = new FolderTreeNode(rec.DisplayName, rec.TargetPath, rec.Exists,
                     _navigate, 0, rec.IsFile);
-                node.Row.ContextMenu = BuildRecentMenu(captured);
+                node.Row.ContextMenu = BuildRecentMenu(captured, node.Row);
                 items.Children.Add(node);
             }
 
@@ -116,7 +117,7 @@ namespace PowerPane.UI
             catch { return rec.TargetPath; }
         }
 
-        private ContextMenu BuildRecentMenu(PinnedFolder rec)
+        private ContextMenu BuildRecentMenu(PinnedFolder rec, FrameworkElement owner)
         {
             var menu = new ContextMenu();
             if (rec.IsFile)
@@ -143,7 +144,11 @@ namespace PowerPane.UI
                 if (pinTo.Items.Count > 0) pinTo.Items.Add(new Separator());
                 pinTo.Items.Add(Item("New group...", () =>
                 {
-                    var name = TextPrompt.Ask("New group name", "");
+                    var name = AnchoredPrompt.Ask(owner, new PromptOptions
+                    {
+                        Title = "New group name",
+                        Validate = text => TabNameRules.Validate(text, null)
+                    });
                     if (string.IsNullOrWhiteSpace(name)) return;
                     App.Groups.PostEdit(store =>
                     {
@@ -165,13 +170,19 @@ namespace PowerPane.UI
             return menu;
         }
 
-        internal static void RenameSectionPrompt(string type, string fallback)
+        internal static void RenameSectionPrompt(string type, string fallback, FrameworkElement anchor = null)
         {
             try
             {
                 var sec = App.Settings?.Current.Sections.FirstOrDefault(x => x.Type == type);
                 if (sec == null) return;
-                var v = TextPrompt.Ask("Rename section", string.IsNullOrWhiteSpace(sec.Title) ? fallback : sec.Title);
+                // Most callers are a header's double-click, which has no control to hand over, so the control
+                // under the pointer is the anchor, which is the header that was clicked.
+                var v = AnchoredPrompt.Ask(anchor ?? Mouse.DirectlyOver as FrameworkElement, new PromptOptions
+                {
+                    Title = "Rename section",
+                    Initial = string.IsNullOrWhiteSpace(sec.Title) ? fallback : sec.Title
+                });
                 if (v == null) return;
                 sec.Title = v;
                 App.Settings.Save();
@@ -190,7 +201,7 @@ namespace PowerPane.UI
         {
             var menu = new ContextMenu();
             var mi = new MenuItem { Header = "Rename section" };
-            mi.Click += (s, e) => RenameSectionPrompt(type, fallback);
+            mi.Click += (s, e) => RenameSectionPrompt(type, fallback, PromptAnchor.MenuOwner(s));
             menu.Items.Add(mi);
             var reset = new MenuItem { Header = "Reset name" };
             reset.Click += (s, e) =>
