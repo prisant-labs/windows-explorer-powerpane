@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+- The right-click verb now appears on files and on drives as well as on folders and folder backgrounds ([#242](https://github.com/prisant-labs/windows-explorer-powerpane/issues/242)).
+- The verb's window lets you choose a tab as well as a group, with "New group..." and "New tab..." entries, and remembers the group and tab you used last. It is reachable by keyboard and its controls are named for screen readers.
+- Selecting several items and choosing the verb opens one window for all of them, however Explorer starts the verb, and an item whose launch arrives while the window is open joins it.
+
+### Changed
+- The right-click verb is renamed from "Pin to PowerPane" to "Add to PowerPane", because Explorer already uses "pin" for its own verbs. The window's title reads "Add to PowerPane" and its confirm button reads "Add". Inside the pane, pins are still called pins. On Windows 11 the verb is under "Show more options".
+
+### Fixed
+- An item added from the right-click verb lands in the tab you choose. The old window offered groups only and pinned into the group's active tab as its separate process saw it.
+- The verb's window opens fully on the monitor the pointer is on, sized for that monitor's scale.
+
 ## [4.0.0.1] - 2026-11-12
 
 Two fixes for the pane inside Open, Save As, and Select Folder dialogs.
