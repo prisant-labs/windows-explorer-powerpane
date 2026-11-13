@@ -177,8 +177,10 @@ namespace PowerPane.Tests
         }
 
         [Test]
-        public void PlusName_IsDifferentForEachGroup()
+        public void PlusName_IsDifferentForGroupsWithDifferentNames_AndSameForGroupsThatShareOne()
         {
+            Assert.That(AddMenuLabels.PlusName(Group("Apollo", "Apollo")),
+                Is.EqualTo(AddMenuLabels.PlusName(Group("Apollo", "Mira", "Orion"))));
             Assert.That(AddMenuLabels.PlusName(Group("Apollo", "Apollo")),
                 Is.Not.EqualTo(AddMenuLabels.PlusName(Group("Zephyr", "Mira", "Orion"))));
         }

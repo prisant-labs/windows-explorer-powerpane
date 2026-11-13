@@ -107,8 +107,9 @@ namespace PowerPane.UI
             return list;
         }
 
-        /// <summary>The "+" button's tooltip and automation name. It names the group, so each group's
-        /// button can be told apart.</summary>
+        /// <summary>The "+" button's tooltip and automation name. It names the group, so buttons of groups
+        /// with different names can be told apart. It is not unique: two groups can share a name, and a
+        /// blank name becomes "Group", so their buttons carry the same name.</summary>
         internal static string PlusName(PinnedGroup group)
         {
             return "Add to \"" + GroupLabel(group) + "\"";
