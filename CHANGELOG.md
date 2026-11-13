@@ -3,14 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- A **Sort pins** submenu on a tab's right-click menu, and on the header menu of a group that has one tab. **A to Z (keep sorted)** and **Recently added (keep sorted)** keep a tab ordered by themselves, so a pin added by any other route than a drop at a line lands in its place. **Sort A to Z once** reorders the tab one time, and **Manual order** turns keep-sorted off without moving anything. A tab stays in manual order until you choose otherwise. Dropping a pin, file, or folder at a line, or using Move up or Move down, puts a sorted tab back in manual order with the order you left on screen ([#241](https://github.com/prisant-labs/windows-explorer-powerpane/issues/241)).
 - The right-click verb now appears on files and on drives as well as on folders and folder backgrounds ([#242](https://github.com/prisant-labs/windows-explorer-powerpane/issues/242)).
 - The verb's window lets you choose a tab as well as a group, with "New group..." and "New tab..." entries, and remembers the group and tab you used last. It is reachable by keyboard and its controls are named for screen readers.
 - Selecting several items and choosing the verb opens one window for all of them, however Explorer starts the verb, and an item whose launch arrives while the window is open joins it.
 
 ### Changed
+- The **+** at the end of a group's tab strip, and the **+** in a one-tab group's header, now open a menu to add a tab, a group below, a folder, or a file. Each entry names what it adds to, such as `Add tab to "Mira / Orion"...` for a group with the tabs Mira and Orion, and a folder or file goes into the tab that is selected when you click. The group's right-click menu builds the same entries, and a tab's right-click menu has the folder and file ones, aimed at that tab. A name's underscores now show in these menus ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
 - The right-click verb is renamed from "Pin to PowerPane" to "Add to PowerPane", because Explorer already uses "pin" for its own verbs. The window's title reads "Add to PowerPane" and its confirm button reads "Add". Inside the pane, pins are still called pins. On Windows 11 the verb is under "Show more options".
 
 ### Fixed
+- The name box for a new tab, a new group, a rename, or a pin's path now opens next to the control you used, on the pane's own monitor, instead of at the bottom of the screen. The box for a new tab says which group it goes into ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
+- A tab or group name is checked as you type. An invalid character, a trailing dot or space, or a tab name already in the group shows a message and turns off OK, where the name used to be changed without a word ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
 - An item added from the right-click verb lands in the tab you choose. The old window offered groups only and pinned into the group's active tab as its separate process saw it.
 - The verb's window opens fully on the monitor the pointer is on, sized for that monitor's scale.
 

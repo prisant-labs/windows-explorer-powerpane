@@ -54,7 +54,23 @@ namespace PowerPane.UI
 
         /// <summary>Set while a drag or a context menu is active anywhere in a pane, so the desktop
         /// dock does not auto-collapse out from under the user mid-interaction.</summary>
-        public static bool SuppressAutoHide;
+        public static bool SuppressAutoHide
+        {
+            get { return _menuOrDragHold || _promptHolds > 0; }
+            set { _menuOrDragHold = value; }
+        }
+
+        private static bool _menuOrDragHold;
+        private static int _promptHolds;
+
+        /// <summary>A name prompt holds the dock open in a count of its own. A menu's item click is raised
+        /// before the menu's Closed event, so a prompt opened from a menu entry starts while the menu
+        /// still holds the flag, and the menu then clears the flag while the prompt is up. A separate
+        /// count means neither one can clear or restore the other's hold.</summary>
+        internal static void HoldAutoHide() { _promptHolds++; }
+
+        /// <summary>Lets go of one <see cref="HoldAutoHide"/>.</summary>
+        internal static void ReleaseAutoHide() { if (_promptHolds > 0) _promptHolds--; }
 
         public SidebarControl()
         {

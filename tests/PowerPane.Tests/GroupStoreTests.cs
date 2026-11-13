@@ -276,6 +276,25 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void CreateGroupAfter_AGroupFromTheOldProfile_CreatesNothing()
+        {
+            // The "New group below" prompt can stay open across a profile switch (#243).
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups[0];
+                f.SwitchToB();
+                f.Store.ScanOnce();
+                var before = f.Tree();
+
+                var created = f.Store.CreateGroupAfter(alpha, "Hermes");
+
+                Assert.That(created, Is.Null);
+                Assert.That(f.Tree(), Is.EqualTo(before));
+            }
+        }
+
+        [Test]
         public void IsCurrent_RefusesAPinFromTheOldProfile()
         {
             using (var f = new TwoProfiles())
@@ -508,6 +527,432 @@ namespace PowerPane.Tests
 
                 f.Store.ScanOnce();
                 Assert.That(f.Store.Groups[0].Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Second", "Main", "Third" }));
+            }
+        }
+
+        // ---- tab auto-sort (#241) ---------------------------------------------
+        // Pins here are real shortcuts to a folder inside the test's own temp directory, so loading
+        // one never fails and never writes to the log in the system temp folder.
+
+        private static string MainDir(TwoProfiles f) { return Path.Combine(f.GroupA, "01_Main"); }
+        private static string SecondDir(TwoProfiles f) { return Path.Combine(f.GroupA, "02_Second"); }
+
+        private static string Touch(string dir, string fileName, System.DateTime? createdUtc = null)
+        {
+            var path = Path.Combine(dir, fileName);
+            ShellLink.Create(path, Path.GetDirectoryName(dir));
+            if (createdUtc.HasValue) File.SetCreationTimeUtc(path, createdUtc.Value);
+            return path;
+        }
+
+        private static void Mark(string dir, string text)
+        {
+            File.WriteAllText(Path.Combine(dir, PinSorter.MarkerFileName), text);
+        }
+
+        private static string[] Names(PinnedTab tab) { return tab.Items.Select(p => p.DisplayName).ToArray(); }
+
+        private static string[] FileNames(string dir)
+        {
+            return Directory.GetFiles(dir, "*.lnk").Select(Path.GetFileName).OrderBy(n => n).ToArray();
+        }
+
+        private static bool HasMarker(string dir) { return File.Exists(Path.Combine(dir, PinSorter.MarkerFileName)); }
+
+        private static PinnedTab MainTab(TwoProfiles f) { f.Store.ScanOnce(); return f.Store.Groups[0].Tabs[0]; }
+
+        [Test]
+        public void Scan_WithoutAMarker_ShowsTheStoredOrder()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Item 10.lnk");
+                Touch(MainDir(f), "003_Item 2.lnk");
+
+                var tab = MainTab(f);
+
+                Assert.That(tab.SortMode, Is.EqualTo(PinSortMode.Manual));
+                Assert.That(Names(tab), Is.EqualTo(new[] { "Zephyr", "Item 10", "Item 2" }));
+            }
+        }
+
+        [Test]
+        public void Scan_NameMarker_ShowsNaturalCaseInsensitiveOrder()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Item 10.lnk");
+                Touch(MainDir(f), "003_apollo.lnk");
+                Touch(MainDir(f), "004_Item 2.lnk");
+                Mark(MainDir(f), "name");
+
+                var tab = MainTab(f);
+
+                Assert.That(tab.SortMode, Is.EqualTo(PinSortMode.Name));
+                Assert.That(Names(tab), Is.EqualTo(new[] { "apollo", "Item 2", "Item 10", "Zephyr" }));
+                // The scan never rewrites the stored names.
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Zephyr.lnk", "002_Item 10.lnk", "003_apollo.lnk", "004_Item 2.lnk" }));
+            }
+        }
+
+        [Test]
+        public void Scan_RecentMarker_ShowsNewestFirstByCreationTime()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var t = new System.DateTime(2026, 3, 1, 0, 0, 0, System.DateTimeKind.Utc);
+                Touch(MainDir(f), "001_Apollo.lnk", t.AddDays(2));
+                Touch(MainDir(f), "002_Zephyr.lnk", t);
+                Touch(MainDir(f), "003_Item 2.lnk", t.AddDays(5));
+                Mark(MainDir(f), "recent");
+
+                var tab = MainTab(f);
+
+                Assert.That(tab.SortMode, Is.EqualTo(PinSortMode.Recent));
+                Assert.That(Names(tab), Is.EqualTo(new[] { "Item 2", "Apollo", "Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void Scan_UnknownMarker_ReadsAsManualAndDoesNotThrow()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                Mark(MainDir(f), "sideways");
+
+                var tab = MainTab(f);
+
+                Assert.That(tab.SortMode, Is.EqualTo(PinSortMode.Manual));
+                Assert.That(Names(tab), Is.EqualTo(new[] { "Zephyr", "Apollo" }));
+            }
+        }
+
+        [Test]
+        public void CopyGroupFolder_KeepsEachShortcutsCreationTime_SoARecentTabKeepsItsOrder()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var t = new System.DateTime(2026, 3, 1, 12, 0, 0, System.DateTimeKind.Utc);
+                Touch(MainDir(f), "001_Apollo.lnk", t);
+                Touch(MainDir(f), "002_Zephyr.lnk", t.AddDays(3));
+                Mark(MainDir(f), "recent");
+                var destRoot = Path.Combine(f.Temp.Path, "CopyTarget");
+
+                GroupStore.CopyGroupFolder(f.GroupA, destRoot);
+
+                var copied = Directory.GetDirectories(destRoot).Single();
+                var main = Path.Combine(copied, "01_Main");
+                Assert.That(File.GetCreationTimeUtc(Path.Combine(main, "001_Apollo.lnk")), Is.EqualTo(t));
+                Assert.That(File.GetCreationTimeUtc(Path.Combine(main, "002_Zephyr.lnk")), Is.EqualTo(t.AddDays(3)));
+                Assert.That(HasMarker(main), Is.True);
+            }
+        }
+
+        [Test]
+        public void Touch_CreatesAShortcutThatResolvesToItsTargetFolder()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var path = Touch(MainDir(f), "001_Apollo.lnk");
+                Assert.That(ShellLink.ResolveTarget(path), Is.EqualTo(Path.GetDirectoryName(MainDir(f))).IgnoreCase);
+            }
+        }
+
+        [Test]
+        public void InsertMovedPinAt_WhenTheRenameFails_PutsThePinBackUnderItsOwnName()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var original = Touch(SecondDir(f), "001_Mango.lnk");
+                var other = Touch(MainDir(f), "001_Apollo.lnk");
+                var tmpNew = Path.Combine(MainDir(f), "~new~abc.lnk");
+                File.Move(original, tmpNew);
+
+                // An open handle with no sharing makes the rename of Apollo throw, as a lock would.
+                using (new FileStream(other, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Assert.Throws<IOException>(() => GroupStore.InsertMovedPinAt(MainDir(f), tmpNew, original, "Mango", 1));
+                }
+
+                Assert.That(File.Exists(original), Is.True);
+                Assert.That(File.Exists(tmpNew), Is.False);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Apollo.lnk" }));
+            }
+        }
+
+        [Test]
+        public void SetPinSort_Name_WritesTheMarkerAndLeavesFileNames()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                var tab = MainTab(f);
+
+                f.Store.SetPinSort(tab, PinSortMode.Name);
+
+                Assert.That(HasMarker(MainDir(f)), Is.True);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Zephyr.lnk", "002_Apollo.lnk" }));
+                var after = f.Store.Groups[0].Tabs[0];
+                Assert.That(after.SortMode, Is.EqualTo(PinSortMode.Name));
+                Assert.That(Names(after), Is.EqualTo(new[] { "Apollo", "Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void SetPinSort_Manual_FreezesTheDisplayedOrderAndRemovesTheMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Item 10.lnk");
+                Touch(MainDir(f), "003_Item 2.lnk");
+                Mark(MainDir(f), "name");
+                var tab = MainTab(f);
+
+                f.Store.SetPinSort(tab, PinSortMode.Manual);
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Item 2.lnk", "002_Item 10.lnk", "003_Zephyr.lnk" }));
+                var after = f.Store.Groups[0].Tabs[0];
+                Assert.That(after.SortMode, Is.EqualTo(PinSortMode.Manual));
+                Assert.That(Names(after), Is.EqualTo(new[] { "Item 2", "Item 10", "Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void SetPinSort_Manual_OnAManualTab_ChangesNothing()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "005_Zephyr.lnk");
+                Touch(MainDir(f), "009_Apollo.lnk");
+                var tab = MainTab(f);
+
+                f.Store.SetPinSort(tab, PinSortMode.Manual);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "005_Zephyr.lnk", "009_Apollo.lnk" }));
+            }
+        }
+
+        [Test]
+        public void ReorderPins_OnASortedTab_RemovesTheMarkerAndWritesTheOrderGiven()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                Mark(MainDir(f), "name");
+                var tab = MainTab(f);
+                var moved = tab.Items.ToList();   // on screen: Apollo, Zephyr
+                moved.Reverse();                   // the person leaves Zephyr first
+
+                f.Store.ReorderPins(tab, moved);
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Zephyr", "Apollo" }));
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Zephyr.lnk", "002_Apollo.lnk" }));
+            }
+        }
+
+        [Test]
+        public void MovePin_OnASortedTab_UsesTheDisplayedOrderAndLeavesTheTabManual()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Mango.lnk");
+                Touch(MainDir(f), "003_Apollo.lnk");
+                Mark(MainDir(f), "name");
+                var tab = MainTab(f);   // on screen: Apollo, Mango, Zephyr
+
+                f.Store.MovePin(tab, tab.Items[0], +1);   // Apollo down one
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Mango", "Apollo", "Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void SortPinsOnce_WritesAToZAndLeavesNoMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var t = new System.DateTime(2026, 3, 1, 0, 0, 0, System.DateTimeKind.Utc);
+                Touch(MainDir(f), "001_Zephyr.lnk", t);
+                Touch(MainDir(f), "002_Item 10.lnk", t.AddDays(1));
+                Touch(MainDir(f), "003_Item 2.lnk", t.AddDays(2));
+                Mark(MainDir(f), "recent");
+                var tab = MainTab(f);
+
+                f.Store.SortPinsOnce(tab);
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Item 2.lnk", "002_Item 10.lnk", "003_Zephyr.lnk" }));
+                Assert.That(f.Store.Groups[0].Tabs[0].SortMode, Is.EqualTo(PinSortMode.Manual));
+            }
+        }
+
+        [Test]
+        public void SetPinSort_OnAnImplicitEmptyTab_CreatesTheTabFolderWithTheMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var empty = Path.Combine(f.RootA, "03_Empty");
+                Directory.CreateDirectory(empty);
+                f.Store.ScanOnce();
+                var tab = f.Store.Groups.First(g => g.Name == "Empty").Tabs[0];
+                Assert.That(tab.FolderPath, Is.EqualTo(empty));
+
+                f.Store.SetPinSort(tab, PinSortMode.Name);
+
+                var created = Path.Combine(empty, "01_Empty");
+                Assert.That(HasMarker(created), Is.True);
+                Assert.That(HasMarker(empty), Is.False);
+                Assert.That(f.Store.Groups.First(g => g.Name == "Empty").Tabs[0].SortMode, Is.EqualTo(PinSortMode.Name));
+            }
+        }
+
+        [Test]
+        public void SetPinSort_Manual_OnAnImplicitEmptyTab_CreatesNothing()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var empty = Path.Combine(f.RootA, "03_Empty");
+                Directory.CreateDirectory(empty);
+                f.Store.ScanOnce();
+                var tab = f.Store.Groups.First(g => g.Name == "Empty").Tabs[0];
+                var before = f.Tree();
+
+                f.Store.SetPinSort(tab, PinSortMode.Manual);
+
+                Assert.That(f.Tree(), Is.EqualTo(before));
+            }
+        }
+
+        [Test]
+        public void SortEdits_AfterAProfileSwitch_ChangeNothing()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                Mark(SecondDir(f), "name");
+                f.Store.ScanOnce();
+                var main = f.Store.Groups[0].Tabs[0];
+                var second = f.Store.Groups[0].Tabs[1];
+                var pin = main.Items[0];
+                var before = f.Tree();
+
+                f.SwitchToB();
+                f.Store.SetPinSort(main, PinSortMode.Recent);
+                f.Store.SetPinSort(second, PinSortMode.Manual);
+                f.Store.SortPinsOnce(main);
+                f.Store.MovePinToTabAt(pin, second, 0);
+
+                Assert.That(f.Tree(), Is.EqualTo(before));
+                Assert.That(f.Notes.Count, Is.EqualTo(4));
+            }
+        }
+
+        [Test]
+        public void MoveTabToGroup_KeepsTheSortMode()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Mark(SecondDir(f), "recent");
+                f.Store.ScanOnce();
+                var second = f.Store.Groups[0].Tabs[1];
+                var gamma = f.Store.Groups[1];
+
+                f.Store.MoveTabToGroup(second, gamma);
+
+                f.Store.ScanOnce();
+                var moved = f.Store.Groups.First(g => g.Name == "Gamma").Tabs.First(t => t.Name == "Second");
+                Assert.That(moved.SortMode, Is.EqualTo(PinSortMode.Recent));
+            }
+        }
+
+        [Test]
+        public void MovePinToTabAt_IntoASortedTab_InsertsAtTheLineInScreenOrderAndClearsTheMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                // Stored order is Zephyr, Apollo; the sorted tab shows Apollo, Zephyr.
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                Mark(MainDir(f), "name");
+                Touch(SecondDir(f), "001_Mango.lnk");
+                f.Store.ScanOnce();
+                var main = f.Store.Groups[0].Tabs[0];
+                var mango = f.Store.Groups[0].Tabs[1].Items[0];
+
+                f.Store.MovePinToTabAt(mango, main, 1);   // the line between Apollo and Zephyr
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Apollo.lnk", "002_Mango.lnk", "003_Zephyr.lnk" }));
+                Assert.That(FileNames(SecondDir(f)), Is.Empty);
+            }
+        }
+
+        [Test]
+        public void MovePinToTab_IntoASortedTab_LandsSortedAndKeepsTheMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                Mark(MainDir(f), "name");
+                Touch(SecondDir(f), "001_Mango.lnk");
+                f.Store.ScanOnce();
+                var main = f.Store.Groups[0].Tabs[0];
+                var mango = f.Store.Groups[0].Tabs[1].Items[0];
+
+                f.Store.MovePinToTab(mango, main);
+
+                Assert.That(HasMarker(MainDir(f)), Is.True);
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Apollo", "Mango", "Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void AddPins_IntoASortedTab_LandsSortedAndKeepsTheMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Mark(MainDir(f), "name");
+                var tab = MainTab(f);
+                var target = Path.Combine(f.Temp.Path, "Apollo");
+                Directory.CreateDirectory(target);
+
+                f.Store.AddPins(tab, new[] { target });
+
+                Assert.That(HasMarker(MainDir(f)), Is.True);
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Apollo", "Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void AddPinAtIndex_OnASortedTab_InsertsInScreenOrderAndClearsTheMarker()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002_Apollo.lnk");
+                Mark(MainDir(f), "name");
+                var tab = MainTab(f);   // on screen: Apollo, Zephyr
+                var target = Path.Combine(f.Temp.Path, "Mango");
+                Directory.CreateDirectory(target);
+
+                f.Store.AddPinAtIndex(tab, target, 1);
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Apollo", "Mango", "Zephyr" }));
             }
         }
     }

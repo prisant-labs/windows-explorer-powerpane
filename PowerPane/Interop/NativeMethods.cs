@@ -210,6 +210,10 @@ namespace PowerPane.Interop
         public static extern IntPtr SHGetFileInfo(string pszPath, uint dwFileAttributes,
             ref SHFILEINFO psfi, uint cbSizeFileInfo, uint uFlags);
 
+        // The comparison Explorer uses for file names: case-insensitive, digit runs compare as numbers.
+        [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+        public static extern int StrCmpLogicalW(string a, string b);
+
         [DllImport("user32.dll")]
         public static extern bool DestroyIcon(IntPtr hIcon);
 

@@ -204,7 +204,7 @@ namespace PowerPane.UI
                     var captured = pin;
                     var node = new FolderTreeNode(pin.DisplayName, pin.TargetPath, pin.Exists, _navigate, 0,
                         captured.IsFile, null, pinCtx);
-                    LazyContextMenu.Attach(node.Row, () => BuildPinMenu(group, active, captured));
+                    LazyContextMenu.Attach(node.Row, () => BuildPinMenu(group, active, captured, node.Row));
                     WirePinDragSource(node.Row, captured);
                     items.Children.Add(node);
                 }
@@ -230,9 +230,9 @@ namespace PowerPane.UI
             Grid header = null;
             header = UiHelpers.BuildHeader(tab.Name,
                 () => { group.Expanded = !group.Expanded; UiState.SetExpanded("group:" + group.FolderPath, group.Expanded); UiHelpers.ToggleExpand(items, ChevronOf(header), group.Expanded); },
-                () => RenameGroupOrTab(group, tab),
+                () => RenameGroupOrTab(group, tab, header),
                 out chevron, out label);
-            header.ContextMenu = BuildGroupMenu(group, tab);
+            header.ContextMenu = BuildGroupMenu(group, tab, header);
             AddPlusButton(header, group);
             WireGroupDrag(header, group);
             EnableGroupDrop(header, group);
@@ -290,7 +290,9 @@ namespace PowerPane.UI
 
             var addTab = new Button
             {
-                Content = "+",
+                // A TextBlock, not the string "+": WPF strips the first underscore from the automation
+                // name of a button whose content is a string, so "my_notes" was announced as "mynotes".
+                Content = new TextBlock { Text = "+" },
                 FontSize = 13,
                 FontWeight = FontWeights.Bold,
                 Background = Brushes.Transparent,
@@ -299,18 +301,16 @@ namespace PowerPane.UI
                 Cursor = Cursors.Hand,
                 Padding = new Thickness(6, 0, 4, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = "Add tab"
+                ToolTip = AddMenuLabels.PlusName(group)
             };
-            UiHelpers.Named(addTab, "Add tab");
-            addTab.Click += (s, e) =>
-            {
-                var v = TextPrompt.Ask("New tab name", "");
-                if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v));
-            };
+            UiHelpers.Named(addTab, AddMenuLabels.PlusName(group));
+            // Opens the Add menu rather than a name box, so a folder, a file, or a group can be added
+            // from the same button. The menu is built on each click, so it sees the selected tab.
+            addTab.Click += (s, e) => GroupAddMenu.Open(addTab, group, null);
             Grid.SetColumn(addTab, 2);
             grid.Children.Add(addTab);
 
-            grid.ContextMenu = BuildGroupMenu(group, group.Active);
+            grid.ContextMenu = BuildGroupMenu(group, group.Active, grid);
             // The row is a drop target for groups (merge) and tabs (move in).
             EnableGroupDrop(grid, group);
             return grid;
@@ -339,11 +339,11 @@ namespace PowerPane.UI
             stack.Children.Add(underline);
 
             var btn = new Border { Background = Brushes.Transparent, Cursor = Cursors.Hand, Child = stack, Tag = "tab" };
-            btn.ContextMenu = BuildTabMenu(group, tab);
+            btn.ContextMenu = BuildTabMenu(group, tab, btn);
 
             btn.PreviewMouseLeftButtonDown += (s, e) =>
             {
-                if (e.ClickCount == 2) { e.Handled = true; RenameTab(tab); return; }
+                if (e.ClickCount == 2) { e.Handled = true; RenameTab(group, tab, btn); return; }
                 BeginMaybeDrag(btn, e);
             };
             btn.PreviewMouseLeftButtonUp += (s, e) =>
@@ -729,13 +729,18 @@ namespace PowerPane.UI
             if (!ReferenceEquals(hit.Item1, destTab))
             {
                 var folder = hit.Item2;
-                App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
+                // A pin dropped at a line on a sorted tab goes in at that line, in the order shown,
+                // and the tab becomes Manual (#241). A manual tab keeps its append-at-end behavior.
+                if (destTab.SortMode != PinSortMode.Manual)
+                    App.Groups.PostEdit(store => store.MovePinToTabAt(folder, destTab, index));
+                else
+                    App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
                 return;
             }
-            var ordered = destTab.Items.Where(p => !ReferenceEquals(p, hit.Item2)).ToList();
-            if (index < 0) index = 0;
-            if (index > ordered.Count) index = ordered.Count;
-            ordered.Insert(index, hit.Item2);
+            // The index counts the dragged row too. A drop that leaves the order as it is posts
+            // nothing, so it never turns a sorted tab to Manual.
+            var ordered = PinSorter.PlaceAtLine(destTab.Items, hit.Item2, index);
+            if (ordered == null) return;
             App.Groups.PostEdit(store => store.ReorderPins(destTab, ordered));
         }
 
@@ -771,15 +776,17 @@ namespace PowerPane.UI
         }
 
         // ---- menus ----
-        private ContextMenu BuildGroupMenu(PinnedGroup group, PinnedTab activeTab)
+        private ContextMenu BuildGroupMenu(PinnedGroup group, PinnedTab activeTab, FrameworkElement owner)
         {
             var menu = new ContextMenu();
-            menu.Items.Add(Item("Rename", () => RenameGroupOrTab(group, group.Tabs.Count == 1 ? group.Tabs[0] : activeTab)));
+            menu.Items.Add(Item("Rename", () => RenameGroupOrTab(group, group.Tabs.Count == 1 ? group.Tabs[0] : activeTab, owner)));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Add tab", () => { var v = TextPrompt.Ask("New tab name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v)); }));
-            menu.Items.Add(Item("Add group below", () => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroupAfter(group, v)); }));
-            menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(group, p)); }));
-            menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(group, p)); }));
+            // The same entries as the "+" button's menu, each naming its target. Prompts open next to
+            // the control this menu belongs to, read when an entry is chosen.
+            GroupAddMenu.AddGroupMenuEntries(menu, group, activeTab, owner);
+            // A group with one tab has no tab row, so this header menu is the only menu that tab has.
+            // With several tabs, sorting is chosen per tab from the tab's own menu.
+            if (group.Tabs.Count == 1) menu.Items.Add(BuildSortMenu(group.Tabs[0]));
             menu.Items.Add(Item("Move up", () => App.Groups.PostEdit(store => store.MoveGroup(group, -1))));
             menu.Items.Add(Item("Move down", () => App.Groups.PostEdit(store => store.MoveGroup(group, +1))));
             menu.Items.Add(new Separator());
@@ -787,16 +794,16 @@ namespace PowerPane.UI
             return menu;
         }
 
-        private ContextMenu BuildTabMenu(PinnedGroup group, PinnedTab tab)
+        private ContextMenu BuildTabMenu(PinnedGroup group, PinnedTab tab, FrameworkElement owner)
         {
             var menu = new ContextMenu();
-            menu.Items.Add(Item("Rename tab", () => RenameTab(tab)));
+            menu.Items.Add(Item("Rename tab", () => RenameTab(group, tab, owner)));
             menu.Items.Add(new Separator());
             // These land in the tab that was right-clicked, not the group's active tab: a group with
             // several tabs otherwise has no way to add a pin anywhere but the narrow strip past the
             // last tab, which always targets whichever tab happened to be active.
-            menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(tab, p)); }));
-            menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(tab, p)); }));
+            GroupAddMenu.AddTabMenuEntries(menu, group, tab, owner);
+            menu.Items.Add(BuildSortMenu(tab));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Move tab left", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, -1))));
             menu.Items.Add(Item("Move tab right", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, +1))));
@@ -806,13 +813,46 @@ namespace PowerPane.UI
             return menu;
         }
 
+        // The "Sort pins" submenu for one tab (#241). The pane rebuilds on GroupsChanged, so the
+        // check mark reads the mode the tab has when the menu is built.
+        private static MenuItem BuildSortMenu(PinnedTab tab)
+        {
+            return BuildSortMenu(tab.SortMode,
+                mode => App.Groups.PostEdit(store => store.SetPinSort(tab, mode)),
+                () => App.Groups.PostEdit(store => store.SortPinsOnce(tab)));
+        }
+
+        internal static MenuItem BuildSortMenu(PinSortMode current, Action<PinSortMode> setMode, Action sortOnce)
+        {
+            var sort = new MenuItem { Header = "Sort pins" };
+            sort.Items.Add(SortChoice("Manual order", PinSortMode.Manual, current, setMode));
+            sort.Items.Add(SortChoice("A to Z (keep sorted)", PinSortMode.Name, current, setMode));
+            sort.Items.Add(SortChoice("Recently added (keep sorted)", PinSortMode.Recent, current, setMode));
+            sort.Items.Add(new Separator());
+            // Never checked: it writes the order once and leaves the tab in Manual.
+            sort.Items.Add(Item("Sort A to Z once", sortOnce));
+            return sort;
+        }
+
+        private static MenuItem SortChoice(string header, PinSortMode mode, PinSortMode current, Action<PinSortMode> setMode)
+        {
+            var mi = Item(header, () => setMode(mode));
+            // The pane's template draws no check of its own, so the glyph below is what people see.
+            // IsChecked is what UI Automation reports, so a screen reader can tell which mode is on.
+            mi.IsCheckable = true;
+            mi.IsChecked = mode == current;
+            if (mode == current)
+                mi.Icon = new TextBlock { Text = "\uE73E", FontFamily = UiHelpers.IconFont(), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            return mi;
+        }
+
         /// <summary>
         /// Point a pin somewhere else without removing and re-pinning it. A pin whose target moved, or
         /// was captured wrongly in the first place, keeps its name and its place in the group and only
         /// its destination changes. The text is taken as typed, because a share that is offline right
         /// now is still the path that was meant.
         /// </summary>
-        private void EditPinPath(PinnedFolder pin)
+        private void EditPinPath(PinnedFolder pin, FrameworkElement owner)
         {
             try
             {
@@ -823,7 +863,7 @@ namespace PowerPane.UI
                 Func<string, string> browse = pin.IsFile
                     ? (Func<string, string>)BrowseForFile
                     : BrowseForFolder;
-                var typed = TextPrompt.Ask("Edit path", pin.TargetPath ?? "", browse);
+                var typed = AnchoredPrompt.Ask(owner, new PromptOptions { Title = "Edit path", Initial = pin.TargetPath ?? "", Browse = browse });
                 if (typed == null) return;
                 typed = typed.Trim().Trim('"');
                 if (typed.Length == 0) return;
@@ -839,7 +879,7 @@ namespace PowerPane.UI
             catch (Exception ex) { Log.Error("edit the path of '" + (pin == null ? "" : pin.DisplayName) + "'", ex); }
         }
 
-        private ContextMenu BuildPinMenu(PinnedGroup group, PinnedTab tab, PinnedFolder pin)
+        private ContextMenu BuildPinMenu(PinnedGroup group, PinnedTab tab, PinnedFolder pin, FrameworkElement owner)
         {
             var menu = new ContextMenu();
             if (pin.IsFile)
@@ -863,8 +903,8 @@ namespace PowerPane.UI
                 if (quickActions != null) menu.Items.Add(quickActions);
             }
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Rename", () => { var v = TextPrompt.Ask("Rename pin", pin.DisplayName); if (v != null) App.Groups.PostEdit(store => store.RenamePin(pin, v)); }));
-            menu.Items.Add(Item("Edit path", () => EditPinPath(pin)));
+            menu.Items.Add(Item("Rename", () => { var v = AnchoredPrompt.Ask(owner, new PromptOptions { Title = "Rename pin", Initial = pin.DisplayName }); if (v != null) App.Groups.PostEdit(store => store.RenamePin(pin, v)); }));
+            menu.Items.Add(Item("Edit path", () => EditPinPath(pin, owner)));
             menu.Items.Add(new Separator());
 
             var moveTo = new MenuItem { Header = "Move to group" };
@@ -939,21 +979,34 @@ namespace PowerPane.UI
             App.Groups.PostEdit(store => store.DeleteTab(group, tab));
         }
 
-        private void RenameGroupOrTab(PinnedGroup group, PinnedTab tab)
+        private void RenameGroupOrTab(PinnedGroup group, PinnedTab tab, FrameworkElement owner)
         {
-            if (group.Tabs.Count == 1) RenameGroupSingle(group);
-            else RenameTab(tab);
+            if (group.Tabs.Count == 1) RenameGroupSingle(group, owner);
+            else RenameTab(group, tab, owner);
         }
 
-        private void RenameGroupSingle(PinnedGroup group)
+        private void RenameGroupSingle(PinnedGroup group, FrameworkElement owner)
         {
-            var v = TextPrompt.Ask("Rename", group.Tabs.Count == 1 ? group.Tabs[0].Name : GroupStore.DisplayName(group));
+            var v = AnchoredPrompt.Ask(owner, new PromptOptions
+            {
+                Title = "Rename",
+                Initial = group.Tabs.Count == 1 ? group.Tabs[0].Name : GroupStore.DisplayName(group),
+                InputName = "New group name",
+                Validate = text => TabNameRules.Validate(text, null)
+            });
             if (v != null) App.Groups.PostEdit(store => store.RenameGroup(group, v));
         }
 
-        private void RenameTab(PinnedTab tab)
+        private void RenameTab(PinnedGroup group, PinnedTab tab, FrameworkElement owner)
         {
-            var v = TextPrompt.Ask("Rename tab", tab.Name);
+            // The tab's own name is not a duplicate of itself, so only the other tabs count.
+            var v = AnchoredPrompt.Ask(owner, new PromptOptions
+            {
+                Title = "Rename tab",
+                Initial = tab.Name,
+                InputName = "New tab name",
+                Validate = GroupAddMenu.RenameTabValidator(group, tab)
+            });
             if (v != null) App.Groups.PostEdit(store => store.RenameTab(tab, v));
         }
 
@@ -962,7 +1015,9 @@ namespace PowerPane.UI
         {
             var plus = new Button
             {
-                Content = "+",
+                // A TextBlock, not the string "+": WPF strips the first underscore from the automation
+                // name of a button whose content is a string, so "my_notes" was announced as "mynotes".
+                Content = new TextBlock { Text = "+" },
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Opacity = 0,
@@ -972,15 +1027,21 @@ namespace PowerPane.UI
                 Cursor = Cursors.Hand,
                 Padding = new Thickness(6, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = "Add group below"
+                ToolTip = AddMenuLabels.PlusName(group)
             };
-            UiHelpers.Named(plus, "Add group below");
-            plus.Click += (s, e) => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroupAfter(group, v)); };
+            UiHelpers.Named(plus, AddMenuLabels.PlusName(group));
+            // Hidden until the pointer is over the header, so the pane stays quiet. It also shows while
+            // it has keyboard focus and while its menu is open, which the hover rule alone would hide.
+            bool hovered = false, menuOpen = false;
+            Action refresh = () => plus.Opacity = GroupAddMenu.PlusOpacity(hovered, plus.IsKeyboardFocused, menuOpen);
+            plus.Click += (s, e) => GroupAddMenu.Open(plus, group, open => { menuOpen = open; refresh(); });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(plus, header.ColumnDefinitions.Count - 1);
             header.Children.Add(plus);
-            header.MouseEnter += (s, e) => plus.Opacity = 1;
-            header.MouseLeave += (s, e) => plus.Opacity = 0;
+            header.MouseEnter += (s, e) => { hovered = true; refresh(); };
+            header.MouseLeave += (s, e) => { hovered = false; refresh(); };
+            plus.GotKeyboardFocus += (s, e) => refresh();
+            plus.LostKeyboardFocus += (s, e) => refresh();
         }
 
         private FrameworkElement BuildAddGroupRow()
@@ -996,7 +1057,16 @@ namespace PowerPane.UI
                 Padding = new Thickness(8, 6, 8, 6),
                 FontSize = 12
             };
-            btn.Click += (s, e) => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroup(v)); };
+            btn.Click += (s, e) =>
+            {
+                var v = AnchoredPrompt.Ask(btn, new PromptOptions
+                {
+                    Title = "New group",
+                    InputName = "New group name",
+                    Validate = text => TabNameRules.Validate(text, null)
+                });
+                if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroup(v));
+            };
             return UiHelpers.Named(btn, "Add group");
         }
 
@@ -1049,19 +1119,19 @@ namespace PowerPane.UI
         }
 
         // ---- helpers ----
-        private static MenuItem Item(string header, Action action)
+        internal static MenuItem Item(string header, Action action)
         {
             var mi = new MenuItem { Header = header };
             mi.Click += (s, e) => { try { action(); } catch (Exception ex) { Log.Error("menu action", ex); } };
             return mi;
         }
 
-        private static string PickFolder(string startFolder = null)
+        internal static string PickFolder(string startFolder = null)
         {
             return FolderPicker.Pick("Pick a folder to pin", startFolder);
         }
 
-        private static string PickFile()
+        internal static string PickFile()
         {
             var dlg = new Microsoft.Win32.OpenFileDialog { Title = "Pick a file to pin" };
             PickerPlaces.AddTo(dlg);
