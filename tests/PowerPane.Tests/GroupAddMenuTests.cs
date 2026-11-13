@@ -39,8 +39,8 @@ namespace PowerPane.Tests
             Assert.That(menu.Items[2], Is.TypeOf<Separator>());
             Assert.That(Headers(menu), Is.EqualTo(new[]
             {
-                "Add tab to \"Zephyr\"...",
-                "Add group below \"Zephyr\"...",
+                "Add tab to \"Mira / Orion / Vega\"...",
+                "Add group below \"Mira / Orion / Vega\"...",
                 "Add folder to tab \"Orion\"...",
                 "Add file to tab \"Orion\"..."
             }));

@@ -39,14 +39,14 @@ namespace PowerPane.Tests
         }
 
         [Test]
-        public void MultiTabGroup_NamesTheGroupForTabAndGroup_AndTheSelectedTabForFolderAndFile()
+        public void MultiTabGroup_NamesTheTabsForTabAndGroup_AndTheSelectedTabForFolderAndFile()
         {
             var zephyr = Group("Zephyr", "Mira", "Orion", "Vega");
 
             Assert.That(Texts(zephyr, zephyr.Tabs[1], AddKinds.All), Is.EqualTo(new[]
             {
-                "Add tab to \"Zephyr\"...",
-                "Add group below \"Zephyr\"...",
+                "Add tab to \"Mira / Orion / Vega\"...",
+                "Add group below \"Mira / Orion / Vega\"...",
                 "Add folder to tab \"Orion\"...",
                 "Add file to tab \"Orion\"..."
             }));
@@ -153,36 +153,44 @@ namespace PowerPane.Tests
             Assert.That(AddMenuLabels.EscapeAccessKeys(null), Is.EqualTo(string.Empty));
             Assert.That(AddMenuLabels.GroupLabel(null), Is.EqualTo(string.Empty));
             Assert.That(AddMenuLabels.Headers(null, null, AddKinds.All), Is.Empty);
-            Assert.That(AddMenuLabels.TabTarget(Group("G", "A", "B"), Tab(null)), Is.EqualTo("\"G\""));
+            Assert.That(AddMenuLabels.TabTarget(Group("G", "A", "B"), Tab(null)), Is.EqualTo("\"A / B\""));
             Assert.That(AddMenuLabels.TabTarget(null, null), Is.EqualTo("\"\""));
         }
 
         [Test]
-        public void GroupWithoutAName_FallsBackToTheJoinedTabNames()
+        public void GroupLabel_IsTheJoinedTabNames_NotTheGroupsOwnName()
         {
-            var g = Group("", "Mira", "Orion");
-
-            Assert.That(AddMenuLabels.GroupLabel(g), Is.EqualTo("Mira / Orion"));
+            // Walk D13: a multi-tab group's own name never shows in the pane, so it is not the label.
+            Assert.That(AddMenuLabels.GroupLabel(Group("Zephyr", "Mira", "Orion")), Is.EqualTo("Mira / Orion"));
+            Assert.That(AddMenuLabels.GroupLabel(Group("", "Mira", "Orion")), Is.EqualTo("Mira / Orion"));
             Assert.That(AddMenuLabels.GroupLabel(Group(null, "Apollo")), Is.EqualTo("Apollo"));
         }
 
         [Test]
-        public void PlusName_AndPromptHeadings_NameTheGroup()
+        public void GroupWithBlankTabNames_FallsBackToItsOwnName()
         {
-            var zephyr = Group("Zephyr", "Mira", "Orion");
-
-            Assert.That(AddMenuLabels.PlusName(zephyr), Is.EqualTo("Add to \"Zephyr\""));
-            Assert.That(AddMenuLabels.NewTabTitle(zephyr), Is.EqualTo("New tab in \"Zephyr\""));
-            Assert.That(AddMenuLabels.NewGroupBelowTitle(zephyr), Is.EqualTo("New group below \"Zephyr\""));
+            Assert.That(AddMenuLabels.GroupLabel(Group("Zephyr", "", " ")), Is.EqualTo("Zephyr"));
+            Assert.That(AddMenuLabels.GroupLabel(Group("Zephyr", new string[] { null })), Is.EqualTo("Zephyr"));
+            Assert.That(AddMenuLabels.GroupLabel(Group("Zephyr")), Is.EqualTo("Zephyr"));
         }
 
         [Test]
-        public void PlusName_IsDifferentForGroupsWithDifferentNames_AndSameForGroupsThatShareOne()
+        public void PlusName_AndPromptHeadings_NameTheTabs()
         {
+            var zephyr = Group("Zephyr", "Mira", "Orion");
+
+            Assert.That(AddMenuLabels.PlusName(zephyr), Is.EqualTo("Add to \"Mira / Orion\""));
+            Assert.That(AddMenuLabels.NewTabTitle(zephyr), Is.EqualTo("New tab in \"Mira / Orion\""));
+            Assert.That(AddMenuLabels.NewGroupBelowTitle(zephyr), Is.EqualTo("New group below \"Mira / Orion\""));
+        }
+
+        [Test]
+        public void PlusName_IsDifferentForGroupsWithDifferentTabs_AndSameForGroupsWithTheSameTabNames()
+        {
+            Assert.That(AddMenuLabels.PlusName(Group("Apollo", "Mira", "Orion")),
+                Is.EqualTo(AddMenuLabels.PlusName(Group("Zephyr", "Mira", "Orion"))));
             Assert.That(AddMenuLabels.PlusName(Group("Apollo", "Apollo")),
-                Is.EqualTo(AddMenuLabels.PlusName(Group("Apollo", "Mira", "Orion"))));
-            Assert.That(AddMenuLabels.PlusName(Group("Apollo", "Apollo")),
-                Is.Not.EqualTo(AddMenuLabels.PlusName(Group("Zephyr", "Mira", "Orion"))));
+                Is.Not.EqualTo(AddMenuLabels.PlusName(Group("Apollo", "Mira", "Orion"))));
         }
     }
 }

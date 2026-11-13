@@ -67,12 +67,15 @@ namespace PowerPane.UI
             return string.IsNullOrEmpty(text) ? string.Empty : text.Replace("_", "__");
         }
 
-        /// <summary>The name that stands for a group: its own name, which is its folder's name without
-        /// the order prefix. A group with no name of its own falls back to the joined tab names.</summary>
+        /// <summary>The name that stands for a group: its tab names joined with " / ", the same text
+        /// Rename uses. A multi-tab group's own folder name never shows in the pane and cannot be renamed
+        /// there, so a label built from it would name the group by a word the person never saw (#243,
+        /// walk D13). A group whose tab names are all blank falls back to its own name.</summary>
         internal static string GroupLabel(PinnedGroup group)
         {
             if (group == null) return string.Empty;
-            string label = !string.IsNullOrWhiteSpace(group.Name) ? group.Name : GroupStore.DisplayName(group);
+            string label = GroupStore.DisplayName(group) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(label.Replace("/", string.Empty))) label = group.Name;
             return Shorten(label, MaxName);
         }
 
@@ -107,9 +110,9 @@ namespace PowerPane.UI
             return list;
         }
 
-        /// <summary>The "+" button's tooltip and automation name. It names the group, so buttons of groups
-        /// with different names can be told apart. It is not unique: two groups can share a name, and a
-        /// blank name becomes "Group", so their buttons carry the same name.</summary>
+        /// <summary>The "+" button's tooltip and automation name. It names the group by its tab names, so
+        /// buttons of groups with different tabs can be told apart. It is not unique: two groups can have
+        /// tabs with the same names, and then their buttons carry the same name.</summary>
         internal static string PlusName(PinnedGroup group)
         {
             return "Add to \"" + GroupLabel(group) + "\"";
