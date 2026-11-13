@@ -121,6 +121,11 @@ Filename: "{app}\{#MyAppExe}"; Description: "Launch Explorer PowerPane"; Flags: 
 ; restores every Explorer window's layout. The verb blocks until the app and its watchdog are both gone.
 Filename: "{app}\{#MyAppExe}"; Parameters: "--exit"; Flags: runhidden waituntilterminated; RunOnceId: "StopPowerPane"
 
+[UninstallDelete]
+; The Add to PowerPane verb queues its paths in a PinQueue folder inside {app}. Without this line the
+; folder, and so {app} itself, would be left behind after an uninstall.
+Type: filesandordirs; Name: "{app}\PinQueue"
+
 [Code]
 { Same reasoning on the way in: an upgrade over a running copy has to stop it before the executable can
   be replaced, and Inno's own force-close would look like a crash to the watchdog. }

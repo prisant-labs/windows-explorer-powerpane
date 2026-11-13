@@ -159,10 +159,30 @@ namespace PowerPane.Tests
         }
 
         [Test]
-        public void TheFallbackNames_AreTheOnesTheStoreAlreadyUses()
+        public void TheFallbackNames_AreTheOnesTheStoreActuallyUses()
         {
-            Assert.That(PinPickerModel.DefaultGroupName, Is.EqualTo("Group"));
-            Assert.That(PinPickerModel.DefaultTabName, Is.EqualTo("Tab"));
+            using (var t = new TempDir())
+            {
+                var config = AppSettings.CreateDefault();
+                config.GroupsPath = Path.Combine(t.Path, "Groups");
+                Directory.CreateDirectory(config.GroupsPath);
+                config.Profiles = new List<Profile>
+                {
+                    new Profile { Name = "Profile 1", GroupsPath = config.GroupsPath, RecentsMaxCount = 15, SidebarWidthPx = 220 }
+                };
+                using (var fs = File.Create(Path.Combine(t.Path, "settings.json")))
+                    new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(AppSettings)).WriteObject(fs, config);
+                var settings = new PowerPane.Services.SettingsStore(t.Path);
+                settings.Load();
+                using (var store = new PowerPane.Services.GroupStore(settings, info => { }, action => action()))
+                {
+                    var group = store.CreateGroup("");
+                    var tab = store.AddTab(group, "");
+
+                    Assert.That(group.Name, Is.EqualTo(PinPickerModel.DefaultGroupName));
+                    Assert.That(tab.Name, Is.EqualTo(PinPickerModel.DefaultTabName));
+                }
+            }
         }
 
         // ---- PinMemory --------------------------------------------------------
