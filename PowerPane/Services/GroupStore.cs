@@ -813,8 +813,22 @@ namespace PowerPane.Services
                 var dir = EnsureTabDir(dest);
                 var tmpNew = Path.Combine(dir, "~new~" + Guid.NewGuid().ToString("N") + ".lnk");
                 File.Move(folder.LinkPath, tmpNew);
-                InsertPinAt(dir, tmpNew, folder.DisplayName, index);
+                InsertMovedPinAt(dir, tmpNew, folder.LinkPath, folder.DisplayName, index);
             });
+        }
+
+        // InsertPinAt rolls its renames back to the ~new~ name, and the next scan would turn that into
+        // 999_Recovered and lose the pin's name and tab. So a failure puts the pin back where it came
+        // from before it rethrows.
+        internal static void InsertMovedPinAt(string dir, string tmpNew, string originalLink, string name, int index)
+        {
+            try { InsertPinAt(dir, tmpNew, name, index); }
+            catch
+            {
+                try { if (File.Exists(tmpNew) && !File.Exists(originalLink)) File.Move(tmpNew, originalLink); }
+                catch (Exception ex) { Log.Error("put back a pin after a failed move", ex); }
+                throw;
+            }
         }
 
         public void RemovePin(PinnedFolder folder)

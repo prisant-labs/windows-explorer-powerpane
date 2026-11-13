@@ -391,8 +391,8 @@ namespace PowerPane.Tests
         }
 
         // ---- tab auto-sort (#241) ---------------------------------------------
-        // Pins here are empty .lnk files: LoadPins reads their names and creation times, and an
-        // empty file resolves to no target, which the scan accepts.
+        // Pins here are real shortcuts to a folder inside the test's own temp directory, so loading
+        // one never fails and never writes to the log in the system temp folder.
 
         private static string MainDir(TwoProfiles f) { return Path.Combine(f.GroupA, "01_Main"); }
         private static string SecondDir(TwoProfiles f) { return Path.Combine(f.GroupA, "02_Second"); }
@@ -400,7 +400,7 @@ namespace PowerPane.Tests
         private static string Touch(string dir, string fileName, System.DateTime? createdUtc = null)
         {
             var path = Path.Combine(dir, fileName);
-            File.WriteAllBytes(path, new byte[0]);
+            ShellLink.Create(path, Path.GetDirectoryName(dir));
             if (createdUtc.HasValue) File.SetCreationTimeUtc(path, createdUtc.Value);
             return path;
         }
@@ -492,14 +492,34 @@ namespace PowerPane.Tests
         }
 
         [Test]
-        public void ShellLinkResolveTarget_OnAnEmptyShortcutFile_DoesNotThrow()
+        public void Touch_CreatesAShortcutThatResolvesToItsTargetFolder()
         {
             using (var f = new TwoProfiles())
             {
-                var path = Touch(MainDir(f), "001_Empty.lnk");
-                string result = "unset";
-                Assert.DoesNotThrow(() => result = ShellLink.ResolveTarget(path));
-                Assert.That(string.IsNullOrEmpty(result), Is.True);
+                var path = Touch(MainDir(f), "001_Apollo.lnk");
+                Assert.That(ShellLink.ResolveTarget(path), Is.EqualTo(Path.GetDirectoryName(MainDir(f))).IgnoreCase);
+            }
+        }
+
+        [Test]
+        public void InsertMovedPinAt_WhenTheRenameFails_PutsThePinBackUnderItsOwnName()
+        {
+            using (var f = new TwoProfiles())
+            {
+                var original = Touch(SecondDir(f), "001_Mango.lnk");
+                var other = Touch(MainDir(f), "001_Apollo.lnk");
+                var tmpNew = Path.Combine(MainDir(f), "~new~abc.lnk");
+                File.Move(original, tmpNew);
+
+                // An open handle with no sharing makes the rename of Apollo throw, as a lock would.
+                using (new FileStream(other, FileMode.Open, FileAccess.Read, FileShare.None))
+                {
+                    Assert.Throws<IOException>(() => GroupStore.InsertMovedPinAt(MainDir(f), tmpNew, original, "Mango", 1));
+                }
+
+                Assert.That(File.Exists(original), Is.True);
+                Assert.That(File.Exists(tmpNew), Is.False);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Apollo.lnk" }));
             }
         }
 
