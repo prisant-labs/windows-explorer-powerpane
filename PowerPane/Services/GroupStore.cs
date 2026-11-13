@@ -518,6 +518,9 @@ namespace PowerPane.Services
 
         public PinnedGroup CreateGroupAfter(PinnedGroup reference, string name)
         {
+            // The prompt that asked for the name stayed open while a profile switch could happen, and
+            // PostEdit reads the root only after it closes, so check the group this one goes below.
+            if (reference != null && StaleGroup(reference.FolderPath)) return null;
             var created = CreateGroup(name);
             if (created == null || reference == null) return created;
             var ordered = _groups.Where(g => !ReferenceEquals(g, created)).ToList();
@@ -1177,6 +1180,9 @@ namespace PowerPane.Services
             if (m.Success && int.TryParse(m.Groups[1].Value, out order)) { name = m.Groups[2].Value; return; }
             order = int.MaxValue; name = raw;
         }
+
+        /// <summary>What the store would write for a typed name, so the prompt compares names the way the store does.</summary>
+        internal static string SanitizeName(string name) { return Sanitize(name); }
 
         private static string Sanitize(string name)
         {

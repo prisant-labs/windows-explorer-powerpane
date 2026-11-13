@@ -5,6 +5,13 @@
 ### Added
 - A **Sort pins** submenu on a tab's right-click menu, and on the header menu of a group that has one tab. **A to Z (keep sorted)** and **Recently added (keep sorted)** keep a tab ordered by themselves, so a pin added by any other route than a drop at a line lands in its place. **Sort A to Z once** reorders the tab one time, and **Manual order** turns keep-sorted off without moving anything. A tab stays in manual order until you choose otherwise. Dropping a pin, file, or folder at a line, or using Move up or Move down, puts a sorted tab back in manual order with the order you left on screen ([#241](https://github.com/prisant-labs/windows-explorer-powerpane/issues/241)).
 
+### Changed
+- The **+** at the end of a group's tab strip, and the **+** in a one-tab group's header, now open a menu to add a tab, a group below, a folder, or a file. Each entry names what it adds to, such as `Add tab to "Mira / Orion"...` for a group with the tabs Mira and Orion, and a folder or file goes into the tab that is selected when you click. The group's right-click menu builds the same entries, and a tab's right-click menu has the folder and file ones, aimed at that tab. A name's underscores now show in these menus ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
+
+### Fixed
+- The name box for a new tab, a new group, a rename, or a pin's path now opens next to the control you used, on the pane's own monitor, instead of at the bottom of the screen. The box for a new tab says which group it goes into ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
+- A tab or group name is checked as you type. An invalid character, a trailing dot or space, or a tab name already in the group shows a message and turns off OK, where the name used to be changed without a word ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
+
 ## [4.0.0.1] - 2026-11-12
 
 Two fixes for the pane inside Open, Save As, and Select Folder dialogs.

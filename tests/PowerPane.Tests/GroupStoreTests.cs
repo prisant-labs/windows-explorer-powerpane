@@ -276,6 +276,25 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void CreateGroupAfter_AGroupFromTheOldProfile_CreatesNothing()
+        {
+            // The "New group below" prompt can stay open across a profile switch (#243).
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups[0];
+                f.SwitchToB();
+                f.Store.ScanOnce();
+                var before = f.Tree();
+
+                var created = f.Store.CreateGroupAfter(alpha, "Hermes");
+
+                Assert.That(created, Is.Null);
+                Assert.That(f.Tree(), Is.EqualTo(before));
+            }
+        }
+
+        [Test]
         public void IsCurrent_RefusesAPinFromTheOldProfile()
         {
             using (var f = new TwoProfiles())
