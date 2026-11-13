@@ -48,6 +48,87 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void Drain_PathsFromSeveralLaunches_ComeBackSortedByPath()
+        {
+            using (var f = new Fixture())
+            {
+                // Two queue instances on one folder stand in for two launch processes.
+                var other = new PinQueue(f.Folder, () => DateTime.UtcNow + f.Skew);
+                f.Queue.Enqueue(new[] { @"C:\Demo\Zephyr" });
+                other.Enqueue(new[] { @"C:\Demopollo" });
+                f.Queue.Enqueue(new[] { @"C:\Demo\Borealis" });
+
+                Assert.That(f.Queue.Drain(),
+                    Is.EqualTo(new[] { @"C:\Demopollo", @"C:\Demo\Borealis", @"C:\Demo\Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void Drain_PathsFromOneLaunch_KeepTheOrderThatLaunchGave()
+        {
+            using (var f = new Fixture())
+            {
+                f.Queue.Enqueue(new[] { @"C:\Demo\Zephyr", @"C:\Demo\Apollo", @"C:\Demo\Mira" });
+                Assert.That(f.Queue.Drain(),
+                    Is.EqualTo(new[] { @"C:\Demo\Zephyr", @"C:\Demo\Apollo", @"C:\Demo\Mira" }));
+            }
+        }
+
+        [Test]
+        public void Enqueue_ReportsEachPathItWrote()
+        {
+            using (var f = new Fixture())
+            {
+                var written = new System.Collections.Generic.List<string>();
+                f.Queue.Enqueue(new[] { @"C:\Demo\Apollo", "", @"C:\Demo\Zephyr" }, written);
+                Assert.That(written, Is.EqualTo(new[] { @"C:\Demo\Apollo", @"C:\Demo\Zephyr" }));
+            }
+        }
+
+        [Test]
+        public void TryClaim_IsByOwnership_SoAnOpenHandleThatLostDoesNotBlockTheNextClaim()
+        {
+            string name = "PowerPane.Tests.PinPicker." + Guid.NewGuid().ToString("N");
+            System.Threading.Mutex ownerMutex = null;
+            bool lostFirst = true, loserHeldAfter = true, reclaimed = false;
+            var ownerHolds = new System.Threading.ManualResetEventSlim();
+            var releaseOwner = new System.Threading.ManualResetEventSlim();
+            var ownerReleased = new System.Threading.ManualResetEventSlim();
+
+            var owner = new System.Threading.Thread(() =>
+            {
+                Assert.That(PinQueue.TryClaim(name, out ownerMutex), Is.True);
+                ownerHolds.Set();
+                releaseOwner.Wait();
+                ownerMutex.ReleaseMutex();
+                ownerMutex.Dispose();
+                ownerReleased.Set();
+            });
+            owner.Start();
+            ownerHolds.Wait();
+
+            // A launch that arrives while the owner holds the picker loses.
+            System.Threading.Mutex loser;
+            lostFirst = !PinQueue.TryClaim(name, out loser);
+
+            // A second handle is still open on the kernel object here, as in the race.
+            using (var lingering = new System.Threading.Mutex(false, name))
+            {
+                releaseOwner.Set();
+                ownerReleased.Wait();
+                System.Threading.Mutex again;
+                reclaimed = PinQueue.TryClaim(name, out again);
+                if (reclaimed) { again.ReleaseMutex(); again.Dispose(); }
+            }
+            loserHeldAfter = loser != null;
+            owner.Join();
+
+            Assert.That(lostFirst, Is.True, "a launch must not claim while another owns the picker");
+            Assert.That(loserHeldAfter, Is.False);
+            Assert.That(reclaimed, Is.True, "the owner's re-claim must not fail because another handle is open");
+        }
+
+        [Test]
         public void Drain_WhenTheFolderDoesNotExist_ReturnsEmpty()
         {
             using (var f = new Fixture())
@@ -170,9 +251,8 @@ namespace PowerPane.Tests
                 var drained = f.Queue.Drain();
                 Assert.That(drained.Count, Is.EqualTo(200));
                 Assert.That(drained, Is.EquivalentTo(a.Concat(b)));
-                // Within one writer, arrival order holds.
-                Assert.That(drained.Where(p => p.StartsWith(@"C:\Demo\A")).ToList(), Is.EqualTo(a));
-                Assert.That(drained.Where(p => p.StartsWith(@"C:\Demo\B")).ToList(), Is.EqualTo(b));
+                // Two launches wrote, so the result is in path order.
+                Assert.That(drained, Is.EqualTo(a.Concat(b).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList()));
             }
         }
 
