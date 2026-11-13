@@ -737,10 +737,10 @@ namespace PowerPane.UI
                     App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
                 return;
             }
-            var ordered = destTab.Items.Where(p => !ReferenceEquals(p, hit.Item2)).ToList();
-            if (index < 0) index = 0;
-            if (index > ordered.Count) index = ordered.Count;
-            ordered.Insert(index, hit.Item2);
+            // The index counts the dragged row too. A drop that leaves the order as it is posts
+            // nothing, so it never turns a sorted tab to Manual.
+            var ordered = PinSorter.PlaceAtLine(destTab.Items, hit.Item2, index);
+            if (ordered == null) return;
             App.Groups.PostEdit(store => store.ReorderPins(destTab, ordered));
         }
 

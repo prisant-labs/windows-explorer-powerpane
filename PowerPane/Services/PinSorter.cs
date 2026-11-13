@@ -69,5 +69,21 @@ namespace PowerPane.Services
                         .ThenBy(p => p.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
             }
         }
+
+        /// <summary>The order after dropping a pin at a line. lineIndex counts the rows on screen, and
+        /// the dragged row is one of them, so a line below it is one further along than it is in the
+        /// list without it. Returns null when the drop changes nothing.</summary>
+        public static List<PinnedFolder> PlaceAtLine(IList<PinnedFolder> shown, PinnedFolder moved, int lineIndex)
+        {
+            int from = shown.IndexOf(moved);
+            if (from < 0) return null;
+            var result = shown.Where(p => !ReferenceEquals(p, moved)).ToList();
+            int at = lineIndex > from ? lineIndex - 1 : lineIndex;
+            if (at < 0) at = 0;
+            if (at > result.Count) at = result.Count;
+            if (at == from) return null;
+            result.Insert(at, moved);
+            return result;
+        }
     }
 }

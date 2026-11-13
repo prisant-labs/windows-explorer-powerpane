@@ -93,5 +93,37 @@ namespace PowerPane.Tests
         {
             Assert.That(PinSorter.Order(null, PinSortMode.Name), Is.Empty);
         }
+
+        // Rows on screen are [A, B, C, D]. A line is numbered by the row below it, so line 4 is the
+        // bottom.
+        private static string Placed(int dragged, int line)
+        {
+            var shown = new[] { Pin("A", 1), Pin("B", 2), Pin("C", 3), Pin("D", 4) };
+            var result = PinSorter.PlaceAtLine(shown, shown[dragged], line);
+            return result == null ? "unchanged" : string.Concat(result.Select(p => p.DisplayName));
+        }
+
+        [Test]
+        public void PlaceAtLine_DraggingDown_LandsAtTheLineAndNotOneRowTooFar()
+        {
+            Assert.That(Placed(0, 3), Is.EqualTo("BCAD"));   // A to the line between C and D
+            Assert.That(Placed(0, 4), Is.EqualTo("BCDA"));   // A to the bottom
+        }
+
+        [Test]
+        public void PlaceAtLine_DraggingUp_LandsAtTheLine()
+        {
+            Assert.That(Placed(3, 1), Is.EqualTo("ADBC"));
+            Assert.That(Placed(2, 0), Is.EqualTo("CABD"));
+        }
+
+        [Test]
+        public void PlaceAtLine_ADropThatChangesNothing_GivesNull()
+        {
+            Assert.That(Placed(1, 1), Is.EqualTo("unchanged"));   // the line just above its own row
+            Assert.That(Placed(1, 2), Is.EqualTo("unchanged"));   // the line just below its own row
+            Assert.That(Placed(3, 4), Is.EqualTo("unchanged"));
+            Assert.That(Placed(0, 0), Is.EqualTo("unchanged"));
+        }
     }
 }
