@@ -22,14 +22,14 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.0.0.0";
+        public const string Version = "4.0.0.1";
 
         public static readonly Item[] Items =
         {
-            new Item("QuickPane is now Explorer PowerPane",
-                "A new name, with its own program and data folders. Settings and backups copied from QuickPane find your pins in the new folder."),
-            new Item("\"Remove pin\"",
-                "A pin's menu says \"Remove pin\" instead of \"Remove Shortcut\", the word the rest of the app uses."),
+            new Item("Search box kept in file dialogs",
+                "An Open, Save As, or Select Folder dialog with the pane inside keeps its search box, which making room for the pane used to cut off."),
+            new Item("Width grip in file dialogs",
+                "Dragging the pane's width grip in a file dialog resizes that dialog's pane. The dialog keeps its size."),
         };
     }
 }
