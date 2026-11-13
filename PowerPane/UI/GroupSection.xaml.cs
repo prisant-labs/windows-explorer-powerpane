@@ -729,13 +729,18 @@ namespace PowerPane.UI
             if (!ReferenceEquals(hit.Item1, destTab))
             {
                 var folder = hit.Item2;
-                App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
+                // A pin dropped at a line on a sorted tab goes in at that line, in the order shown,
+                // and the tab becomes Manual (#241). A manual tab keeps its append-at-end behavior.
+                if (destTab.SortMode != PinSortMode.Manual)
+                    App.Groups.PostEdit(store => store.MovePinToTabAt(folder, destTab, index));
+                else
+                    App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
                 return;
             }
-            var ordered = destTab.Items.Where(p => !ReferenceEquals(p, hit.Item2)).ToList();
-            if (index < 0) index = 0;
-            if (index > ordered.Count) index = ordered.Count;
-            ordered.Insert(index, hit.Item2);
+            // The index counts the dragged row too. A drop that leaves the order as it is posts
+            // nothing, so it never turns a sorted tab to Manual.
+            var ordered = PinSorter.PlaceAtLine(destTab.Items, hit.Item2, index);
+            if (ordered == null) return;
             App.Groups.PostEdit(store => store.ReorderPins(destTab, ordered));
         }
 
@@ -780,6 +785,9 @@ namespace PowerPane.UI
             menu.Items.Add(Item("Add group below", () => { var v = TextPrompt.Ask("New group name", ""); if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.CreateGroupAfter(group, v)); }));
             menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(group, p)); }));
             menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(group, p)); }));
+            // A group with one tab has no tab row, so this header menu is the only menu that tab has.
+            // With several tabs, sorting is chosen per tab from the tab's own menu.
+            if (group.Tabs.Count == 1) menu.Items.Add(BuildSortMenu(group.Tabs[0]));
             menu.Items.Add(Item("Move up", () => App.Groups.PostEdit(store => store.MoveGroup(group, -1))));
             menu.Items.Add(Item("Move down", () => App.Groups.PostEdit(store => store.MoveGroup(group, +1))));
             menu.Items.Add(new Separator());
@@ -797,6 +805,7 @@ namespace PowerPane.UI
             // last tab, which always targets whichever tab happened to be active.
             menu.Items.Add(Item("Add folder...", () => { var p = PickFolder(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(tab, p)); }));
             menu.Items.Add(Item("Add file...", () => { var p = PickFile(); if (!string.IsNullOrEmpty(p)) App.Groups.PostEdit(store => store.AddPin(tab, p)); }));
+            menu.Items.Add(BuildSortMenu(tab));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Move tab left", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, -1))));
             menu.Items.Add(Item("Move tab right", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, +1))));
@@ -804,6 +813,39 @@ namespace PowerPane.UI
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Delete tab", () => ConfirmDeleteTab(group, tab)));
             return menu;
+        }
+
+        // The "Sort pins" submenu for one tab (#241). The pane rebuilds on GroupsChanged, so the
+        // check mark reads the mode the tab has when the menu is built.
+        private static MenuItem BuildSortMenu(PinnedTab tab)
+        {
+            return BuildSortMenu(tab.SortMode,
+                mode => App.Groups.PostEdit(store => store.SetPinSort(tab, mode)),
+                () => App.Groups.PostEdit(store => store.SortPinsOnce(tab)));
+        }
+
+        internal static MenuItem BuildSortMenu(PinSortMode current, Action<PinSortMode> setMode, Action sortOnce)
+        {
+            var sort = new MenuItem { Header = "Sort pins" };
+            sort.Items.Add(SortChoice("Manual order", PinSortMode.Manual, current, setMode));
+            sort.Items.Add(SortChoice("A to Z (keep sorted)", PinSortMode.Name, current, setMode));
+            sort.Items.Add(SortChoice("Recently added (keep sorted)", PinSortMode.Recent, current, setMode));
+            sort.Items.Add(new Separator());
+            // Never checked: it writes the order once and leaves the tab in Manual.
+            sort.Items.Add(Item("Sort A to Z once", sortOnce));
+            return sort;
+        }
+
+        private static MenuItem SortChoice(string header, PinSortMode mode, PinSortMode current, Action<PinSortMode> setMode)
+        {
+            var mi = Item(header, () => setMode(mode));
+            // The pane's template draws no check of its own, so the glyph below is what people see.
+            // IsChecked is what UI Automation reports, so a screen reader can tell which mode is on.
+            mi.IsCheckable = true;
+            mi.IsChecked = mode == current;
+            if (mode == current)
+                mi.Icon = new TextBlock { Text = "\uE73E", FontFamily = UiHelpers.IconFont(), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            return mi;
         }
 
         /// <summary>
