@@ -327,22 +327,66 @@ namespace PowerPane.Services
             return false;
         }
 
+        // One listing of a tab folder gives both the pins and the sort marker (#241). The pins carry
+        // their stored order, display name, and creation time, and no target yet.
+        private static List<PinnedFolder> ReadPinFiles(string tabDir, out PinSortMode mode)
+        {
+            mode = PinSortMode.Manual;
+            var pins = new List<PinnedFolder>();
+            foreach (var fi in new DirectoryInfo(tabDir).GetFiles())
+            {
+                if (string.Equals(fi.Name, PinSorter.MarkerFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    try { mode = PinSorter.ParseMarker(File.ReadAllText(fi.FullName)); }
+                    catch (Exception ex) { Log.Error("read the sort marker", ex); }
+                    continue;
+                }
+                if (!fi.Extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase)) continue;
+                int o; string disp;
+                Split(Path.GetFileNameWithoutExtension(fi.Name), out o, out disp);
+                pins.Add(new PinnedFolder { DisplayName = disp, LinkPath = fi.FullName, Order = o, AddedUtc = fi.CreationTimeUtc });
+            }
+            return pins;
+        }
+
         private static void LoadPins(string tabDir, PinnedTab tab)
         {
-            foreach (var lnk in Directory.GetFiles(tabDir, "*.lnk"))
+            PinSortMode mode;
+            foreach (var pin in ReadPinFiles(tabDir, out mode))
             {
-                int o; string disp;
-                Split(Path.GetFileNameWithoutExtension(lnk), out o, out disp);
-                var target = ShellLink.ResolveTarget(lnk) ?? string.Empty;
+                var target = ShellLink.ResolveTarget(pin.LinkPath) ?? string.Empty;
                 // Existence and file-vs-folder come from the background probe cache, never from a
                 // direct disk hit here: scans run on the UI thread after mutations, and probing a
                 // dead network target inline froze the input queue shared with Explorer.
-                bool exists = target.Length > 0 && PathStatus.IsAlive(target);
-                bool isFile = target.Length > 0 && PathStatus.IsFile(target);
-                tab.Items.Add(new PinnedFolder { DisplayName = disp, TargetPath = target, LinkPath = lnk, Order = o, Exists = exists, IsFile = isFile });
+                pin.TargetPath = target;
+                pin.Exists = target.Length > 0 && PathStatus.IsAlive(target);
+                pin.IsFile = target.Length > 0 && PathStatus.IsFile(target);
+                tab.Items.Add(pin);
             }
-            tab.Items = tab.Items.OrderBy(i => i.Order)
-                .ThenBy(i => i.DisplayName, StringComparer.CurrentCultureIgnoreCase).ToList();
+            tab.SortMode = mode;
+            tab.Items = PinSorter.Order(tab.Items, mode);
+        }
+
+        private static string MarkerPath(string tabDir) { return Path.Combine(tabDir, PinSorter.MarkerFileName); }
+
+        // Removing a sort marker: the tab becomes Manual. Absent already is fine.
+        private static void DeleteMarker(string tabDir)
+        {
+            var marker = MarkerPath(tabDir);
+            if (File.Exists(marker)) File.Delete(marker);
+        }
+
+        // The real folder pins live in. A group with no tab subfolders shows one implicit tab that
+        // points at the group folder, so the first write creates its 01_<name> subfolder.
+        private string EnsureTabDir(PinnedTab tab)
+        {
+            var dir = tab.FolderPath;
+            if (IsGroupFolder(dir))
+            {
+                dir = Path.Combine(dir, "01_" + (string.IsNullOrWhiteSpace(tab.Name) ? "Main" : tab.Name));
+                Directory.CreateDirectory(dir);
+            }
+            return dir;
         }
 
         // Bring back anything stranded under a temp name by a reorder that died halfway (crash,
@@ -701,12 +745,7 @@ namespace PowerPane.Services
             try
             {
                 if (tab == null || targetPaths == null || Stale(tab.FolderPath)) return;
-                var dir = tab.FolderPath;
-                if (IsGroupFolder(dir)) // implicit empty tab, materialize a real subfolder
-                {
-                    dir = Path.Combine(dir, "01_" + (string.IsNullOrWhiteSpace(tab.Name) ? "Main" : tab.Name));
-                    Directory.CreateDirectory(dir);
-                }
+                var dir = EnsureTabDir(tab); // an implicit empty tab gets a real subfolder
                 int order = NextPinOrder(dir);
                 bool any = false;
                 foreach (var targetPath in targetPaths)
@@ -728,43 +767,55 @@ namespace PowerPane.Services
             try
             {
                 if (tab == null || string.IsNullOrEmpty(targetPath) || Stale(tab.FolderPath)) return;
-                var dir = tab.FolderPath;
-                if (IsGroupFolder(dir))
-                {
-                    dir = Path.Combine(dir, "01_" + (string.IsNullOrWhiteSpace(tab.Name) ? "Main" : tab.Name));
-                    Directory.CreateDirectory(dir);
-                }
-
-                var existing = Directory.GetFiles(dir, "*.lnk")
-                    .Select(p => { int o; string n; Split(Path.GetFileNameWithoutExtension(p), out o, out n); return new PinSort { Path = p, Order = o, Name = n }; })
-                    .OrderBy(x => x.Order).ThenBy(x => x.Name, StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-
+                var dir = EnsureTabDir(tab);
                 string leaf = SafeLeaf(targetPath);
                 string tmpNew = Path.Combine(dir, "~new~" + Guid.NewGuid().ToString("N") + ".lnk");
                 ShellLink.Create(tmpNew, targetPath, leaf);
-
-                var order = existing.Select(x => new PinSort { Path = x.Path, Name = x.Name }).ToList();
-                if (index < 0) index = 0;
-                if (index > order.Count) index = order.Count;
-                order.Insert(index, new PinSort { Path = tmpNew, Name = leaf });
-
-                var plan = new List<Tuple<string, string, string>>();
-                for (int i = 0; i < order.Count; i++)
-                {
-                    var o = order[i];
-                    plan.Add(Tuple.Create(o.Path,
-                        Path.Combine(dir, "~ord~" + Guid.NewGuid().ToString("N") + ".lnk"),
-                        Path.Combine(dir, (i + 1).ToString("000") + "_" + o.Name + ".lnk")));
-                }
-                TwoPhaseRename(plan, isDir: false);
+                InsertPinAt(dir, tmpNew, leaf, index);
 
                 ScanOnce(); RaiseChanged();
             }
             catch (Exception ex) { Log.Error("AddPinAtIndex failed", ex); }
         }
 
-        private sealed class PinSort { public string Path; public int Order; public string Name; }
+        // Put a new shortcut, already inside dir under a temp name, at a position in the order the
+        // tab shows on screen, and write that order into the file names. A tab that was sorted
+        // loses its marker, because a pin placed at a line is a manual order (#241).
+        private static void InsertPinAt(string dir, string newLink, string newName, int index)
+        {
+            PinSortMode mode;
+            var existing = ReadPinFiles(dir, out mode)
+                .Where(p => !string.Equals(p.LinkPath, newLink, StringComparison.OrdinalIgnoreCase));
+            var order = PinSorter.Order(existing, mode)
+                .Select(p => Tuple.Create(p.LinkPath, p.DisplayName)).ToList();
+            if (index < 0) index = 0;
+            if (index > order.Count) index = order.Count;
+            order.Insert(index, Tuple.Create(newLink, newName));
+
+            var plan = new List<Tuple<string, string, string>>();
+            for (int i = 0; i < order.Count; i++)
+            {
+                plan.Add(Tuple.Create(order[i].Item1,
+                    Path.Combine(dir, "~ord~" + Guid.NewGuid().ToString("N") + ".lnk"),
+                    Path.Combine(dir, (i + 1).ToString("000") + "_" + order[i].Item2 + ".lnk")));
+            }
+            TwoPhaseRename(plan, isDir: false);
+            if (mode != PinSortMode.Manual) DeleteMarker(dir);
+        }
+
+        /// <summary>Move a pin into another tab at a position on screen, as a pin dragged from a
+        /// different tab and dropped at a line. The destination keeps no sort marker afterwards.</summary>
+        public void MovePinToTabAt(PinnedFolder folder, PinnedTab dest, int index)
+        {
+            if (folder == null || dest == null || Stale(folder.LinkPath, dest.FolderPath)) return;
+            Try(() =>
+            {
+                var dir = EnsureTabDir(dest);
+                var tmpNew = Path.Combine(dir, "~new~" + Guid.NewGuid().ToString("N") + ".lnk");
+                File.Move(folder.LinkPath, tmpNew);
+                InsertPinAt(dir, tmpNew, folder.DisplayName, index);
+            });
+        }
 
         public void RemovePin(PinnedFolder folder)
         {
@@ -792,8 +843,7 @@ namespace PowerPane.Services
             Try(() =>
             {
                 if (dest == null) return;
-                var dir = dest.FolderPath;
-                if (IsGroupFolder(dir)) { dir = Path.Combine(dir, "01_" + (string.IsNullOrWhiteSpace(dest.Name) ? "Main" : dest.Name)); Directory.CreateDirectory(dir); }
+                var dir = EnsureTabDir(dest);
                 int order = NextPinOrder(dir);
                 var target = UniqueLink(dir, order, folder.DisplayName);
                 File.Move(folder.LinkPath, target);
@@ -837,9 +887,51 @@ namespace PowerPane.Services
                         Path.Combine(dir, (i + 1).ToString("000") + "_" + p.DisplayName + ".lnk")));
                 }
                 TwoPhaseRename(plan, isDir: false);
+                // A manual order replaces any sort mode. Only after the rename succeeded, so a
+                // failed reorder leaves the tab sorted as it was.
+                DeleteMarker(dir);
             }
             catch (Exception ex) { Log.Error("ReorderPins failed", ex); }
             ScanOnce(); RaiseChanged();
+        }
+
+        // The tab as the latest scan holds it, matched by path for the same reason as MovePin (#75).
+        private PinnedTab CurrentTab(PinnedTab tab)
+        {
+            return _groups.SelectMany(g => g.Tabs).FirstOrDefault(t =>
+                string.Equals(t.FolderPath, tab.FolderPath, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>Set how a tab orders its pins (#241). Name and Recent write the marker and leave
+        /// the file names alone. Manual freezes the order on screen into the file names first, so
+        /// nothing visibly moves when keep-sorted turns off.</summary>
+        public void SetPinSort(PinnedTab tab, PinSortMode mode)
+        {
+            if (tab == null || Stale(tab.FolderPath)) return;
+            try
+            {
+                if (mode == PinSortMode.Manual)
+                {
+                    if (IsGroupFolder(tab.FolderPath)) return; // implicit tab: nothing on disk to clear
+                    var current = CurrentTab(tab);
+                    if (current == null || current.SortMode == PinSortMode.Manual) return;
+                    ReorderPins(current, current.Items.ToList()); // clears the marker and scans
+                    return;
+                }
+                var dir = EnsureTabDir(tab);
+                File.WriteAllText(MarkerPath(dir), PinSorter.MarkerText(mode));
+                ScanOnce(); RaiseChanged();
+            }
+            catch (Exception ex) { Log.Error("SetPinSort failed", ex); }
+        }
+
+        /// <summary>Write the A-to-Z order into the file names and leave the tab in Manual.</summary>
+        public void SortPinsOnce(PinnedTab tab)
+        {
+            if (tab == null || Stale(tab.FolderPath)) return;
+            var current = CurrentTab(tab);
+            if (current == null || IsGroupFolder(current.FolderPath)) return;
+            ReorderPins(current, PinSorter.Order(current.Items, PinSortMode.Name));
         }
 
         // ---- cross-profile group operations ----------------------------------
