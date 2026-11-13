@@ -371,6 +371,127 @@ namespace PowerPane.Tests
             }
         }
 
+        // ---- AddPins into a chosen tab (#242) --------------------------------
+        // The "Add to PowerPane" picker pins into the tab the user chose, not the group's active tab.
+        // Targets are invented folders and files created inside the test's own temporary folder.
+
+        private static string MakeFolder(TempDir temp, string name)
+        {
+            var dir = Path.Combine(temp.Path, "Targets", name);
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        private static string MakeFile(TempDir temp, string name)
+        {
+            var dir = Path.Combine(temp.Path, "Targets");
+            Directory.CreateDirectory(dir);
+            var file = Path.Combine(dir, name);
+            File.WriteAllText(file, "demo");
+            return file;
+        }
+
+        [Test]
+        public void AddPins_IntoTheSecondTabOfATwoTabGroup_LeavesTheFirstTabAlone()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups.First(g => g.Name == "Alpha");
+                Assert.That(alpha.Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Main", "Second" }));
+                Assert.That(alpha.ActiveTab, Is.EqualTo(0), "the group's visible tab is the first one");
+
+                var apollo = MakeFolder(f.Temp, "Apollo");
+                var zephyr = MakeFolder(f.Temp, "Zephyr");
+                f.Store.AddPins(alpha.Tabs[1], new[] { apollo, zephyr });
+
+                var after = f.Store.Groups.First(g => g.Name == "Alpha");
+                Assert.That(after.Tabs[0].Items, Is.Empty);
+                Assert.That(after.Tabs[1].Items.Select(i => i.TargetPath),
+                    Is.EqualTo(new[] { apollo, zephyr }).IgnoreCase);
+                Assert.That(Directory.GetFiles(Path.Combine(f.GroupA, "01_Main"), "*.lnk"), Is.Empty);
+            }
+        }
+
+        [Test]
+        public void AddPins_AFileAndAFolderInOneCall_BothArePinnedInOrder()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups.First(g => g.Name == "Alpha");
+
+                var folder = MakeFolder(f.Temp, "Borealis");
+                var file = MakeFile(f.Temp, "notes.txt");
+                f.Store.AddPins(alpha.Tabs[0], new[] { file, folder });
+
+                var items = f.Store.Groups.First(g => g.Name == "Alpha").Tabs[0].Items;
+                Assert.That(items.Select(i => i.TargetPath), Is.EqualTo(new[] { file, folder }).IgnoreCase);
+                Assert.That(Directory.GetFiles(Path.Combine(f.GroupA, "01_Main"), "*.lnk").Length, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void AddPins_AppendsAfterTheExistingPins()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var tab = f.Store.Groups.First(g => g.Name == "Alpha").Tabs[1];
+                var first = MakeFolder(f.Temp, "Apollo");
+                var second = MakeFolder(f.Temp, "Zephyr");
+                var third = MakeFile(f.Temp, "plan.txt");
+
+                f.Store.AddPins(tab, new[] { first });
+                tab = f.Store.Groups.First(g => g.Name == "Alpha").Tabs[1];
+                f.Store.AddPins(tab, new[] { second, third });
+
+                var items = f.Store.Groups.First(g => g.Name == "Alpha").Tabs[1].Items;
+                Assert.That(items.Select(i => i.TargetPath), Is.EqualTo(new[] { first, second, third }).IgnoreCase);
+            }
+        }
+
+        [Test]
+        public void AddTab_ThenAddPins_PinsIntoTheNewTab()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups.First(g => g.Name == "Alpha");
+
+                var created = f.Store.AddTab(alpha, "Ideas");
+                Assert.That(created, Is.Not.Null);
+
+                var apollo = MakeFolder(f.Temp, "Apollo");
+                var file = MakeFile(f.Temp, "sketch.txt");
+                f.Store.AddPins(created, new[] { apollo, file });
+
+                var after = f.Store.Groups.First(g => g.Name == "Alpha");
+                Assert.That(after.Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Main", "Second", "Ideas" }));
+                Assert.That(after.Tabs[2].Items.Select(i => i.TargetPath), Is.EqualTo(new[] { apollo, file }).IgnoreCase);
+                Assert.That(after.Tabs[0].Items, Is.Empty);
+                Assert.That(after.Tabs[1].Items, Is.Empty);
+            }
+        }
+
+        [Test]
+        public void CreateGroup_ThenAddPinsToItsFirstTab_PinsIntoTheNewGroup()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var created = f.Store.CreateGroup("Borealis");
+                Assert.That(created, Is.Not.Null);
+                Assert.That(created.Tabs.Count, Is.EqualTo(1));
+
+                var file = MakeFile(f.Temp, "brief.txt");
+                f.Store.AddPins(created.Active, new[] { file });
+
+                var after = f.Store.Groups.First(g => g.Name == "Borealis");
+                Assert.That(after.Tabs[0].Items.Select(i => i.TargetPath), Is.EqualTo(new[] { file }).IgnoreCase);
+            }
+        }
+
         [Test]
         public void MoveTab_WithAGroupObjectFromBeforeATabWasAdded_KeepsEveryTab()
         {
