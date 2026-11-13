@@ -76,6 +76,17 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void DuplicateMessage_ShortensALongName_SoThePromptKeepsItsHeight()
+        {
+            string longName = new string('a', 20) + new string('b', 40);
+
+            string message = TabNameRules.Validate(longName, new[] { longName });
+
+            Assert.That(message, Does.Contain("..."));
+            Assert.That(message, Does.Not.Contain(longName));
+        }
+
+        [Test]
         public void NullEntriesInTheTakenList_AreSkipped()
         {
             Assert.That(TabNameRules.Validate("Vega", new string[] { null, "Mira" }), Is.Null);

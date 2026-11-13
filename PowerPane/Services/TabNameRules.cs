@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using PowerPane.UI;
 
 namespace PowerPane.Services
 {
@@ -38,7 +39,7 @@ namespace PowerPane.Services
                     string existing = GroupStore.SanitizeName(other);
                     // Names the tab that is already there, so the message shows its spelling, not the typed one.
                     if (string.Equals(existing, mine, StringComparison.OrdinalIgnoreCase))
-                        return "This group already has a tab named \"" + existing + "\".";
+                        return "This group already has a tab named \"" + AddMenuLabels.Shorten(existing, AddMenuLabels.MaxName) + "\".";
                 }
             }
             return null;
