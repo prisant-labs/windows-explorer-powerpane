@@ -467,6 +467,7 @@ namespace PowerPane
         private System.Windows.Threading.DispatcherTimer _pinPoll;
         private PowerPane.Interop.NativeMethods.POINT _pinPointer;
         private bool _havePinPointer;
+        private int _pinIdleRounds;
 
         private void RunPinMode(string[] args)
         {
@@ -484,24 +485,28 @@ namespace PowerPane
                 _havePinPointer = PowerPane.Interop.NativeMethods.GetCursorPos(out _pinPointer);
 
                 _pinQueue = PinQueue.Default;
-                bool queued = true;
-                try { _pinQueue.Enqueue(own); }
+                var written = new System.Collections.Generic.List<string>();
+                try { _pinQueue.Enqueue(own, written); }
                 catch (Exception ex)
                 {
-                    queued = false;   // the picker still shows this launch's own items
                     Log.Error("Add to PowerPane could not write the queue", ex);
                 }
 
+                // Paths that never reached the queue are shown from memory, so a failed write loses nothing.
+                var unwritten = own.Where(p => !written.Contains(p, StringComparer.OrdinalIgnoreCase)).ToList();
+
                 if (!ClaimPinPicker())
                 {
-                    Shutdown();   // another launch owns the picker and will drain this launch's files
+                    if (unwritten.Count == 0)
+                    {
+                        Shutdown();   // another launch owns the picker and will drain this launch's files
+                        return;
+                    }
+                    WaitForPinPicker(unwritten);   // nobody else can show these, so wait for a turn
                     return;
                 }
 
-                var settings = new SettingsStore();
-                settings.Load();
-                _pinGroups = new GroupStore(settings);
-                BeginPinRound(queued ? null : own);
+                StartPinOwner(unwritten);
             }
             catch (Exception ex)
             {
@@ -511,11 +516,52 @@ namespace PowerPane
             }
         }
 
+        private void StartPinOwner(System.Collections.Generic.List<string> unwritten)
+        {
+            var settings = new SettingsStore();
+            settings.Load();
+            _pinGroups = new GroupStore(settings);
+            BeginPinRound(unwritten.Count > 0 ? unwritten : null);
+        }
+
+        /// <summary>A launch that lost the picker but could not queue its own paths waits here, up to the
+        /// queue's maximum age, and shows them itself once the picker frees.</summary>
+        private void WaitForPinPicker(System.Collections.Generic.List<string> unwritten)
+        {
+            DateTime giveUp = DateTime.UtcNow + PinQueue.MaxAge;
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+            timer.Tick += (s, a) =>
+            {
+                try
+                {
+                    if (ClaimPinPicker())
+                    {
+                        timer.Stop();
+                        _havePinPointer = PowerPane.Interop.NativeMethods.GetCursorPos(out _pinPointer);
+                        StartPinOwner(unwritten);
+                    }
+                    else if (DateTime.UtcNow > giveUp)
+                    {
+                        timer.Stop();
+                        Log.Error("Add to PowerPane gave up waiting for the picker with " + unwritten.Count + " unqueued items");
+                        Shutdown();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    timer.Stop();
+                    Log.Error("Pin mode wait failed", ex);
+                    ReleasePinPicker();
+                    Shutdown();
+                }
+            };
+            timer.Start();
+        }
+
         private bool ClaimPinPicker()
         {
-            bool createdNew;
-            var m = new Mutex(true, PinQueue.PickerMutexName, out createdNew);
-            if (!createdNew) { m.Dispose(); return false; }
+            Mutex m;
+            if (!PinQueue.TryClaim(PinQueue.PickerMutexName, out m)) return false;
             _pinMutex = m;
             return true;
         }
@@ -550,8 +596,10 @@ namespace PowerPane
             try
             {
                 var items = _pinQueue.Drain();
-                if (items.Count == 0 && fallback != null) items = fallback;
-                if (items.Count == 0) { FinishPinRound(); return; }
+                if (fallback != null)
+                    items.AddRange(fallback.Where(p => !items.Contains(p, StringComparer.OrdinalIgnoreCase)));
+                if (items.Count == 0) { _pinIdleRounds++; FinishPinRound(); return; }
+                _pinIdleRounds = 0;
 
                 _pinGroups.ScanOnce();   // no watcher needed for a one-shot popup
                 var picker = new GroupPickerWindow(_pinGroups, items, PinMemory.Load(PinMemory.DefaultPath), !CrashGuard.InstanceHeld());
@@ -562,7 +610,7 @@ namespace PowerPane
                     var more = _pinQueue.Drain();
                     if (more.Count == 0) return;
                     picker.AddPaths(more);
-                    picker.FlashForAttention();
+                    picker.DrawAttention();
                 };
                 picker.Closed += (s, a) =>
                 {
@@ -590,7 +638,9 @@ namespace PowerPane
             try
             {
                 ReleasePinPicker();
-                if (_pinQueue.PendingCount() > 0 && ClaimPinPicker())
+                // A file Drain cannot read or delete stays pending, so a round that drained nothing is
+                // allowed to repeat only once. Otherwise the process would loop until the file turned stale.
+                if (_pinIdleRounds < 2 && _pinQueue.PendingCount() > 0 && ClaimPinPicker())
                 {
                     _havePinPointer = PowerPane.Interop.NativeMethods.GetCursorPos(out _pinPointer);
                     BeginPinRound(null);

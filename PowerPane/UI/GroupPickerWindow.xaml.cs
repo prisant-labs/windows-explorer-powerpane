@@ -74,11 +74,27 @@ namespace PowerPane.UI
             AutomationProperties.SetName(PathText, "Items to add: " + summary);
         }
 
-        /// <summary>Flashes the window so a late launch is noticed when the picker is behind another
-        /// window. It never takes focus.</summary>
-        internal void FlashForAttention()
+        /// <summary>Pulses the window's border so a late launch is noticed. The picker has no caption or
+        /// taskbar button to flash, so the cue is drawn inside it. It never takes focus.</summary>
+        internal void DrawAttention()
         {
-            NM.FlashForAttention(new WindowInteropHelper(this).Handle);
+            try
+            {
+                var brush = Shell.BorderBrush as SolidColorBrush;
+                if (brush == null || brush.IsFrozen) return;
+                var animation = new System.Windows.Media.Animation.ColorAnimation(
+                    Color.FromRgb(0x00, 0x78, 0xD4), TimeSpan.FromMilliseconds(250))
+                {
+                    AutoReverse = true,
+                    RepeatBehavior = new System.Windows.Media.Animation.RepeatBehavior(3),
+                    FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop
+                };
+                brush.BeginAnimation(SolidColorBrush.ColorProperty, animation);
+            }
+            catch (Exception ex)
+            {
+                Log.Error("picker attention cue failed", ex);
+            }
         }
 
         // ---- placement -------------------------------------------------------
@@ -97,7 +113,11 @@ namespace PowerPane.UI
         protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
         {
             base.OnDpiChanged(oldDpi, newDpi);
-            PlaceNearPointer();
+            // WM_DPICHANGED can arrive inside PlaceNearPointer's own SetWindowPos. WPF then applies its
+            // suggested rectangle after the placement finished, so the placement runs again once this
+            // call returns.
+            if (_placing) Dispatcher.BeginInvoke(new Action(PlaceNearPointer));
+            else PlaceNearPointer();
         }
 
         /// <summary>Positions the window in device pixels against the work area of the monitor under the
@@ -155,6 +175,7 @@ namespace PowerPane.UI
                 foreach (var g in _groupSnapshot) GroupList.Items.Add(MakeItem(g.Name, g));
                 GroupList.Items.Add(MakeItem(NewGroupText, null));
                 GroupList.SelectedIndex = choice.IsNewGroup ? _groupSnapshot.Count : choice.GroupIndex;
+                _lastGroupIndex = GroupList.SelectedIndex;
             }
             finally { _building = false; }
 
@@ -181,6 +202,7 @@ namespace PowerPane.UI
                 {
                     TabList.Items.Add(MakeItem(FirstTabText, null));
                     TabList.SelectedIndex = 0;
+                    _lastTabIndex = 0;
                     TabList.IsEnabled = false;
                     return;
                 }
@@ -194,6 +216,7 @@ namespace PowerPane.UI
                 int index = wantedTab == PinChoice.NewIndex ? tabs.Count : wantedTab;
                 if (index < 0 || index > tabs.Count) index = 0;
                 TabList.SelectedIndex = index;
+                _lastTabIndex = index;
             }
             finally { _building = false; }
         }
@@ -221,9 +244,21 @@ namespace PowerPane.UI
             NewTabBox.Visibility = IsNewTabSelected() ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        // A single-select ListBox lets Ctrl+click clear its selection. A choice always has a value, so a
+        // cleared list gets its previous selection back.
+        private int _lastGroupIndex;
+        private int _lastTabIndex;
+
         private void OnGroupChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_building) return;
+            if (GroupList.SelectedIndex < 0)
+            {
+                _building = true;
+                try { GroupList.SelectedIndex = _lastGroupIndex; } finally { _building = false; }
+                return;
+            }
+            _lastGroupIndex = GroupList.SelectedIndex;
             FillTabs(0);
             UpdateNameBoxes();
         }
@@ -231,6 +266,13 @@ namespace PowerPane.UI
         private void OnTabChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_building) return;
+            if (TabList.SelectedIndex < 0)
+            {
+                _building = true;
+                try { TabList.SelectedIndex = _lastTabIndex; } finally { _building = false; }
+                return;
+            }
+            _lastTabIndex = TabList.SelectedIndex;
             UpdateNameBoxes();
         }
 
@@ -252,6 +294,24 @@ namespace PowerPane.UI
                 PinnedGroup group = null;
                 PinnedTab tab = null;
 
+                if (!IsNewGroupSelected())
+                {
+                    // Another process (the tray) may have renamed, moved, or deleted the folder the lists
+                    // were built from. Writing now would recreate a ghost folder, so the picker rescans,
+                    // keeps the items, and asks again.
+                    var chosen = SelectedGroup();
+                    bool tabGone = chosen != null && !IsNewTabSelected()
+                        && TabList.SelectedIndex >= 0 && TabList.SelectedIndex < chosen.Tabs.Count
+                        && !System.IO.Directory.Exists(chosen.Tabs[TabList.SelectedIndex].FolderPath);
+                    if (chosen == null || !System.IO.Directory.Exists(chosen.FolderPath) || tabGone)
+                    {
+                        _groups.ScanOnce();
+                        BuildLists(null);
+                        ShowMessage("That group or tab changed while this window was open. Choose again.");
+                        return;
+                    }
+                }
+
                 if (IsNewGroupSelected())
                 {
                     group = _groups.CreateGroup(PinPickerModel.ResolveName(NewGroupBox.Text, PinPickerModel.DefaultGroupName));
@@ -264,7 +324,7 @@ namespace PowerPane.UI
                     {
                         if (IsNewTabSelected())
                             tab = _groups.AddTab(group, PinPickerModel.ResolveName(NewTabBox.Text, PinPickerModel.DefaultTabName));
-                        else
+                        else if (TabList.SelectedIndex >= 0 && TabList.SelectedIndex < group.Tabs.Count)
                             tab = group.Tabs[TabList.SelectedIndex];
                     }
                 }
@@ -277,13 +337,25 @@ namespace PowerPane.UI
                 else
                 {
                     Log.Info("Add to PowerPane found no group or tab to add to.");
+                    ShowMessage("Could not find that group or tab. Choose again, or Cancel.");
+                    return;
                 }
             }
             catch (Exception ex)
             {
+                // The items were already taken from the queue, so the window stays open for another try.
                 Log.Error("pin confirm failed", ex);
+                ShowMessage("Could not add the items. Try again, or Cancel.");
+                return;
             }
             Close();
+        }
+
+        private void ShowMessage(string text)
+        {
+            HintText.Text = text;
+            HintText.Visibility = Visibility.Visible;
+            AutomationProperties.SetName(HintText, text);
         }
 
         /// <summary>Saves the group and tab for the next picker. AddPins turns an implicit tab into a

@@ -644,39 +644,6 @@ namespace PowerPane.Interop
             return false;
         }
 
-        // ---- asking for attention without taking focus ----
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct FLASHWINFO
-        {
-            public uint cbSize;
-            public IntPtr hwnd;
-            public uint dwFlags;
-            public uint uCount;
-            public uint dwTimeout;
-        }
-
-        [DllImport("user32.dll")]
-        private static extern bool FlashWindowEx(ref FLASHWINFO pwfi);
-
-        private const uint FLASHW_ALL = 0x3;
-        private const uint FLASHW_TIMERNOFG = 0xC;
-
-        /// <summary>Flashes the window's caption and taskbar button until it is brought forward.</summary>
-        public static void FlashForAttention(IntPtr hwnd)
-        {
-            if (hwnd == IntPtr.Zero) return;
-            var info = new FLASHWINFO
-            {
-                cbSize = (uint)Marshal.SizeOf(typeof(FLASHWINFO)),
-                hwnd = hwnd,
-                dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG,
-                uCount = 3,
-                dwTimeout = 0
-            };
-            FlashWindowEx(ref info);
-        }
-
         /// <summary>Pixels per inch of the monitor holding hwnd. GetDpiForWindow needs Windows 10, so
         /// older builds fall back to the desktop DC, which reports the system DPI.</summary>
         public static int DpiForWindow(IntPtr hwnd)
