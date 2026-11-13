@@ -69,7 +69,10 @@ namespace PowerPane.Tests
         public void UsesSelection_OnlyForActionsThatReadIt()
         {
             Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-selected-paths")), Is.True);
-            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-path")), Is.False);
+            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-path")), Is.True);
+            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-parent-path")), Is.False);
+            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("copy-cd-powershell")), Is.False);
+            Assert.That(QuickActionLibrary.UsesSelection(QuickActionLibrary.Find("new-text-file")), Is.False);
 
             var usesPath = new QuickActionDefinition("custom:a", "A", "tool {path}", QuickActionKind.Custom, false);
             var usesDir = new QuickActionDefinition("custom:b", "B", "tool {dir}", QuickActionKind.Custom, false);

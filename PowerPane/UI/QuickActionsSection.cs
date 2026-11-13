@@ -170,13 +170,7 @@ namespace PowerPane.UI
             var hostWindow = _hostWindow;
             Action run = () => WorkQueue.Post(() =>
             {
-                var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
-                List<string> selection = null;
-                var status = SelectionReadStatus.Ok;
-                if (QuickActionLibrary.UsesSelection(def))
-                    status = ExplorerNavigator.GetSelectedPaths(hostWindow, out selection);
-                string message = QuickActionRunner.SelectionProblem(status)
-                    ?? QuickActionRunner.Run(def, folder, selection);
+                string message = QuickActionRunner.RunInWindow(def, hostWindow);
                 if (message != null) WorkQueue.PostUI(() => ShowMessage(row, text, def, message));
             });
             row.MouseLeftButtonUp += (s, e) => { press.Up(); run(); };

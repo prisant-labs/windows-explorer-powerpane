@@ -52,22 +52,26 @@ namespace PowerPane.Services
     {
         public static readonly QuickActionDefinition[] All =
         {
+            // The copy rows with a per-item form copy the selected items when there are any, one per
+            // line, and the folder otherwise. Explorer selects the folder you came from when you go up
+            // a level, which #191 kept these rows away from the selection for; WindowFolderHistory
+            // recognizes that selection and copies the folder instead.
             new QuickActionDefinition("copy-path", "Copy path",
-                "The folder's path, exactly as Windows shows it.", QuickActionKind.CopyPath, true),
+                "The selected items' paths, one per line, or the folder's path when nothing is selected.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-path-quoted", "Copy path in quotes",
-                "The path wrapped in \"double quotes\", ready to paste into a command line.", QuickActionKind.CopyPath, true),
+                "The path wrapped in \"double quotes\", ready to paste into a command line. Uses the selected items when there are any.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-path-forward", "Copy path with forward slashes",
-                "The path with every backslash changed to a forward slash.", QuickActionKind.CopyPath, true),
+                "The path with every backslash changed to a forward slash. Uses the selected items when there are any.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-path-wsl", "Copy WSL path",
-                "The path as WSL would read it, such as /mnt/c/Demo. Does nothing for a network path.", QuickActionKind.CopyPath, true),
+                "The path as WSL would read it, such as /mnt/c/Demo. Uses the selected items when there are any. Does nothing for a network path.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-markdown-link", "Copy Markdown link",
-                "A Markdown link to the folder, such as [Demo](<C:/Demo>).", QuickActionKind.CopyPath, true),
+                "A Markdown link such as [Demo](<C:/Demo>), to each selected item, or to the folder when nothing is selected.", QuickActionKind.CopyPath, true),
             new QuickActionDefinition("copy-folder-name", "Copy folder name",
-                "Only the folder's own name, such as Apollo.", QuickActionKind.CopyPath, false),
+                "Only the folder's own name, such as Apollo, or the selected items' names when there are any.", QuickActionKind.CopyPath, false),
             new QuickActionDefinition("copy-parent-path", "Copy parent folder path",
                 "The path of the folder that holds this one. Does nothing at a drive root.", QuickActionKind.CopyPath, false),
             new QuickActionDefinition("copy-file-url", "Copy as file URL",
-                "The path as a file:// URL, with special characters encoded.", QuickActionKind.CopyPath, false),
+                "The path as a file:// URL, with special characters encoded. Uses the selected items when there are any.", QuickActionKind.CopyPath, false),
             new QuickActionDefinition("copy-cd-powershell", "Copy PowerShell change-directory command",
                 "A Set-Location command for this folder, ready to paste into PowerShell.", QuickActionKind.CopyPath, false),
             new QuickActionDefinition("new-text-file", "New text file",
@@ -92,9 +96,9 @@ namespace PowerPane.Services
                 "Opens your default WSL distribution in the folder. Hidden when no distribution is installed.", QuickActionKind.OpenTool, false),
             new QuickActionDefinition("pin-folder", "Pin this folder",
                 "Opens the group picker to pin the folder, the same as the Explorer right-click command.", QuickActionKind.FolderAction, false),
-            // Separate rows rather than "Copy path" preferring the selection: Explorer selects the
-            // folder you came from when you go up a level, so that row would quietly copy the wrong
-            // path after an ordinary navigation (#191).
+            // These rows act on the selection only and say "Nothing selected" without one. They predate
+            // the copy rows above using the selection, and stay for anyone who wants a copy that never
+            // falls back to the folder (#191).
             new QuickActionDefinition("copy-selected-names", "Copy selected names",
                 "The names of the items selected in Explorer, one per line.", QuickActionKind.Selection, false),
             new QuickActionDefinition("copy-selected-paths", "Copy selected paths",
@@ -361,7 +365,26 @@ namespace PowerPane.Services
         {
             if (def == null) return false;
             return def.Kind == QuickActionKind.Selection
+                || SelectionCopyId(def.Id) != null
                 || (def.Kind == QuickActionKind.Custom && CustomCommandTemplate.UsesTargets(def.Template));
+        }
+
+        /// <summary>The selection action a folder copy action uses when items are selected, or null for
+        /// a copy with no per-item form. The parent path and the PowerShell Set-Location command only
+        /// make sense for the folder, so they always copy the folder.</summary>
+        public static string SelectionCopyId(string actionId)
+        {
+            switch (actionId)
+            {
+                case "copy-path": return "copy-selected-paths";
+                case "copy-path-quoted": return "copy-selected-quoted";
+                case "copy-path-forward": return "copy-selected-forward";
+                case "copy-path-wsl": return "copy-selected-wsl";
+                case "copy-markdown-link": return "copy-selected-markdown";
+                case "copy-file-url": return "copy-selected-urls";
+                case "copy-folder-name": return "copy-selected-names";
+                default: return null;
+            }
         }
 
         // ---- PATH lookup -------------------------------------------------------
