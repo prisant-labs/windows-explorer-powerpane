@@ -3,7 +3,7 @@
 
     This architecture is a single user-mode executable plus two HKCU registry entries, so unlike
     the old COM build there is no regsvr32 and no elevation. The script copies PowerPane.exe into
-    %LOCALAPPDATA%\PowerPane, registers the "Pin to PowerPane" folder verb, adds a startup entry,
+    %LOCALAPPDATA%\PowerPane, registers the "Add to PowerPane" right-click verb, adds a startup entry,
     and launches the app.
 
     Run it by right-clicking and choosing "Run with PowerShell", or from a console:
@@ -47,18 +47,27 @@ New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 Copy-Item -Force -Path $src -Destination (Join-Path $InstallDir $ExeName)
 $exe = Join-Path $InstallDir $ExeName
 
-# 3. Register the "Pin to PowerPane" context menu verb under HKCU (no admin needed).
+# 3. Register the "Add to PowerPane" context menu verb under HKCU (no admin needed). Four keys, all
+#    named PowerPanePin: folders, folder backgrounds, files, and drives. Installer.iss writes the same
+#    four, Uninstall.ps1 removes them, and scripts/check-rules.ps1 fails when the three disagree. The
+#    registry API is used because PowerShell reads the * in the file key as a wildcard.
 $verbCmd = "`"$exe`" --pin `"%1`""
 $verbCmdBg = "`"$exe`" --pin `"%V`""
 
-New-Item -Path 'HKCU:\Software\Classes\Directory\shell\PowerPanePin\command' -Force | Out-Null
-Set-ItemProperty -Path 'HKCU:\Software\Classes\Directory\shell\PowerPanePin' -Name '(default)' -Value 'Pin to PowerPane'
-Set-ItemProperty -Path 'HKCU:\Software\Classes\Directory\shell\PowerPanePin' -Name 'Icon' -Value $exe
-Set-ItemProperty -Path 'HKCU:\Software\Classes\Directory\shell\PowerPanePin\command' -Name '(default)' -Value $verbCmd
+function Register-AddVerb([string]$classKey, [string]$command) {
+    $verb = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("Software\Classes\$classKey\shell\PowerPanePin")
+    $verb.SetValue('', 'Add to PowerPane')
+    $verb.SetValue('Icon', $exe)
+    $verb.Close()
+    $cmd = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("Software\Classes\$classKey\shell\PowerPanePin\command")
+    $cmd.SetValue('', $command)
+    $cmd.Close()
+}
 
-New-Item -Path 'HKCU:\Software\Classes\Directory\Background\shell\PowerPanePin\command' -Force | Out-Null
-Set-ItemProperty -Path 'HKCU:\Software\Classes\Directory\Background\shell\PowerPanePin' -Name '(default)' -Value 'Pin to PowerPane'
-Set-ItemProperty -Path 'HKCU:\Software\Classes\Directory\Background\shell\PowerPanePin\command' -Name '(default)' -Value $verbCmdBg
+Register-AddVerb 'Directory' $verbCmd
+Register-AddVerb 'Directory\Background' $verbCmdBg
+Register-AddVerb '*' $verbCmd
+Register-AddVerb 'Drive' $verbCmd
 
 # 4. Start with Windows.
 Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'PowerPane' -Value "`"$exe`""

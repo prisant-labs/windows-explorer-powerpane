@@ -16,9 +16,11 @@ Write-Host 'Uninstalling PowerPane...' -ForegroundColor Cyan
 Get-Process -Name 'PowerPane' -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Milliseconds 400
 
-# 2. Remove the context menu verb (both folder and folder-background variants).
-Remove-Item -Path 'HKCU:\Software\Classes\Directory\shell\PowerPanePin' -Recurse -Force
-Remove-Item -Path 'HKCU:\Software\Classes\Directory\Background\shell\PowerPanePin' -Recurse -Force
+# 2. Remove the "Add to PowerPane" verb: the folder, folder-background, file, and drive keys. The
+#    registry API is used because PowerShell reads the * in the file key as a wildcard.
+foreach ($classKey in @('Directory', 'Directory\Background', '*', 'Drive')) {
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\Classes\$classKey\shell\PowerPanePin", $false)
+}
 
 # 3. Remove the startup entry.
 Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'PowerPane' -Force

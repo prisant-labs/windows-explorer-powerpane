@@ -3,7 +3,7 @@
 ; This produces a single PowerPane-<version>-x64-setup.exe, listed as "Explorer PowerPane". Because PowerPane is a user-mode app that
 ; only writes HKCU keys, the installer runs without administrator rights (PrivilegesRequired=lowest).
 ; It installs the executable, creates a Start menu shortcut and an optional desktop shortcut, registers
-; the "Pin to PowerPane" folder verb, adds a startup entry, and launches the app. Uninstall preserves
+; the "Add to PowerPane" right-click verb, adds a startup entry, and launches the app. Uninstall preserves
 ; the user's groups and settings under %APPDATA%\PowerPane.
 ;
 ; To build: run scripts/build.ps1, then scripts/package.ps1, which compiles this script and puts the
@@ -82,14 +82,29 @@ Name: "{userprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Comment: "Po
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Comment: "PowerPane sidebar for File Explorer"; Tasks: desktopicon
 
 [Registry]
-; "Pin to PowerPane" on any folder.
-Root: HKCU; Subkey: "Software\Classes\Directory\shell\PowerPanePin"; ValueType: string; ValueName: ""; ValueData: "Pin to PowerPane"; Flags: uninsdeletekey
+; "Add to PowerPane" right-click verb. All four keys keep the name PowerPanePin, so an upgrade rewrites
+; the entry a previous version made instead of leaving it beside a new one. The same four keys are
+; written by Install.ps1 and removed by Uninstall.ps1, and scripts/check-rules.ps1 fails when the three
+; files disagree.
+; On any folder.
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\PowerPanePin"; ValueType: string; ValueName: ""; ValueData: "Add to PowerPane"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\PowerPanePin"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExe}"
 Root: HKCU; Subkey: "Software\Classes\Directory\shell\PowerPanePin\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExe}"" --pin ""%1"""
 
-; "Pin to PowerPane" on the folder background (empty area inside a folder).
-Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\PowerPanePin"; ValueType: string; ValueName: ""; ValueData: "Pin to PowerPane"; Flags: uninsdeletekey
+; On the folder background (empty area inside a folder).
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\PowerPanePin"; ValueType: string; ValueName: ""; ValueData: "Add to PowerPane"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\PowerPanePin"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExe}"
 Root: HKCU; Subkey: "Software\Classes\Directory\Background\shell\PowerPanePin\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExe}"" --pin ""%V"""
+
+; On any file. The * key covers files and not folders, so it never doubles the Directory entry.
+Root: HKCU; Subkey: "Software\Classes\*\shell\PowerPanePin"; ValueType: string; ValueName: ""; ValueData: "Add to PowerPane"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\*\shell\PowerPanePin"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExe}"
+Root: HKCU; Subkey: "Software\Classes\*\shell\PowerPanePin\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExe}"" --pin ""%1"""
+
+; On a drive icon, such as one in This PC. Windows passes the drive root, such as D:\.
+Root: HKCU; Subkey: "Software\Classes\Drive\shell\PowerPanePin"; ValueType: string; ValueName: ""; ValueData: "Add to PowerPane"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\Drive\shell\PowerPanePin"; ValueType: string; ValueName: "Icon"; ValueData: "{app}\{#MyAppExe}"
+Root: HKCU; Subkey: "Software\Classes\Drive\shell\PowerPanePin\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExe}"" --pin ""%1"""
 
 ; Start with Windows.
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "PowerPane"; ValueData: """{app}\{#MyAppExe}"""; Flags: uninsdeletevalue
@@ -105,6 +120,11 @@ Filename: "{app}\{#MyAppExe}"; Description: "Launch Explorer PowerPane"; Flags: 
 ; answers by relaunching PowerPane in the middle of the uninstall, and it also skips the teardown that
 ; restores every Explorer window's layout. The verb blocks until the app and its watchdog are both gone.
 Filename: "{app}\{#MyAppExe}"; Parameters: "--exit"; Flags: runhidden waituntilterminated; RunOnceId: "StopPowerPane"
+
+[UninstallDelete]
+; The Add to PowerPane verb queues its paths in a PinQueue folder inside {app}. Without this line the
+; folder, and so {app} itself, would be left behind after an uninstall.
+Type: filesandordirs; Name: "{app}\PinQueue"
 
 [Code]
 { Same reasoning on the way in: an upgrade over a running copy has to stop it before the executable can

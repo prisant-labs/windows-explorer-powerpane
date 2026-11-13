@@ -612,6 +612,42 @@ namespace PowerPane.Interop
         public const int WM_ENTERSIZEMOVE = 0x0231;
         public const int WM_EXITSIZEMOVE = 0x0232;
 
+        // ---- the monitor under a screen point, and its own scale (the Add to PowerPane picker) ----
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+        // shcore.dll, Windows 8.1 and later. MDT_EFFECTIVE_DPI is 0.
+        [DllImport("shcore.dll")]
+        private static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+        /// <summary>The work area, in device pixels, and the pixels per inch of the monitor that holds
+        /// the screen point, falling back to the primary screen and 96. The scale is that monitor's own
+        /// (GetDpiForMonitor), never the system scale, so a window placed from a pointer on a second
+        /// display uses that display's size.</summary>
+        public static bool MonitorAtPoint(POINT pt, out RECT workArea, out int dpi)
+        {
+            dpi = 96;
+            IntPtr mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+            var mi = new MONITORINFO { cbSize = Marshal.SizeOf(typeof(MONITORINFO)) };
+            if (mon != IntPtr.Zero && GetMonitorInfo(mon, ref mi))
+            {
+                workArea = mi.rcWork;
+                try
+                {
+                    uint dx, dy;
+                    if (GetDpiForMonitor(mon, 0, out dx, out dy) == 0 && dx >= 48 && dx <= 960) dpi = (int)dx;
+                }
+                catch { }
+                return true;
+            }
+
+            RECT wa = new RECT();
+            if (SystemParametersInfo(SPI_GETWORKAREA, 0, ref wa, 0)) { workArea = wa; return false; }
+            workArea = new RECT { Left = 0, Top = 0, Right = GetSystemMetrics(SM_CXSCREEN), Bottom = GetSystemMetrics(SM_CYSCREEN) };
+            return false;
+        }
+
         /// <summary>Pixels per inch of the monitor holding hwnd. GetDpiForWindow needs Windows 10, so
         /// older builds fall back to the desktop DC, which reports the system DPI.</summary>
         public static int DpiForWindow(IntPtr hwnd)

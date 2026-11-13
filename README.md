@@ -87,7 +87,7 @@ Three ways to show the pane, chosen in Settings:
 
 Folders live in groups, and a group can hold several tabs.
 
-- Pin a folder from the **Pin to PowerPane** context-menu verb on any folder, from the folder background, or by dragging it into the pane
+- Add a folder or file with the **Add to PowerPane** context-menu verb on any folder, file, or drive, on a folder's background, or by dragging it into the pane. On Windows 11 the verb is under "Show more options", or press Shift+F10 on the item
 - Create, rename, and delete groups, tabs, and pins
 - Drag to reorder groups, tabs, and pins, with a visible drop line while reordering
 - Drag one group onto another to merge their tabs, or drag a tab into empty space to make it a new group
@@ -188,7 +188,7 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 ### Option A: Run a release build
 
 1. Download the latest `PowerPane-<version>-x64-setup.exe` from the [Releases page](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest) (or build it yourself below)
-2. Run the installer. It installs per-user with no administrator rights, registers the **Pin to PowerPane** folder verb, adds a startup entry, and launches PowerPane. Over an existing PowerPane, it upgrades that install in place. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first
+2. Run the installer. It installs per-user with no administrator rights, registers the **Add to PowerPane** right-click verb, adds a startup entry, and launches PowerPane. Over an existing PowerPane, it upgrades that install in place. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first
 3. Open any Explorer window and the pane appears inside it
 
 ### Moving from QuickPane
@@ -233,7 +233,9 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 
 ### Pinning folders
 
-- Right-click any folder in Explorer and choose **Pin to PowerPane**, or right-click inside a folder's empty background, or drag a folder into the pane
+- Right-click any folder or file in Explorer, or a drive in This PC, and choose **Add to PowerPane**, or right-click inside a folder's empty background, or drag a folder into the pane. On Windows 11 the verb is under "Show more options", or press Shift+F10 on the item
+- Select several items and choose the verb once. One window opens for all of them
+- The window asks for a group and a tab, with "New group..." and "New tab..." to make one on the spot, and remembers your last choice. The Add button pins the items into that tab
 - Click a pinned folder to navigate the current Explorer window to it
 
 ### Groups and tabs
@@ -439,7 +441,7 @@ PowerPane/
         ├── FolderTreeNode.cs         # A lazy tree node
         ├── LazyContextMenu.cs        # Builds a pinned row's menu when it opens
         ├── Settings/                 # The native Settings window, its cards, and its pages
-        ├── GroupPickerWindow.xaml(.cs) # Pick a group when pinning
+        ├── GroupPickerWindow.xaml(.cs) # The Add to PowerPane picker: group, tab, and items
         ├── TextPrompt.cs             # Top-level prompts for text entry
         ├── DropLineAdorner.cs        # Reorder drop line
         └── DragGhostAdorner.cs       # Drag ghost
