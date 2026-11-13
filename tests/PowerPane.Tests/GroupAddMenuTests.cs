@@ -52,13 +52,59 @@ namespace PowerPane.Tests
             var g = Zephyr();
             var plus = GroupAddMenu.BuildMenu(g, g.Active, NoAnchor);
 
-            // The group menu puts Rename and a separator first, then asks for the same four entries.
+            // The builder GroupSection.BuildGroupMenu calls, after Rename and a separator.
             var group = new ContextMenu();
             group.Items.Add(new MenuItem { Header = "Rename" });
             group.Items.Add(new Separator());
-            GroupAddMenu.AddEntries(group, g, g.Active, AddKinds.All, NoAnchor);
+            GroupAddMenu.AddGroupMenuEntries(group, g, g.Active, null);
 
             Assert.That(Headers(group).Skip(1), Is.EqualTo(Headers(plus)));
+        }
+
+        [Test]
+        public void GroupMenuBuilder_AimsFolderAndFileAtTheActiveTab_WhenNoTabIsGiven()
+        {
+            var g = Zephyr();
+            var menu = new ContextMenu();
+
+            GroupAddMenu.AddGroupMenuEntries(menu, g, null, null);
+
+            Assert.That(Headers(menu).Skip(2), Is.EqualTo(new[]
+            {
+                "Add folder to tab \"Orion\"...", "Add file to tab \"Orion\"..."
+            }));
+        }
+
+        [Test]
+        public void TabMenuBuilder_GivesTheFolderAndFileEntriesOfThePlusMenu_ForTheClickedTab()
+        {
+            var g = Zephyr();
+            var plus = GroupAddMenu.BuildMenu(g, g.Tabs[0], NoAnchor);
+            var tab = new ContextMenu();
+
+            GroupAddMenu.AddTabMenuEntries(tab, g, g.Tabs[0], null);
+
+            Assert.That(Headers(tab), Is.EqualTo(Headers(plus).Skip(2)));
+        }
+
+        [Test]
+        public void RenameValidator_AcceptsTheTabsOwnName_AndRejectsAnotherTabs()
+        {
+            var g = Zephyr();
+            var validate = GroupAddMenu.RenameTabValidator(g, g.Tabs[1]);
+
+            Assert.That(validate("Orion"), Is.Null);
+            Assert.That(validate("Vega"), Is.Not.Null);
+        }
+
+        [Test]
+        public void NewTabValidator_RejectsEveryExistingTabName()
+        {
+            var g = Zephyr();
+            var validate = GroupAddMenu.NewTabValidator(g);
+
+            Assert.That(validate("Orion"), Is.Not.Null);
+            Assert.That(validate("Atlas"), Is.Null);
         }
 
         [Test]

@@ -781,7 +781,7 @@ namespace PowerPane.UI
             menu.Items.Add(new Separator());
             // The same entries as the "+" button's menu, each naming its target. Prompts open next to
             // the control this menu belongs to, read when an entry is chosen.
-            GroupAddMenu.AddEntries(menu, group, activeTab ?? group.Active, AddKinds.All, () => PromptAnchor.Capture(owner));
+            GroupAddMenu.AddGroupMenuEntries(menu, group, activeTab, owner);
             // A group with one tab has no tab row, so this header menu is the only menu that tab has.
             // With several tabs, sorting is chosen per tab from the tab's own menu.
             if (group.Tabs.Count == 1) menu.Items.Add(BuildSortMenu(group.Tabs[0]));
@@ -800,7 +800,7 @@ namespace PowerPane.UI
             // These land in the tab that was right-clicked, not the group's active tab: a group with
             // several tabs otherwise has no way to add a pin anywhere but the narrow strip past the
             // last tab, which always targets whichever tab happened to be active.
-            GroupAddMenu.AddEntries(menu, group, tab, AddKinds.FolderAndFile, () => PromptAnchor.Capture(owner));
+            GroupAddMenu.AddTabMenuEntries(menu, group, tab, owner);
             menu.Items.Add(BuildSortMenu(tab));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Move tab left", () => App.Groups.PostEdit(store => store.MoveTab(group, tab, -1))));
@@ -1003,7 +1003,7 @@ namespace PowerPane.UI
                 Title = "Rename tab",
                 Initial = tab.Name,
                 InputName = "New tab name",
-                Validate = text => TabNameRules.Validate(text, group.Tabs.Where(t => !ReferenceEquals(t, tab)).Select(t => t.Name))
+                Validate = GroupAddMenu.RenameTabValidator(group, tab)
             });
             if (v != null) App.Groups.PostEdit(store => store.RenameTab(tab, v));
         }

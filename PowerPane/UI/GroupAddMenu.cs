@@ -38,6 +38,34 @@ namespace PowerPane.UI
             }
         }
 
+        /// <summary>The Add entries of a group's right-click menu: all four, aimed at the tab that is
+        /// selected. GroupSection calls this, so the menu cannot be spelled out by hand again.
+        /// <paramref name="owner"/> is the control the menu belongs to, and prompts open next to it.</summary>
+        internal static void AddGroupMenuEntries(ItemsControl menu, PinnedGroup group, PinnedTab activeTab, FrameworkElement owner)
+        {
+            AddEntries(menu, group, activeTab ?? group.Active, AddKinds.All, () => PromptAnchor.Capture(owner));
+        }
+
+        /// <summary>The Add entries of a tab's right-click menu: folder and file, aimed at that tab.</summary>
+        internal static void AddTabMenuEntries(ItemsControl menu, PinnedGroup group, PinnedTab tab, FrameworkElement owner)
+        {
+            AddEntries(menu, group, tab, AddKinds.FolderAndFile, () => PromptAnchor.Capture(owner));
+        }
+
+        /// <summary>The prompt validator for a new tab in <paramref name="group"/>: every existing tab
+        /// name is taken.</summary>
+        internal static Func<string, string> NewTabValidator(PinnedGroup group)
+        {
+            return text => TabNameRules.Validate(text, group.Tabs.Select(t => t.Name));
+        }
+
+        /// <summary>The prompt validator for renaming <paramref name="tab"/>: the other tabs' names are
+        /// taken, and the tab's own name is not a duplicate of itself.</summary>
+        internal static Func<string, string> RenameTabValidator(PinnedGroup group, PinnedTab tab)
+        {
+            return text => TabNameRules.Validate(text, group.Tabs.Where(t => !ReferenceEquals(t, tab)).Select(t => t.Name));
+        }
+
         /// <summary>The "+" button's menu, for the tab that is selected now.</summary>
         internal static ContextMenu BuildMenu(PinnedGroup group, PinnedTab target, Func<PromptAnchor?> anchor)
         {
@@ -107,7 +135,7 @@ namespace PowerPane.UI
             {
                 Title = AddMenuLabels.NewTabTitle(group),
                 InputName = "New tab name",
-                Validate = text => TabNameRules.Validate(text, group.Tabs.Select(t => t.Name))
+                Validate = NewTabValidator(group)
             });
             if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v));
         }
