@@ -32,11 +32,24 @@ namespace PowerPane.UI
         private bool _detached;
         private IntPtr _hostWindow;
 
+        /// <summary>A toggle row's check box, kept so it can follow the setting without a rebuild.</summary>
+        private sealed class ToggleRow
+        {
+            public string Id;
+            public TextBlock Icon;
+            public TextBlock Text;
+        }
+
+        private readonly List<ToggleRow> _toggles = new List<ToggleRow>();
+
         public QuickActionsSection()
         {
             Focusable = false;
             Content = _root;
             Unloaded += (s, e) => Unwire();
+            // Nothing reliable announces a change made from Explorer's own View > Show menu to this
+            // process, so the check boxes are also re-read whenever the pointer comes to the section.
+            MouseEnter += (s, e) => RefreshToggles();
         }
 
         private void Wire()
@@ -44,6 +57,8 @@ namespace PowerPane.UI
             if (_wired || _detached) return;
             _wired = true;
             QuickActionLibrary.CodeAvailabilityChanged += OnCodeAvailabilityChanged;
+            ExplorerViewOptions.Changed += OnViewOptionsChanged;
+            Microsoft.Win32.SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
         }
 
         private void Unwire()
@@ -51,7 +66,48 @@ namespace PowerPane.UI
             if (!_wired) return;
             _wired = false;
             QuickActionLibrary.CodeAvailabilityChanged -= OnCodeAvailabilityChanged;
+            ExplorerViewOptions.Changed -= OnViewOptionsChanged;
+            // A static event: a pane that never let go would be kept alive by it.
+            try { Microsoft.Win32.SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; } catch { }
         }
+
+        // Raised on the work lane after a toggle.
+        private void OnViewOptionsChanged() { WorkQueue.PostUI(RefreshToggles); }
+
+        // Explorer announces a Show change as a "ShellState" setting change, which arrives as General.
+        private void OnUserPreferenceChanged(object sender, Microsoft.Win32.UserPreferenceChangedEventArgs e)
+        {
+            if (e.Category == Microsoft.Win32.UserPreferenceCategory.General) WorkQueue.PostUI(RefreshToggles);
+        }
+
+        /// <summary>Reads each toggle's setting on the work lane and sets its check box. UI thread.</summary>
+        private void RefreshToggles()
+        {
+            if (_detached || _toggles.Count == 0) return;
+            var rows = _toggles.ToArray();
+            WorkQueue.Post(() =>
+            {
+                var states = new bool?[rows.Length];
+                for (int i = 0; i < rows.Length; i++) states[i] = ExplorerViewOptions.IsOn(rows[i].Id);
+                WorkQueue.PostUI(() =>
+                {
+                    if (_detached) return;
+                    for (int i = 0; i < rows.Length; i++) ShowToggleState(rows[i], states[i]);
+                });
+            });
+        }
+
+        private static void ShowToggleState(ToggleRow t, bool? on)
+        {
+            t.Icon.Text = ToggleGlyph(on == true);
+            t.Icon.Opacity = on.HasValue ? 1.0 : 0.5;
+            // On the row's text, not the row: a Border has no automation peer, so the text is what a
+            // screen reader reaches (checked in Windows Sandbox).
+            System.Windows.Automation.AutomationProperties.SetItemStatus(t.Text, on == true ? "On" : on == false ? "Off" : "Unknown");
+        }
+
+        // Segoe Fluent Icons CheckboxComposite (ticked) and Checkbox (empty).
+        internal static string ToggleGlyph(bool on) { return on ? "\uE73A" : "\uE739"; }
 
         /// <summary>Release this section's subscriptions for good. Called by the pane, because a pane
         /// hosted in an HwndSource never raises Unloaded (#69).</summary>
@@ -68,6 +124,7 @@ namespace PowerPane.UI
             if (_detached) return;
             _hostWindow = hostWindow;
             Wire();
+            _toggles.Clear();
             _root.Children.Clear();
             if (App.Settings == null) return;
 
@@ -101,6 +158,7 @@ namespace PowerPane.UI
                 any = true;
             }
             if (!any) items.Children.Add(Hint("Turn on an action on the Quick actions settings page."));
+            RefreshToggles();
 
             if (_expanded) chevron.Angle = 90;
             else { items.Visibility = Visibility.Collapsed; items.MaxHeight = 0; }
@@ -181,6 +239,13 @@ namespace PowerPane.UI
                 run();
                 e.Handled = true;
             };
+            if (def.Kind == QuickActionKind.Toggle)
+            {
+                // Empty until the first read lands, so a row never claims a state it has not read.
+                var toggle = new ToggleRow { Id = def.Id, Icon = icon, Text = text };
+                ShowToggleState(toggle, null);
+                _toggles.Add(toggle);
+            }
             return row;
         }
 
@@ -295,6 +360,7 @@ namespace PowerPane.UI
                 case QuickActionKind.FolderAction: return "\uE718";
                 case QuickActionKind.Selection: return "\uE8B3";
                 case QuickActionKind.Custom: return "\uE756";
+                case QuickActionKind.Toggle: return ToggleGlyph(true);
                 default: return "\uE8C8";
             }
         }

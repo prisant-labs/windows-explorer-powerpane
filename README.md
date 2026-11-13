@@ -41,7 +41,7 @@ PowerPane puts your folders one click away inside Explorer itself, with:
 - 💾 **Open and Save dialog support**: the pane attaches to file dialogs and navigates them too
 - 🔎 **Search box**: filters every folder in the pane as you type
 - 🚀 **Recent Apps**: the programs you have been using, where a row opens its app and browser rows open out into their profiles
-- ⚡ **Quick actions**: copy a path in several formats, create a starter file, open a terminal, run your own commands, and act on the files selected in Explorer
+- ⚡ **Quick actions**: copy a path in several formats, create a starter file, open a terminal, run your own commands, act on the files selected in Explorer, and flip Explorer's View > Show options
 - 🎯 **Per-app folders**: set a folder as an app's starting point and its Save and Open dialogs land there
 - 👤 **Profiles**: independent workspaces, each with its own groups, recents count, and width
 - 🎨 **Native feel**: dark and light themes that blend into the Windows shell
@@ -228,7 +228,9 @@ Turn on the **Quick actions** section under **Pane sections** in Settings. Then 
 
 ![The Quick actions page in Settings](screens/settings-quick-actions.png)
 
-A row acts on the folder on screen, unless its name says "selected". Those rows act on the files selected in Explorer, and say "Nothing selected" when there are none.
+A row acts on the folder on screen, unless its name says "selected". Those rows act on the files selected in Explorer, and say "Nothing selected" when there are none. **Copy path** and the other copy rows that have a form for each item copy the selected items, one per line, when anything is selected, and the folder otherwise. After you go up a level, Explorer selects the folder you came from by itself, and that one selection is ignored, so the folder you are in is copied.
+
+Five rows flip Explorer's own **View > Show** options for every Explorer window: **Show hidden items**, **Show file name extensions**, **Show item check boxes**, **Compact view**, and **Show navigation pane**. Each row's check box shows whether the option is on now, including a change made from Explorer's own menu. An open window changes its navigation pane when it next opens another folder; new windows and tabs change at once. The other four change open windows at once.
 
 To add your own row, give a command a name and a template on the same page. These are invented examples:
 

@@ -26,6 +26,7 @@ namespace PowerPane.Services
         public static string Run(QuickActionDefinition def, string folder, IList<string> selection)
         {
             if (def == null) return null;
+            if (def.Kind == QuickActionKind.Toggle) return ExplorerViewOptions.Toggle(def.Id);
             if (def.Kind == QuickActionKind.Custom) return RunCustom(def, folder, selection);
             if (def.Kind == QuickActionKind.Selection) return RunOnSelection(def, folder, selection);
             if (def.Kind == QuickActionKind.CopyPath && selection != null && selection.Count > 0
@@ -43,6 +44,8 @@ namespace PowerPane.Services
         public static string RunInWindow(QuickActionDefinition def, IntPtr hostWindow)
         {
             if (def == null) return null;
+            // A toggle belongs to no folder, so it skips the cross-process folder read.
+            if (def.Kind == QuickActionKind.Toggle) return ExplorerViewOptions.Toggle(def.Id);
             var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
             List<string> selection = null;
             var status = SelectionReadStatus.Ok;
