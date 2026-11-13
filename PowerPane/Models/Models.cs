@@ -14,7 +14,11 @@ namespace PowerPane.Models
         public int Order { get; set; }              // from the NNN_ prefix
         public bool Exists { get; set; }            // target currently resolvable
         public bool IsFile { get; set; }            // recent item that is a file, not a folder
+        public DateTime AddedUtc { get; set; }      // creation time of the .lnk, the "Recently added" key
     }
+
+    /// <summary>How a tab orders its pins on screen. Manual is the stored NNN_ prefix order.</summary>
+    public enum PinSortMode { Manual, Name, Recent }
 
     /// <summary>One tab inside a group. Backed by a subfolder of the group folder; its pins are the
     /// .lnk files in that subfolder.</summary>
@@ -23,6 +27,7 @@ namespace PowerPane.Models
         public string Name { get; set; }            // subfolder name, TT_ prefix stripped
         public string FolderPath { get; set; }      // full path of the tab subfolder
         public int Order { get; set; }              // from the TT_ prefix
+        public PinSortMode SortMode { get; set; }   // from the .pane-sort marker in the tab folder
         public List<PinnedFolder> Items { get; set; } = new List<PinnedFolder>();
     }
 

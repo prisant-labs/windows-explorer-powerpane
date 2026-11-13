@@ -90,6 +90,7 @@
     <Compile Include="Services\LruCache.cs" />
     <Compile Include="Services\SettingsStore.cs" />
     <Compile Include="Services\GroupStore.cs" />
+    <Compile Include="Services\PinSorter.cs" />
     <Compile Include="Services\RecentFoldersService.cs" />
     <Compile Include="Services\RecentAppsService.cs" />
     <Compile Include="Services\AppDefaultsService.cs" />
