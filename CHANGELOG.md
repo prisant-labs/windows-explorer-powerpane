@@ -9,6 +9,7 @@
 - Selecting several items and choosing the verb opens one window for all of them, however Explorer starts the verb, and an item whose launch arrives while the window is open joins it.
 
 ### Changed
+- Each release now also carries the installer as `PowerPane-x64-setup.exe`, a name without the version, so [releases/latest/download/PowerPane-x64-setup.exe](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest/download/PowerPane-x64-setup.exe) always downloads the newest installer. The file is identical to `PowerPane-<version>-x64-setup.exe`, and `SHA256SUMS.txt` and the provenance attestation cover both names.
 - The **+** at the end of a group's tab strip, and the **+** in a one-tab group's header, now open a menu to add a tab, a group below, a folder, or a file. Each entry names what it adds to, such as `Add tab to "Mira / Orion"...` for a group with the tabs Mira and Orion, and a folder or file goes into the tab that is selected when you click. The group's right-click menu builds the same entries, and a tab's right-click menu has the folder and file ones, aimed at that tab. A name's underscores now show in these menus ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
 - The right-click verb is renamed from "Pin to PowerPane" to "Add to PowerPane", because Explorer already uses "pin" for its own verbs. The window's title reads "Add to PowerPane" and its confirm button reads "Add". Inside the pane, pins are still called pins. On Windows 11 the verb is under "Show more options".
 

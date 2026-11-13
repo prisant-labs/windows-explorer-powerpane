@@ -80,7 +80,7 @@ jobs:
           name: PowerPane-release
           path: dist/
 
-      # Covers every file SHA256SUMS.txt lists: the installer, the zip, and each file inside the zip. Anyone can then
+      # Covers every file SHA256SUMS.txt lists: the installer under both its names, the zip, and each file inside the zip. Anyone can then
       # check a download with: gh attestation verify <file> -R prisant-labs/windows-explorer-powerpane
       - name: Attest where the files came from
         if: github.ref_type == 'tag'

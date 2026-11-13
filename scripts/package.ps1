@@ -1,11 +1,11 @@
 # Packages a built PowerPane for release: the installer PowerPane-<version>-x64-setup.exe, built
-# from Installer.iss with Inno Setup 6; PowerPane-<version>-x64.zip holding the program and its
+# from Installer.iss with Inno Setup 6, and the same file as PowerPane-x64-setup.exe; PowerPane-<version>-x64.zip holding the program and its
 # license; SHA256SUMS.txt for both and for each file in the zip; and notes.md for the release page.
 # CI runs it on every build, so packaging is proven before anyone pushes a tag; the release
 # workflow runs it on the tagged commit. Run scripts/build.ps1 first.
 #
 # Usage:  pwsh -File scripts/package.ps1 [-Version 3.10.0.3] [-Configuration Release] [-OutDir dist] [-NoNotes] [-NoInstaller]
-# Output: <OutDir>\PowerPane-<version>-x64-setup.exe unless -NoInstaller, PowerPane-<version>-x64.zip,
+# Output: <OutDir>\PowerPane-<version>-x64-setup.exe and PowerPane-x64-setup.exe unless -NoInstaller, PowerPane-<version>-x64.zip,
 #         SHA256SUMS.txt, and notes.md unless -NoNotes
 param(
     [string]$Version,
@@ -53,7 +53,12 @@ if (-not $NoInstaller) {
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
     $setup = Join-Path $OutDir "PowerPane-$Version-x64-setup.exe"
     if (-not (Test-Path $setup)) { throw "Inno Setup did not produce $setup." }
-    $packaged += $setup
+    # The same installer under a name with no version, so the README can link to
+    # releases/latest/download/PowerPane-x64-setup.exe and that link always fetches the newest
+    # release. The versioned copy stays, because the winget workflow looks for it by name.
+    $stableSetup = Join-Path $OutDir 'PowerPane-x64-setup.exe'
+    Copy-Item $setup $stableSetup
+    $packaged += $setup, $stableSetup
 }
 
 $sums = Join-Path $OutDir 'SHA256SUMS.txt'
@@ -78,7 +83,7 @@ if (-not $NoNotes) {
         $installSteps = @'
 ## Install
 
-Download `PowerPane-<version>-x64-setup.exe` and run it. It installs for the current user, with no administrator rights. Over an existing PowerPane, it closes PowerPane, replaces the program, and updates the same Add/Remove Programs entry. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first. Your settings, groups, and pins in `%APPDATA%\PowerPane` stay where they are.
+Download `PowerPane-<version>-x64-setup.exe` and run it. `PowerPane-x64-setup.exe` is the same file under a name that never changes, for links to the newest release. It installs for the current user, with no administrator rights. Over an existing PowerPane, it closes PowerPane, replaces the program, and updates the same Add/Remove Programs entry. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first. Your settings, groups, and pins in `%APPDATA%\PowerPane` stay where they are.
 
 The zip holds the same program, for replacing the files by hand instead:
 
