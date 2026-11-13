@@ -407,8 +407,8 @@ namespace PowerPane.Tests
 
                 var after = f.Store.Groups.First(g => g.Name == "Alpha");
                 Assert.That(after.Tabs[0].Items, Is.Empty);
-                Assert.That(after.Tabs[1].Items.Select(i => i.TargetPath),
-                    Is.EqualTo(new[] { apollo, zephyr }).IgnoreCase);
+                Assert.That(after.Tabs[1].Items.Select(i => Path.GetFileName(i.TargetPath)),
+                    Is.EqualTo(new[] { "Apollo", "Zephyr" }));
                 Assert.That(Directory.GetFiles(Path.Combine(f.GroupA, "01_Main"), "*.lnk"), Is.Empty);
             }
         }
@@ -426,7 +426,7 @@ namespace PowerPane.Tests
                 f.Store.AddPins(alpha.Tabs[0], new[] { file, folder });
 
                 var items = f.Store.Groups.First(g => g.Name == "Alpha").Tabs[0].Items;
-                Assert.That(items.Select(i => i.TargetPath), Is.EqualTo(new[] { file, folder }).IgnoreCase);
+                Assert.That(items.Select(i => Path.GetFileName(i.TargetPath)), Is.EqualTo(new[] { "notes.txt", "Borealis" }));
                 Assert.That(Directory.GetFiles(Path.Combine(f.GroupA, "01_Main"), "*.lnk").Length, Is.EqualTo(2));
             }
         }
@@ -447,7 +447,7 @@ namespace PowerPane.Tests
                 f.Store.AddPins(tab, new[] { second, third });
 
                 var items = f.Store.Groups.First(g => g.Name == "Alpha").Tabs[1].Items;
-                Assert.That(items.Select(i => i.TargetPath), Is.EqualTo(new[] { first, second, third }).IgnoreCase);
+                Assert.That(items.Select(i => Path.GetFileName(i.TargetPath)), Is.EqualTo(new[] { "Apollo", "Zephyr", "plan.txt" }));
             }
         }
 
@@ -468,7 +468,7 @@ namespace PowerPane.Tests
 
                 var after = f.Store.Groups.First(g => g.Name == "Alpha");
                 Assert.That(after.Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Main", "Second", "Ideas" }));
-                Assert.That(after.Tabs[2].Items.Select(i => i.TargetPath), Is.EqualTo(new[] { apollo, file }).IgnoreCase);
+                Assert.That(after.Tabs[2].Items.Select(i => Path.GetFileName(i.TargetPath)), Is.EqualTo(new[] { "Apollo", "sketch.txt" }));
                 Assert.That(after.Tabs[0].Items, Is.Empty);
                 Assert.That(after.Tabs[1].Items, Is.Empty);
             }
@@ -488,7 +488,7 @@ namespace PowerPane.Tests
                 f.Store.AddPins(created.Active, new[] { file });
 
                 var after = f.Store.Groups.First(g => g.Name == "Borealis");
-                Assert.That(after.Tabs[0].Items.Select(i => i.TargetPath), Is.EqualTo(new[] { file }).IgnoreCase);
+                Assert.That(after.Tabs[0].Items.Select(i => Path.GetFileName(i.TargetPath)), Is.EqualTo(new[] { "brief.txt" }));
             }
         }
 

@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using NUnit.Framework;
 using PowerPane.Services;
 
@@ -126,38 +128,26 @@ namespace PowerPane.Tests
             }
         }
 
-        // The C runtime's rules for a command line, which is what the program receives in e.Args.
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern IntPtr CommandLineToArgvW([MarshalAs(UnmanagedType.LPWStr)] string cmd, out int count);
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr LocalFree(IntPtr mem);
+
+        // The parser a started program's arguments come from, after the program name.
         private static string[] SplitLikeWindows(string commandLine)
         {
-            var args = new List<string>();
-            var sb = new System.Text.StringBuilder();
-            bool inQuotes = false, any = false;
-            for (int i = 0; i < commandLine.Length; i++)
+            int count;
+            IntPtr argv = CommandLineToArgvW("prog.exe " + commandLine, out count);
+            Assert.That(argv, Is.Not.EqualTo(IntPtr.Zero));
+            try
             {
-                char c = commandLine[i];
-                if (c == '\\')
-                {
-                    int n = 0;
-                    while (i < commandLine.Length && commandLine[i] == '\\') { n++; i++; }
-                    if (i < commandLine.Length && commandLine[i] == '"')
-                    {
-                        sb.Append('\\', n / 2);
-                        any = true;
-                        if (n % 2 == 1) { sb.Append('"'); continue; }
-                        i--; continue; // an even run leaves the quote to toggle quoting
-                    }
-                    sb.Append('\\', n); any = true; i--; continue;
-                }
-                if (c == '"') { inQuotes = !inQuotes; any = true; continue; }
-                if (!inQuotes && (c == ' ' || c == '\t'))
-                {
-                    if (any) { args.Add(sb.ToString()); sb.Clear(); any = false; }
-                    continue;
-                }
-                sb.Append(c); any = true;
+                var result = new List<string>();
+                for (int i = 1; i < count; i++)
+                    result.Add(Marshal.PtrToStringUni(Marshal.ReadIntPtr(argv, i * IntPtr.Size)));
+                return result.ToArray();
             }
-            if (any) args.Add(sb.ToString());
-            return args.ToArray();
+            finally { LocalFree(argv); }
         }
     }
 }
