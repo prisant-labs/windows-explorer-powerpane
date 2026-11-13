@@ -60,10 +60,14 @@ namespace PowerPane.UI
         }
 
         /// <summary>The prompt validator for renaming <paramref name="tab"/>: the other tabs' names are
-        /// taken, and the tab's own name is not a duplicate of itself.</summary>
+        /// taken, and the tab's own name is not a duplicate of itself. A tab whose name another tab
+        /// already shares can keep it: the rule applies to what is typed, so the prompt does not open
+        /// with an error already showing.</summary>
         internal static Func<string, string> RenameTabValidator(PinnedGroup group, PinnedTab tab)
         {
-            return text => TabNameRules.Validate(text, group.Tabs.Where(t => !ReferenceEquals(t, tab)).Select(t => t.Name));
+            return text => string.Equals(text, tab.Name, StringComparison.Ordinal)
+                ? null
+                : TabNameRules.Validate(text, group.Tabs.Where(t => !ReferenceEquals(t, tab)).Select(t => t.Name));
         }
 
         /// <summary>The "+" button's menu, for the tab that is selected now.</summary>

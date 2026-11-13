@@ -98,6 +98,17 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void RenameValidator_LetsATabThatAlreadySharesANameKeepIt()
+        {
+            var g = Zephyr();
+            g.Tabs[2].Name = "Orion";
+            var validate = GroupAddMenu.RenameTabValidator(g, g.Tabs[1]);
+
+            Assert.That(validate("Orion"), Is.Null, "the prompt opens with the current name and no error");
+            Assert.That(validate("Mira"), Is.Not.Null);
+        }
+
+        [Test]
         public void NewTabValidator_RejectsEveryExistingTabName()
         {
             var g = Zephyr();
