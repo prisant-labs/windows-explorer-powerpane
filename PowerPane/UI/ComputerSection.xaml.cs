@@ -119,7 +119,9 @@ namespace PowerPane.UI
             menu.Items.Add(Item("Open", () => _navigate(ThisPcPath)));
             menu.Items.Add(Item("Open in new window", () => ExplorerNavigator.OpenNewWindow(ThisPcPath)));
             menu.Items.Add(new Separator());
-            menu.Items.Add(Item("Rename", () => RecentsSection.RenameSectionPrompt("computer", "This PC")));
+            // The row is the anchor. With none, the prompt would anchor to whatever is under the pointer
+            // when the click is raised, which is the hidden menu's item or what lies beneath it.
+            menu.Items.Add(Item("Rename", () => RecentsSection.RenameSectionPrompt("computer", "This PC", _pcNode == null ? null : _pcNode.Row)));
             return menu;
         }
 
