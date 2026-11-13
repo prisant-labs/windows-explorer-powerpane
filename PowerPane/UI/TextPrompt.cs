@@ -89,10 +89,12 @@ namespace PowerPane.UI
                 options.Anchor = anchor.Value.Rect;
                 options.AnchorHwnd = anchor.Value.Hwnd;
             }
-            bool prior = SidebarControl.SuppressAutoHide;
-            SidebarControl.SuppressAutoHide = true;
+            // A hold of its own, not a save and restore of the shared flag: the menu this prompt was
+            // opened from clears that flag while the prompt is up, and restoring a saved copy would
+            // set it again and leave the dock open for good.
+            SidebarControl.HoldAutoHide();
             try { return TextPrompt.Ask(options); }
-            finally { SidebarControl.SuppressAutoHide = prior; }
+            finally { SidebarControl.ReleaseAutoHide(); }
         }
 
         /// <summary>The same, anchored to a control read now.</summary>
