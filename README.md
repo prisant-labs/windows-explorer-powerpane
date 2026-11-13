@@ -91,6 +91,7 @@ Folders live in groups, and a group can hold several tabs.
 - Create, rename, and delete groups, tabs, and pins
 - Drag to reorder groups, tabs, and pins, with a visible drop line while reordering
 - Drag one group onto another to merge their tabs, or drag a tab into empty space to make it a new group
+- Sort a tab's pins A to Z or newest first, once or kept sorted, from **Sort pins** in its right-click menu
 - A group with a single tab renders like a plain list; with several tabs it shows a horizontally scrollable tab row
 - A seeded default group appears on first run so the pane is never empty
 
@@ -240,6 +241,7 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 - Drag a group, tab, or pin to reorder it
 - Drag one group onto another to merge their tabs
 - Drag a tab into empty space to split it into a new group
+- Right-click a tab and choose **Sort pins** to order its pins A to Z or by when they were added
 - Right-click a group or section header to rename it
 
 ### Quick actions and custom commands

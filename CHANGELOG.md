@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- A **Sort pins** submenu on a tab's right-click menu, and on the header menu of a group that has one tab. **A to Z (keep sorted)** and **Recently added (keep sorted)** keep a tab ordered by themselves, so a pin added later by any route lands in its place. **Sort A to Z once** reorders the tab one time, and **Manual order** turns keep-sorted off without moving anything. A tab stays in manual order until you choose otherwise. Dragging a pin to a line, or using Move up or Move down, puts a sorted tab back in manual order with the order you left on screen ([#241](https://github.com/prisant-labs/windows-explorer-powerpane/issues/241)).
+
 ## [4.0.0.1] - 2026-11-12
 
 Two fixes for the pane inside Open, Save As, and Select Folder dialogs.
