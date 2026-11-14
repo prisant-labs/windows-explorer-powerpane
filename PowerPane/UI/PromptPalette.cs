@@ -43,27 +43,29 @@ namespace PowerPane.UI
             };
         }
 
-        /// <summary>Decides every colour from the pane's brush colours, given by key. A missing key the
-        /// prompt needs gives the registry colours, so a missing brush never draws grey on grey.</summary>
+        /// <summary>Decides every colour from the pane's brush colours, given by key. Returns null when a
+        /// brush the prompt needs is missing, so the caller falls back to the registry colours and reads
+        /// the real dark-mode setting there; a missing brush never draws grey on grey, and a pane mode
+        /// that could not be read never picks light colours for a dark desktop (#254 review).</summary>
         internal static PromptPalette FromPane(Func<string, Color?> lookup, bool dark, bool highContrast)
         {
             var back = lookup("SidebarBackground");
             var text = lookup("TextPrimary");
             var sep = lookup("SeparatorColor");
             var fieldBorder = lookup("FieldBorder");
-            if (!back.HasValue || !text.HasValue || !sep.HasValue || !fieldBorder.HasValue)
-                return FromRegistry(dark);
+            var fieldBack = lookup("FieldBackground");
+            // Under high contrast the message takes the text colour, so WarningText is not needed there.
+            var warn = highContrast ? text : lookup("WarningText");
+            if (!back.HasValue || !text.HasValue || !sep.HasValue || !fieldBorder.HasValue
+                || !fieldBack.HasValue || !warn.HasValue)
+                return null;
 
             var shell = Opaque(back.Value);
-            var fieldBack = lookup("FieldBackground");
-            var fill = fieldBack.HasValue && fieldBack.Value.A == 255 ? fieldBack.Value : shell;
+            // Dark mode's FieldBackground is transparent, as Explorer's is, so the field takes the shell.
+            var fill = fieldBack.Value.A == 255 ? fieldBack.Value : shell;
 
             var warning = text.Value;
-            if (!highContrast)
-            {
-                var warn = lookup("WarningText");
-                if (warn.HasValue && ContrastRatio(Opaque(warn.Value), shell) >= 4.5) warning = Opaque(warn.Value);
-            }
+            if (!highContrast && ContrastRatio(Opaque(warn.Value), shell) >= 4.5) warning = Opaque(warn.Value);
 
             return new PromptPalette
             {
@@ -83,9 +85,11 @@ namespace PowerPane.UI
         {
             try
             {
-                if (Application.Current == null) return null;
-                bool dark = App.Theme != null && App.Theme.IsDark;
-                bool hc = App.Theme != null && App.Theme.IsHighContrast;
+                // Without the theme service the pane's mode is unknown, so let the prompt read the
+                // registry rather than guess light (#254 review).
+                if (Application.Current == null || App.Theme == null) return null;
+                bool dark = App.Theme.IsDark;
+                bool hc = App.Theme.IsHighContrast;
                 return FromPane(key =>
                 {
                     var b = Application.Current.TryFindResource(key) as SolidColorBrush;

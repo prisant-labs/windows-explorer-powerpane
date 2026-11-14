@@ -79,23 +79,31 @@ namespace PowerPane.Tests
         }
 
         [Test]
-        public void MissingBrush_FallsBackToTheRegistryColours()
+        // A null palette makes TextPrompt use FromRegistry(ReadDark()), so the fallback follows the real
+        // Windows app mode, not a pane mode that could not be read (#254 review).
+        [TestCase("SidebarBackground")]
+        [TestCase("TextPrimary")]
+        [TestCase("SeparatorColor")]
+        [TestCase("FieldBorder")]
+        [TestCase("FieldBackground")]
+        [TestCase("WarningText")]
+        public void MissingBrush_GivesNoPanePalette(string key)
         {
-            var d = ReadTheme("Theme.Dark.xaml");
-            d.Remove("FieldBorder");
-            var p = PromptPalette.FromPane(Lookup(d), true, false);
-            var r = PromptPalette.FromRegistry(true);
-            Assert.That(p.Shell, Is.EqualTo(r.Shell));
-            Assert.That(p.Text, Is.EqualTo(r.Text));
-            Assert.That(p.Warning, Is.EqualTo(r.Warning));
+            foreach (var file in new[] { "Theme.Light.xaml", "Theme.Dark.xaml" })
+            {
+                var d = ReadTheme(file);
+                d.Remove(key);
+                Assert.That(PromptPalette.FromPane(Lookup(d), file.Contains("Dark"), false), Is.Null, file + " without " + key);
+            }
         }
 
         [Test]
-        public void MissingWarningText_UsesTheTextColour()
+        public void HighContrast_DoesNotNeedWarningText()
         {
             var d = ReadTheme("Theme.Light.xaml");
             d.Remove("WarningText");
-            var p = PromptPalette.FromPane(Lookup(d), false, false);
+            var p = PromptPalette.FromPane(Lookup(d), false, true);
+            Assert.That(p, Is.Not.Null);
             Assert.That(p.Warning, Is.EqualTo(p.Text));
         }
 
