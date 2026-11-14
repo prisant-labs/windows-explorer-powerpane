@@ -21,6 +21,9 @@
                      SelectionChanged="OnTabChanged" />
             <TextBox x:Name="NewTabBox" Margin="0,6,0,0" Visibility="Collapsed" Text="" />
 
+            <TextBlock x:Name="DuplicateText" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap" Opacity="0.85"
+                       Visibility="Collapsed" AutomationProperties.LiveSetting="Polite" />
+
             <TextBlock x:Name="HintText" FontSize="11" Margin="0,10,0,0" TextWrapping="Wrap" Opacity="0.7"
                        Visibility="Collapsed" />
 

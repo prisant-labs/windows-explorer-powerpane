@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -72,6 +73,47 @@ namespace PowerPane.UI
             string summary = PinPickerModel.ItemSummary(_paths);
             PathText.Text = summary;
             AutomationProperties.SetName(PathText, "Items to add: " + summary);
+            UpdateDuplicates();
+        }
+
+        /// <summary>Tells the user, before they confirm, how many items the chosen existing tab already
+        /// pins (#252), and disables Add when every item is one. The tab's pins are already in memory
+        /// with their targets resolved, so this is a string comparison with no disk access. "New group"
+        /// and "New tab" hold no pins, so they show no note. Add is enabled only when no rule blocks it:
+        /// today the duplicate rule is the only one, because the name boxes fall back to default names.</summary>
+        private void UpdateDuplicates()
+        {
+            string note = null;
+            bool allowAdd = true;
+            var tab = SelectedExistingTab();
+            if (tab != null && _paths.Count > 0)
+            {
+                var split = PinPickerModel.SplitDuplicates(tab.Items.Select(i => i.TargetPath), _paths);
+                note = PinPickerModel.DuplicateNote(split.ToAdd.Count + split.AlreadyPinned, split.AlreadyPinned);
+                allowAdd = split.ToAdd.Count > 0;
+            }
+            OkBtn.IsEnabled = allowAdd;
+
+            string shown = note ?? string.Empty;
+            bool changed = DuplicateText.Text != shown;
+            DuplicateText.Text = shown;
+            DuplicateText.Visibility = shown.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            AutomationProperties.SetName(DuplicateText, shown.Length > 0 ? shown : "Duplicate items");
+            // A live region only announces if the element says it changed, so tell it (as TextPrompt does).
+            if (changed && shown.Length > 0)
+            {
+                var peer = UIElementAutomationPeer.FromElement(DuplicateText) ?? UIElementAutomationPeer.CreatePeerForElement(DuplicateText);
+                if (peer != null) peer.RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
+            }
+        }
+
+        /// <summary>The chosen tab when it is an existing one, or null for "New group..." and "New tab...".</summary>
+        private PinnedTab SelectedExistingTab()
+        {
+            if (IsNewGroupSelected()) return null;
+            var group = SelectedGroup();
+            int i = TabList.SelectedIndex;
+            return group != null && i >= 0 && i < group.Tabs.Count ? group.Tabs[i] : null;
         }
 
         /// <summary>Pulses the window's border so a late launch is noticed. The picker has no caption or
@@ -181,6 +223,7 @@ namespace PowerPane.UI
 
             FillTabs(choice.TabIndex);
             UpdateNameBoxes();
+            UpdateDuplicates();
             if (_groupSnapshot.Count == 0) NewGroupBox.Visibility = Visibility.Visible;
         }
 
@@ -261,6 +304,7 @@ namespace PowerPane.UI
             _lastGroupIndex = GroupList.SelectedIndex;
             FillTabs(0);
             UpdateNameBoxes();
+            UpdateDuplicates();
         }
 
         private void OnTabChanged(object sender, SelectionChangedEventArgs e)
@@ -274,6 +318,7 @@ namespace PowerPane.UI
             }
             _lastTabIndex = TabList.SelectedIndex;
             UpdateNameBoxes();
+            UpdateDuplicates();
         }
 
         /// <summary>The group list has focus on open, so Up and Down choose a group at once. With no
@@ -306,7 +351,7 @@ namespace PowerPane.UI
                     if (chosen == null || !System.IO.Directory.Exists(chosen.FolderPath) || tabGone)
                     {
                         _groups.ScanOnce();
-                        BuildLists(null);
+                        BuildLists(null);   // also recomputes the duplicate note and the Add button
                         ShowMessage("That group or tab changed while this window was open. Choose again.");
                         return;
                     }
@@ -331,7 +376,23 @@ namespace PowerPane.UI
 
                 if (group != null && tab != null)
                 {
-                    _groups.AddPins(tab, _paths.ToList());
+                    // An existing tab is checked again here, from the same snapshot the note used, so a
+                    // duplicate is never written even if Add was enabled from an older state (#252). A
+                    // tab the picker just created holds no pins, so everything is added.
+                    var toAdd = _paths.ToList();
+                    if (SelectedExistingTab() == tab)
+                    {
+                        var split = PinPickerModel.SplitDuplicates(tab.Items.Select(i => i.TargetPath), _paths);
+                        if (split.ToAdd.Count == 0)
+                        {
+                            UpdateDuplicates();
+                            ShowMessage(PinPickerModel.DuplicateNote(split.AlreadyPinned, split.AlreadyPinned)
+                                ?? "Those items are already in this tab.");
+                            return;
+                        }
+                        toAdd = split.ToAdd;
+                    }
+                    _groups.AddPins(tab, toAdd);
                     Remember(group, tab);
                 }
                 else
@@ -399,6 +460,7 @@ namespace PowerPane.UI
             AutomationProperties.SetName(NewGroupBox, "New group name");
             AutomationProperties.SetName(NewTabBox, "New tab name");
             AutomationProperties.SetName(HintText, "PowerPane is not running");
+            AutomationProperties.SetName(DuplicateText, "Duplicate items");
             AutomationProperties.SetName(OkBtn, "Add");
             AutomationProperties.SetName(CancelBtn, "Cancel");
             AutomationProperties.SetName(TitleText, "Add to PowerPane");
@@ -433,6 +495,7 @@ namespace PowerPane.UI
             GroupLabel.Foreground = _fg;
             TabLabel.Foreground = _fg;
             HintText.Foreground = _fg;
+            DuplicateText.Foreground = _fg;
             GroupList.Foreground = _fg;
             TabList.Foreground = _fg;
             GroupList.BorderBrush = borderBrush;
