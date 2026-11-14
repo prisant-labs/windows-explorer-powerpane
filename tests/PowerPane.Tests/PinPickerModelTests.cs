@@ -289,6 +289,25 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void LiveTargets_LeavesOutPinsWhoseShortcutIsGone()
+        {
+            // A pin deleted while the picker is open must not make its item look pinned (#252 review).
+            var pins = new[]
+            {
+                new PinnedFolder { TargetPath = @"C:\Demo\Apollo", LinkPath = @"C:\Demo\Groups\01_A\001_Apollo.lnk" },
+                new PinnedFolder { TargetPath = @"C:\Demo\Borealis", LinkPath = @"C:\Demo\Groups\01_A\002_Borealis.lnk" },
+                new PinnedFolder { TargetPath = @"C:\Demo\Contoso", LinkPath = null },
+                null
+            };
+            var live = PinPickerModel.LiveTargets(pins, link => link.EndsWith("001_Apollo.lnk"));
+            Assert.That(live, Is.EqualTo(new[] { @"C:\Demo\Apollo" }));
+            var split = PinPickerModel.SplitDuplicates(live, new[] { @"C:\Demo\Apollo", @"C:\Demo\Borealis" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"C:\Demo\Borealis" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(1));
+            Assert.That(PinPickerModel.LiveTargets(null, link => true), Is.Empty);
+        }
+
+        [Test]
         public void SplitDuplicates_NoExisting_KeepsAll()
         {
             var split = PinPickerModel.SplitDuplicates(new string[0], new[] { @"C:\Demo\A", @"C:\Demo\B" });

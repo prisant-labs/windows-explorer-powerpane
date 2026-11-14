@@ -187,6 +187,19 @@ namespace PowerPane.UI
         /// tab. A null or empty existing target (a dead shortcut) never matches. Two candidates that
         /// differ only by a trailing backslash are one item, so the second is dropped without being
         /// counted as a skipped duplicate.</summary>
+        /// <summary>The targets of the pins whose shortcut file still exists, by <paramref name="exists"/>.
+        /// The picker's tab snapshot is taken when it opens, so a pin deleted while it is open would
+        /// otherwise make its item look already pinned and be skipped (#252 review). A pin with no link
+        /// path is left out, which can only cause a second pin, never a missing one.</summary>
+        internal static List<string> LiveTargets(IEnumerable<PinnedFolder> pins, Func<string, bool> exists)
+        {
+            var result = new List<string>();
+            if (pins == null || exists == null) return result;
+            foreach (var pin in pins)
+                if (pin != null && !string.IsNullOrEmpty(pin.LinkPath) && exists(pin.LinkPath)) result.Add(pin.TargetPath);
+            return result;
+        }
+
         internal static DuplicateSplit SplitDuplicates(IEnumerable<string> existingTargets, IList<string> candidates)
         {
             var split = new DuplicateSplit();

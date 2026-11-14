@@ -376,14 +376,18 @@ namespace PowerPane.UI
 
                 if (group != null && tab != null)
                 {
-                    // An existing tab is checked again here, from the same snapshot the note used, so a
-                    // duplicate is never written even if Add was enabled from an older state (#252). A
-                    // tab the picker just created holds no pins, but its batch still collapses repeats
-                    // such as C:\Demo\Apollo and C:\Demo\Apollo\ to one pin.
+                    // An existing tab is checked again here (#252). Only pins whose shortcut file still
+                    // exists count, so a pin deleted while the picker was open does not make its item
+                    // look pinned and get skipped; one local file check per pin, as the folder check
+                    // above makes. A pin added elsewhere after the picker opened is not in the snapshot,
+                    // so it can still get a second shortcut, as before this change. A tab the picker
+                    // just created holds no pins, but its batch still collapses repeats such as
+                    // C:\Demo\Apollo and C:\Demo\Apollo\ to one pin.
                     var toAdd = PinPickerModel.SplitDuplicates(Enumerable.Empty<string>(), _paths).ToAdd;
                     if (SelectedExistingTab() == tab)
                     {
-                        var split = PinPickerModel.SplitDuplicates(tab.Items.Select(i => i.TargetPath), _paths);
+                        var live = PinPickerModel.LiveTargets(tab.Items, System.IO.File.Exists);
+                        var split = PinPickerModel.SplitDuplicates(live, _paths);
                         if (split.ToAdd.Count == 0)
                         {
                             UpdateDuplicates();
