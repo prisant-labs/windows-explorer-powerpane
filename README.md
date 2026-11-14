@@ -4,55 +4,29 @@
 ![.NET Framework](https://img.shields.io/badge/.NET%20Framework-4.8-512BD4.svg?logo=dotnet&logoColor=white)
 ![C#](https://img.shields.io/badge/C%23-7.3-239120.svg?logo=csharp&logoColor=white)
 ![UI](https://img.shields.io/badge/UI-WPF-1f6feb.svg)
-![Version](https://img.shields.io/github/v/release/prisant-labs/windows-explorer-powerpane?label=Version&color=success)
 ![License](https://img.shields.io/badge/License-MIT-orange.svg)
-
-> **Based on QuickPane.** Explorer PowerPane began in October 2026 as a fork of [QuickPane by lso2](https://github.com/lso2/QuickPane) (PlexPixel), released under the MIT license, and its releases from 3.10.0.2 to 3.13.0.1 were published as "QuickPane (fork)". Version 4.0.0.0 renamed it; [Moving from QuickPane](#moving-from-quickpane) describes the switch. Versions carry four numbers, and [CHANGELOG.md](CHANGELOG.md) lists what each one changes. To build from source, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md). The sections below began as the original project's README.
->
-> **What changed since QuickPane.** Each item links to the release notes for the published release that first shipped it. Downloads are on the [Releases](https://github.com/prisant-labs/windows-explorer-powerpane/releases) page.
->
-> - **Windows 11 tabs:** every tab in an Explorer window makes room for the pane, including tabs opened later, so the pane no longer covers Explorer's sidebar or hides under a tab. [3.10.0.2](docs/releases/3.10.0.2.md) ([#4](https://github.com/prisant-labs/windows-explorer-powerpane/issues/4), [lso2/QuickPane#3](https://github.com/lso2/QuickPane/issues/3))
-> - **Add to a tab:** a tab's right-click menu has "Add folder..." and "Add file...", and the pin lands in that tab. [3.10.0.2](docs/releases/3.10.0.2.md) ([lso2/QuickPane#1](https://github.com/lso2/QuickPane/issues/1))
-> - **Safer "Delete tab":** deleting a tab that holds pins asks first, and sends the tab's folder to the Recycle Bin. [3.10.0.2](docs/releases/3.10.0.2.md) ([lso2/QuickPane#5](https://github.com/lso2/QuickPane/issues/5))
-> - **Profile row:** the profile row appears only once a second profile exists. [3.10.0.2](docs/releases/3.10.0.2.md) ([#5](https://github.com/prisant-labs/windows-explorer-powerpane/issues/5))
-> - **File dialogs setting:** the pane in Open and Save dialogs can follow Explorer windows, sit beside the dialog, or stay off. [3.10.0.2](docs/releases/3.10.0.2.md)
-> - **Browse in "Edit path":** the "Edit path" prompt has a "Browse..." button that opens a picker at the pin's current location. [3.10.0.2](docs/releases/3.10.0.2.md)
-> - **Modern folder picker:** choosing a folder opens the Explorer-style picker instead of the old "Browse For Folder" tree. [3.10.0.2](docs/releases/3.10.0.2.md) ([lso2/QuickPane#2](https://github.com/lso2/QuickPane/issues/2))
-> - **Update notice follows this project:** the Settings footer checks this project's releases and shows the full four-part version. [3.10.0.2](docs/releases/3.10.0.2.md) ([#2](https://github.com/prisant-labs/windows-explorer-powerpane/pull/2))
-> - **Tested, verifiable builds:** unit tests and a build on every pull request, and releases built from the tagged commit with checksums and a provenance attestation. [3.10.0.2](docs/releases/3.10.0.2.md)
-> - **Installer:** each release includes a per-user installer that upgrades an existing install in place, so Add/Remove Programs keeps one entry with the right version. [3.10.0.3](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.3) ([#15](https://github.com/prisant-labs/windows-explorer-powerpane/issues/15))
-> - **No donation button:** the "Buy me a coffee" button is gone, because it funded the original author rather than this project, and Add/Remove Programs names the app "Explorer PowerPane <version>". [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#18](https://github.com/prisant-labs/windows-explorer-powerpane/issues/18))
-> - **Windows accent color:** the active tab, the drop line, and accent-colored Settings controls follow the accent chosen in Windows, including changes made while PowerPane runs. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#20](https://github.com/prisant-labs/windows-explorer-powerpane/issues/20))
-> - **Contrast themes:** with a Windows contrast theme on, the pane and Settings take its colors, and switch back when it is turned off. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#30](https://github.com/prisant-labs/windows-explorer-powerpane/issues/30))
-> - **Settings for screen readers:** every Settings control is reachable by accessibility tools, and icon buttons carry names that say what they do. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#28](https://github.com/prisant-labs/windows-explorer-powerpane/issues/28))
-> - **Dark Settings title bar:** the Settings title bar follows the Windows light or dark mode. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#26](https://github.com/prisant-labs/windows-explorer-powerpane/issues/26))
-> - **Windows 11 icons:** on Windows 11 the pane and Settings use Segoe Fluent Icons, and Windows 10 keeps Segoe MDL2 Assets. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#24](https://github.com/prisant-labs/windows-explorer-powerpane/issues/24))
-> - **Settings gear always in reach:** the gear sits at the bottom left of the pane and stays there when the pane collapses, so Settings opens in one click. [3.10.0.6](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.6) ([#22](https://github.com/prisant-labs/windows-explorer-powerpane/issues/22), [#33](https://github.com/prisant-labs/windows-explorer-powerpane/issues/33))
-> - **Clicks follow the tab in front:** in a Windows 11 window with several tabs, a folder click opens in the tab on screen, and Recent records that tab's folder. [3.10.0.8](docs/releases/3.10.0.8.md) ([#35](https://github.com/prisant-labs/windows-explorer-powerpane/issues/35))
-> - **Clicks that never wait:** folder clicks run on a thread of their own, folder pickers give up quickly on a share that does not answer, and startup no longer waits for the groups folder. [3.10.0.8](docs/releases/3.10.0.8.md) ([#38](https://github.com/prisant-labs/windows-explorer-powerpane/issues/38), [#41](https://github.com/prisant-labs/windows-explorer-powerpane/issues/41), [#42](https://github.com/prisant-labs/windows-explorer-powerpane/issues/42))
-> - **Less background work:** the Recent check, the Explorer window sweep, the groups folder watcher, the log, and the crash guard do far less work while you are not using the pane, and the caches have size limits. [3.10.0.8](docs/releases/3.10.0.8.md) ([#39](https://github.com/prisant-labs/windows-explorer-powerpane/issues/39), [#40](https://github.com/prisant-labs/windows-explorer-powerpane/issues/40), [#43](https://github.com/prisant-labs/windows-explorer-powerpane/issues/43), [#44](https://github.com/prisant-labs/windows-explorer-powerpane/issues/44), [#45](https://github.com/prisant-labs/windows-explorer-powerpane/issues/45), [#46](https://github.com/prisant-labs/windows-explorer-powerpane/issues/46), [#47](https://github.com/prisant-labs/windows-explorer-powerpane/issues/47), [#48](https://github.com/prisant-labs/windows-explorer-powerpane/issues/48), [#49](https://github.com/prisant-labs/windows-explorer-powerpane/issues/49), [#50](https://github.com/prisant-labs/windows-explorer-powerpane/issues/50))
-> - **Profile switches keep edits in place:** an edit made while a new profile's groups are loading can no longer land in the previous profile's folder. [3.10.0.9](docs/releases/3.10.0.9.md) ([#68](https://github.com/prisant-labs/windows-explorer-powerpane/issues/68))
-> - **Closed panes release memory:** a pane section closed while a rebuild was waiting no longer stays in memory. [3.10.0.9](docs/releases/3.10.0.9.md) ([#69](https://github.com/prisant-labs/windows-explorer-powerpane/issues/69))
-> - **Dialog clicks navigate first:** a pin click in an Open or Save dialog navigates before Recent Apps records the app, and startup no longer creates the groups folder on the UI thread. [3.10.0.9](docs/releases/3.10.0.9.md) ([#70](https://github.com/prisant-labs/windows-explorer-powerpane/issues/70), [#71](https://github.com/prisant-labs/windows-explorer-powerpane/issues/71))
-> - **No flicker while resizing:** dragging an Explorer window's border no longer makes the tree and the file list jump under the pane and back. The pane steps aside during the drag, so Explorer's own tree stays in view, and it returns on release. [3.10.0.11](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.11) ([#99](https://github.com/prisant-labs/windows-explorer-powerpane/issues/99), [#102](https://github.com/prisant-labs/windows-explorer-powerpane/issues/102))
-> - **Dialogs keep the pane inside:** a Save dialog that resizes itself as it opens, or that the user resizes, keeps the pane inside instead of moving it beside, and reopens at the same size each time. [3.10.0.11](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v3.10.0.11) ([#103](https://github.com/prisant-labs/windows-explorer-powerpane/issues/103))
-> - **Settings redesigned as a Windows 11 Settings page:** a navigation pane, search, cards, and a Mica backdrop replace the old tabbed panel, with full keyboard and screen reader support. It opens on the Pane page, and pane sections and quick actions reorder by drag or by button, with a Reset to default. [3.11.0.2](docs/releases/3.11.0.2.md) ([#89](https://github.com/prisant-labs/windows-explorer-powerpane/issues/89)-[#96](https://github.com/prisant-labs/windows-explorer-powerpane/issues/96))
-> - **Quick actions:** an optional pane section that copies the current folder's path in several formats, creates a new file or dated folder, or opens the folder in Windows Terminal or Visual Studio Code. [3.11.0.2](docs/releases/3.11.0.2.md) ([#144](https://github.com/prisant-labs/windows-explorer-powerpane/pull/144))
-> - **Pane color and dock display:** a row of background swatches for the pane, with Explorer's own color as the default, and a choice of monitor and screen edge for the desktop dock. [3.11.0.2](docs/releases/3.11.0.2.md) ([#134](https://github.com/prisant-labs/windows-explorer-powerpane/issues/134), [#146](https://github.com/prisant-labs/windows-explorer-powerpane/issues/146), [#177](https://github.com/prisant-labs/windows-explorer-powerpane/issues/177))
-> - **Less waiting on the disk:** icons, pane edits, and Settings changes load or save in the background, so a slow or network disk no longer stalls Explorer. [3.11.0.2](docs/releases/3.11.0.2.md) ([#75](https://github.com/prisant-labs/windows-explorer-powerpane/issues/75), [#76](https://github.com/prisant-labs/windows-explorer-powerpane/issues/76), [#163](https://github.com/prisant-labs/windows-explorer-powerpane/issues/163))
-> - **Update notice:** PowerPane tells you when a new version exists, at most once a day and once per version, and it never downloads anything. You can turn the daily check off on the About page. [3.12.0.0](docs/releases/3.12.0.0.md) ([#176](https://github.com/prisant-labs/windows-explorer-powerpane/issues/176))
-> - **Quick actions you can extend:** ten more built-in actions, your own custom commands from a template such as `code {path}`, and eight actions on the files selected in Explorer. All of them start off. [3.12.0.0](docs/releases/3.12.0.0.md) ([#189](https://github.com/prisant-labs/windows-explorer-powerpane/issues/189), [#190](https://github.com/prisant-labs/windows-explorer-powerpane/issues/190), [#191](https://github.com/prisant-labs/windows-explorer-powerpane/issues/191))
-> - **Dock grip with a maximized window:** the width grip of a reserved desktop dock can be dragged while a window is maximized. [3.12.0.0](docs/releases/3.12.0.0.md) ([#185](https://github.com/prisant-labs/windows-explorer-powerpane/issues/185))
-> - **Lighter with many pins:** a pinned folder's right-click menu is built when it opens, so many pins and windows use far less memory and the pane rebuilds faster. [3.12.0.1](docs/releases/3.12.0.1.md) ([#210](https://github.com/prisant-labs/windows-explorer-powerpane/issues/210))
-> - **What's new and clearer settings rows:** the About page summarizes each version and links to its full notes, and rows on the Pane sections and Quick actions pages have their own icons and an info button. [3.12.0.1](docs/releases/3.12.0.1.md) ([#208](https://github.com/prisant-labs/windows-explorer-powerpane/issues/208), [#207](https://github.com/prisant-labs/windows-explorer-powerpane/issues/207), [#205](https://github.com/prisant-labs/windows-explorer-powerpane/issues/205))
-> - **Quick switcher:** an optional shortcut opens one search box over the window in front, which finds pins, Recent folders, drives, and quick actions and sends Explorer or an Open or Save dialog to the result. It starts off. [3.13.0.0](docs/releases/3.13.0.0.md) ([#226](https://github.com/prisant-labs/windows-explorer-powerpane/issues/226))
-> - **Folders Recent never shows, and Clear Recent:** a Recent row's menu can hide a folder and everything inside it, and the Recent page in Settings lists hidden folders and clears Recent without touching Windows' own lists. [3.13.0.0](docs/releases/3.13.0.0.md) ([#224](https://github.com/prisant-labs/windows-explorer-powerpane/issues/224))
-> - **Pins inside PowerPane's own pickers:** PowerPane's own file and folder pickers, such as Browse in "Edit path" and Add folder, list your pins in their navigation pane instead of getting a pane attached that did not follow a move or resize. [3.13.0.1](docs/releases/3.13.0.1.md) ([#231](https://github.com/prisant-labs/windows-explorer-powerpane/issues/231))
-> - **File dialogs keep their search box, and the grip resizes their pane:** a dialog with the pane inside no longer cuts off its search box, and dragging the pane's width grip there resizes that dialog's pane. [4.0.0.1](https://github.com/prisant-labs/windows-explorer-powerpane/releases/tag/v4.0.0.1) ([#238](https://github.com/prisant-labs/windows-explorer-powerpane/issues/238), [#239](https://github.com/prisant-labs/windows-explorer-powerpane/issues/239))
 
 A folder sidebar for Windows File Explorer. PowerPane embeds a pinned-folders pane inside every Explorer window, so your groups, recent locations, drives, network shares, and WSL distros travel with the window you are already using. Pin it inside the window, float it beside the window, or run it as a slim screen-edge dock. Everything runs locally as a single tray app, no code is ever injected into Explorer, and all data stays in plain files under your user profile.
 
-![PowerPane embedded inside a File Explorer window, showing pinned folder groups with tabs](screens/powerpane-demo.jpg)
+## Download
+
+**[Download the installer](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest/download/PowerPane-x64-setup.exe)** (always the newest version), or open the [latest release](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest) for the `.zip`, which holds only the program and its license, with no right-click verb or startup entry. [Installation](#installation) has the details.
+
+[![Latest release](https://img.shields.io/github/v/release/prisant-labs/windows-explorer-powerpane?label=Latest%20release&style=for-the-badge&logo=windows&color=0078D6)](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest)
+
+![PowerPane inside a File Explorer window, showing pinned groups with tabs, Recent, This PC, Network, Recent Apps, and Quick actions](screens/pane-inside-light.png)
+
+PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by lso2 (PlexPixel), released under the MIT license. It is developed here under its own name, and [CHANGELOG.md](CHANGELOG.md) lists every version since.
+
+## What's new
+
+<!-- Keep the three newest releases here, one line each, and replace "Next release" with its version and date when tagging. CHANGELOG.md holds every version. -->
+
+- **Next release**: the **Add to PowerPane** verb works on files and drives as well as folders, and it lets you choose a tab. A **+** menu on each group adds a tab, a group, a folder, or a file, and **Sort pins** keeps a tab in order by itself.
+- **4.0.0.1** (2026-11-12): the pane inside Open and Save dialogs no longer pushes the dialog's search box off the edge, and dragging the pane's width works there.
+- **4.0.0.0** (2026-11-11): QuickPane became Explorer PowerPane, with a new name, a new icon, and a new install location. The [release notes](docs/releases/4.0.0.0.md) describe moving your groups across.
+
+[Full changelog](CHANGELOG.md)
 
 ## Summary
 
@@ -83,6 +57,8 @@ Three ways to show the pane, chosen in Settings:
 - **Beside** floats a follower pane against the left edge of each window without shifting its content. The pane is an owned window of its Explorer window, so Windows keeps it at that window's z-level, on that window's virtual desktop, and hides it when the window is minimized.
 - **Off** uses only the desktop dock and leaves Explorer windows untouched.
 
+![Beside mode: the pane floats against the left edge of an Explorer window](screens/pane-beside.png)
+
 ### Pinned folder groups
 
 Folders live in groups, and a group can hold several tabs.
@@ -95,6 +71,10 @@ Folders live in groups, and a group can hold several tabs.
 - A group with a single tab renders like a plain list; with several tabs it shows a horizontally scrollable tab row
 - A seeded default group appears on first run so the pane is never empty
 
+![The + menu on a group adds a tab, a group, a folder, or a file](screens/plus-menu.png)
+
+![The Sort pins submenu on a tab](screens/sort-pins.png)
+
 ### Sections
 
 The pane is a stack of sections you can show, hide, reorder, and rename:
@@ -106,8 +86,6 @@ The pane is a stack of sections you can show, hide, reorder, and rename:
 - **This PC**: a This PC row that opens the folder and expands to the drives, each drive expanding into subtrees that enumerate lazily like the native Explorer tree
 - **Network** and **Linux (WSL)**: each its own section with a proper icon and a visibility toggle
 - **Recent Apps**: the programs you have been using, each opening its app
-
-![The pane showing This PC, Network, and a Linux (WSL) distro browsed like a local drive](screens/powerpane-demo-2.jpg)
 
 ### Native file drag
 
@@ -123,9 +101,13 @@ An optional AppBar at the left or right screen edge, independent of the window p
 - An Edge setting puts it on the left (the default) or right edge of its display. On an edge shared with another display, auto-hide waits briefly before opening, so crossing between displays does not open it ([#177](https://github.com/prisant-labs/windows-explorer-powerpane/issues/177))
 - Clicking a folder navigates the active Explorer window and brings it forward, or opens a new window when none is open
 
+![The desktop dock on the left edge of the screen](screens/desktop-dock.png)
+
 ### Open and Save dialog support
 
 PowerPane attaches to file Open and Save common dialogs and honors the same pane mode as real windows. Inside mode shifts every one of the dialog's controls and widens the dialog so nothing overlaps the pane, and beside mode floats a pane against the dialog's edge. Both the classic dialog and the modern common item dialog navigate to the clicked folder.
+
+![The pane inside a Save As dialog](screens/save-dialog.png)
 
 ### Search
 
@@ -156,6 +138,8 @@ An optional shortcut moves focus into the pane, where the arrow keys move betwee
 
 A second optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front. Type part of a pin, a Recent folder, a drive, or a quick action, and press Enter. The Explorer window or Open or Save dialog in front goes to that folder, or the action runs against that Explorer window. With neither in front, the folder opens in a new Explorer window. Escape closes the box. Pins rank above Recent folders when both match equally well. The shortcut also stays off until it is switched on under Settings, Keyboard.
 
+![The quick switcher finding a pinned folder](screens/quick-switcher.png)
+
 ### Profiles
 
 Each profile is an independent workspace with its own groups folder, recents count, and sidebar width.
@@ -176,6 +160,8 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 - Adjustable pane width from 160 to 400 px, dragged from the inner edge
 - Settings apply live with no Apply button
 
+![The pane in dark mode](screens/pane-inside-dark.png)
+
 ## Requirements
 
 - **Windows 11 or Windows 10**, 64-bit. PowerPane is developed and tested on Windows 11, including in Windows Sandbox. Windows 10 is expected to work, but it is not tested regularly. See [Compatibility](#compatibility).
@@ -187,21 +173,11 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 
 ### Option A: Run a release build
 
-1. Download the latest `PowerPane-<version>-x64-setup.exe` from the [Releases page](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest) (or build it yourself below)
-2. Run the installer. It installs per-user with no administrator rights, registers the **Add to PowerPane** right-click verb, adds a startup entry, and launches PowerPane. Over an existing PowerPane, it upgrades that install in place. While QuickPane is still installed, it stops and asks you to uninstall QuickPane first
+1. Download `PowerPane-<version>-x64-setup.exe` from the [latest release](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest), or build it yourself below
+2. Run the installer. It installs per-user with no administrator rights, registers the **Add to PowerPane** right-click verb, adds a startup entry, and launches PowerPane. Over an existing PowerPane, it upgrades that install in place.
 3. Open any Explorer window and the pane appears inside it
 
-### Moving from QuickPane
-
-QuickPane and Explorer PowerPane are separate installs, with their own program and data folders, and they must not run together. To move your groups, pins, and settings across:
-
-1. Copy `%APPDATA%\QuickPane` somewhere safe, as a backup
-2. Uninstall QuickPane from Settings, Apps. Its data folder stays
-3. Install Explorer PowerPane, and untick "Launch Explorer PowerPane" on the installer's last page
-4. In PowerShell, run `robocopy "$env:APPDATA\QuickPane" "$env:APPDATA\PowerPane" /E /XD "$env:APPDATA\QuickPane\Logs"`. The old logs stay behind, because they describe QuickPane's last run
-5. Start Explorer PowerPane from the Start menu
-
-The copied settings still name `%APPDATA%\QuickPane\Groups`, and PowerPane reads any path inside the old data folder as the same place inside `%APPDATA%\PowerPane`. Backups made by QuickPane restore the same way. The [4.0.0.0 release notes](docs/releases/4.0.0.0.md) have the details and the way back.
+The installer is not code-signed yet, so Windows SmartScreen may warn about it. Each release lists SHA-256 checksums and a build provenance attestation, so you can confirm the file came from this repository. To uninstall, use Settings, Apps. Your data stays in `%APPDATA%\PowerPane` until you delete it.
 
 ### Option B: Build from source
 
@@ -227,8 +203,6 @@ git clone https://github.com/prisant-labs/windows-explorer-powerpane.git
 
 PowerPane sits alongside Windows' built-in navigation pane rather than replacing it, so the two will show side by side until you turn the native one off. In any Explorer window, open the **View** tab, click **Navigation pane**, and uncheck **Navigation pane** so PowerPane is the only tree on the left.
 
-![Explorer's View ribbon with the Navigation pane toggle open](screens/hide-nav-pane-windows.jpg)
-
 ## Usage
 
 ### Pinning folders
@@ -237,6 +211,8 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 - Select several items and choose the verb once. One window opens for all of them
 - The window asks for a group and a tab, with "New group..." and "New tab..." to make one on the spot, and remembers your last choice. The Add button pins the items into that tab
 - Click a pinned folder to navigate the current Explorer window to it
+
+![The Add to PowerPane window, asking for a group and a tab](screens/add-picker.png)
 
 ### Groups and tabs
 
@@ -249,6 +225,8 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 ### Quick actions and custom commands
 
 Turn on the **Quick actions** section under **Pane sections** in Settings. Then choose its rows on the **Quick actions** page, where you can also reorder them and reset them to their defaults.
+
+![The Quick actions page in Settings](screens/settings-quick-actions.png)
 
 A row acts on the folder on screen, unless its name says "selected". Those rows act on the files selected in Explorer, and say "Nothing selected" when there are none.
 
@@ -277,6 +255,8 @@ A placeholder is refused for a program that would read a folder name as code: `c
 
 ### Settings
 
+![The Pane page of the Settings window](screens/settings-pane.png)
+
 - Open Settings from the tray icon or the gear in the pane
 - A navigation pane lists the pages, and a search box jumps to a setting
 - Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, folders Recent never shows, which apps Recent Apps lists, the keyboard shortcuts, and profiles
@@ -292,7 +272,7 @@ All data is stored locally under your user profile:
 ├── settings.json        # All settings, sections, dock options, and profiles
 ├── Groups\              # Groups, tabs, and pinned shortcuts on disk
 ├── uistate.txt          # Remembered open/closed state of sections, groups, and trees
-└── debug.log            # Diagnostic log
+└── Logs\                # debug.log and events.log, for diagnosis
 ```
 
 Groups are stored as ordinary folders: a **group** is a folder under `Groups\`, a **tab** is a subfolder, and a **pin** is a `.lnk` shortcut. You can back up, edit, or rearrange the `Groups` tree directly and PowerPane reflects it.
@@ -390,7 +370,7 @@ PowerPane/
 ├── PowerPane.sln              # Visual Studio solution
 ├── Installer.iss              # Inno Setup installer script
 ├── CHANGELOG.md               # Version history
-├── screens/                   # Screenshots used in this README
+├── screens/                   # Screenshots used in this README (taken in Windows Sandbox)
 └── PowerPane/
     ├── PowerPane.csproj       # Project (.NET Framework 4.8, x64, WPF)
     ├── app.manifest           # Per-monitor DPI, runs without elevation
@@ -463,11 +443,7 @@ MIT, see the [LICENSE](LICENSE) file for details. The license keeps the original
 
 ### Third-party code
 
-The Settings window's visual style (`PowerPane/Themes/Fluent/`) is ported from Microsoft's
-WPF Fluent theme (`dotnet/wpf`, MIT), itself built from the open-source
-[WPF-UI](https://github.com/lepoco/wpfui) project. See
-[`PowerPane/Themes/Fluent/NOTICE.md`](PowerPane/Themes/Fluent/NOTICE.md) for the source
-commit, the ported files, and both copyright notices.
+The Settings window's visual style (`PowerPane/Themes/Fluent/`) is ported from Microsoft's WPF Fluent theme (`dotnet/wpf`, MIT), itself built from the open-source [WPF-UI](https://github.com/lepoco/wpfui) project. See [`PowerPane/Themes/Fluent/NOTICE.md`](PowerPane/Themes/Fluent/NOTICE.md) for the source commit, the ported files, and both copyright notices.
 
 ---
 
