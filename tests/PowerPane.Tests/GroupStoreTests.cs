@@ -747,6 +747,31 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void RequestSelect_AfterAProfileSwitch_IsRefused()
+        {
+            // AddTab for profile A records its request only after creating the folder; a switch to B
+            // in between must not leave A's folder waiting (#253 review).
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                f.SwitchToB();
+                f.Store.RequestSelect(Path.Combine(f.GroupA, "02_Second"), System.DateTime.MaxValue);
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+            }
+        }
+
+        [TestCase(@"C:\Demo\Groups\01_Alpha\02_Ideas", @"C:\Demo\Groups", true)]
+        [TestCase(@"c:\demo\groups\01_Alpha", @"C:\Demo\Groups\", true)]
+        [TestCase(@"C:\Demo\GroupsOther\01_Alpha", @"C:\Demo\Groups", false)]
+        [TestCase(@"C:\Demo\Groups", @"C:\Demo\Groups", false)]
+        [TestCase(null, @"C:\Demo\Groups", false)]
+        [TestCase(@"C:\Demo\Groups\01_Alpha", null, false)]
+        public void IsUnderRoot_MatchesOnlyFoldersInsideTheRoot(string path, string root, bool expected)
+        {
+            Assert.That(GroupStore.IsUnderRoot(path, root), Is.EqualTo(expected));
+        }
+
+        [Test]
         public void Publish_DiscardedScan_CommitsNoSelection()
         {
             // A scan of profile A that found a requested tab, finishing after the switch to B.

@@ -351,7 +351,23 @@ namespace PowerPane.Services
         internal void RequestSelect(string tabFolder, DateTime requestedUtc)
         {
             if (string.IsNullOrEmpty(tabFolder)) return;
-            lock (_gate) { _pendingSelect[tabFolder] = requestedUtc; }
+            lock (_gate)
+            {
+                // A profile switch can land while AddTab creates the folder. DropIfRootChanged clears
+                // requests under this same lock, so checking the root here closes the gap from either
+                // side: a request recorded before the switch is cleared, and one after it is refused
+                // (#253 review).
+                if (!IsUnderRoot(tabFolder, Root)) return;
+                _pendingSelect[tabFolder] = requestedUtc;
+            }
+        }
+
+        /// <summary>True when path lies inside root, ignoring case and a trailing separator.</summary>
+        internal static bool IsUnderRoot(string path, string root)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(root)) return false;
+            var r = root.TrimEnd('\\', '/') + "\\";
+            return path.StartsWith(r, StringComparison.OrdinalIgnoreCase);
         }
 
         internal int PendingSelectCount { get { lock (_gate) return _pendingSelect.Count; } }
