@@ -14,7 +14,9 @@ namespace PowerPane.Tests
         [Test]
         public void Version_MatchesTheAssembly()
         {
-            string assembly = typeof(WhatsNew).Assembly.GetName().Version.ToString();
+            // Spelled as the release tag spells it: 4.1.0 for the program version 4.1.0.0 from Semantic
+            // Versioning on, and all four parts for an older release such as 4.0.0.1.
+            string assembly = UpdateService.Display(typeof(WhatsNew).Assembly.GetName().Version);
             Assert.That(WhatsNew.Version, Is.EqualTo(assembly),
                 "WhatsNew.cs still describes another version. See the release steps in docs/DEVELOPMENT.md.");
         }

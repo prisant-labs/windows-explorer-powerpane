@@ -27,6 +27,9 @@ jobs:
   winget:
     runs-on: windows-latest
     steps:
+      # Only for scripts/release-version.ps1, which maps the tag to the version winget is given.
+      - uses: actions/checkout@v7
+
       # The tag arrives through env, not ${{ }} inside the script, so a tag name can never become code.
       - name: Open the winget pull request
         shell: pwsh
@@ -40,10 +43,9 @@ jobs:
               '::notice::WINGET_TOKEN is not set, so no winget pull request was opened.'
               exit 0
           }
-          if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+\.\d+)$') {
-              throw "Tag $env:TAG is not v<major>.<minor>.<patch>.<fork>, such as v3.10.0.3."
-          }
-          $version = $Matches[1]
+          # The same mapping the release workflow uses: v4.1.0 is version 4.1.0, and an older
+          # four-part tag such as v4.0.0.1 is still its own version, so a retry for it works.
+          $version = ((./scripts/release-version.ps1 -Tag $env:TAG) -match '^version=') -replace '^version=', ''
 
           # A by-hand run could name a draft or a pre-release. Neither may reach winget.
           $release = gh release view $env:TAG -R $env:REPO --json isDraft,isPrerelease,publishedAt,assets | ConvertFrom-Json

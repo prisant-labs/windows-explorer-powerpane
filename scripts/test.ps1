@@ -11,6 +11,9 @@ $repo = Split-Path $PSScriptRoot -Parent
 & (Join-Path $PSScriptRoot 'check-rules.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Repository rules failed; see the list above.' }
 
+# The tag-to-version mapping the release and winget workflows rely on, checked against sample tags.
+& (Join-Path $PSScriptRoot 'release-version.ps1') -SelfTest
+
 if (-not $NoBuild) { & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration }
 
 $proj = Join-Path $repo 'tests\PowerPane.Tests\PowerPane.Tests.csproj'

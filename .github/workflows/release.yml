@@ -43,13 +43,13 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: |
-          if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+\.\d+)$') {
-              throw "Tag $env:TAG is not v<major>.<minor>.<patch>.<revision>, such as v4.0.0.1."
-          }
-          $version = $Matches[1]
+          # scripts/release-version.ps1 holds the one rule: v<major>.<minor>.<patch> (Semantic
+          # Versioning, from 4.1.0) for a program whose file version is the same numbers plus .0. It
+          # throws on any other tag, and prints version= and fileVersion= lines for the steps below.
+          $lines = ./scripts/release-version.ps1 -Tag $env:TAG
           git merge-base --is-ancestor HEAD origin/main
           if ($LASTEXITCODE -ne 0) { throw "Tag $env:TAG points at a commit that is not on main." }
-          "version=$version" >> $env:GITHUB_OUTPUT
+          $lines >> $env:GITHUB_OUTPUT
 
       - name: Build the app
         shell: pwsh

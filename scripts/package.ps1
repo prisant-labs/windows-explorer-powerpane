@@ -4,7 +4,7 @@
 # CI runs it on every build, so packaging is proven before anyone pushes a tag; the release
 # workflow runs it on the tagged commit. Run scripts/build.ps1 first.
 #
-# Usage:  pwsh -File scripts/package.ps1 [-Version 3.10.0.3] [-Configuration Release] [-OutDir dist] [-NoNotes] [-NoInstaller]
+# Usage:  pwsh -File scripts/package.ps1 [-Version 4.1.0] [-Configuration Release] [-OutDir dist] [-NoNotes] [-NoInstaller]
 # Output: <OutDir>\PowerPane-<version>-x64-setup.exe and PowerPane-x64-setup.exe unless -NoInstaller, PowerPane-<version>-x64.zip,
 #         SHA256SUMS.txt, and notes.md unless -NoNotes
 param(
@@ -27,9 +27,15 @@ foreach ($f in $exe, $config) {
 # The exe's own file version is the source of truth. A tag that disagrees with it means
 # AssemblyInfo.cs was not bumped, and the zip would carry a program that misreports its version
 # to the in-app update check.
+# The release version is spelled as its tag is (4.1.0 from Semantic Versioning on, 4.0.0.1 before),
+# and scripts/release-version.ps1 says which file version that requires (4.1.0.0, or 4.0.0.1).
 $built = (Get-Item $exe).VersionInfo.FileVersion
-if (-not $Version) { $Version = $built }
-if ($built -ne $Version) { throw "Built version is $built, expected $Version. Bump PowerPane\Properties\AssemblyInfo.cs." }
+if (-not $Version) {
+    $parts = $built.Split('.')
+    $Version = if ($parts.Count -eq 4 -and $parts[3] -eq '0') { $parts[0..2] -join '.' } else { $built }
+}
+$expected = ((& (Join-Path $PSScriptRoot 'release-version.ps1') -Version $Version) -match '^fileVersion=') -replace '^fileVersion=', ''
+if ($built -ne $expected) { throw "Built version is $built, but release $Version needs $expected. Bump PowerPane\Properties\AssemblyInfo.cs." }
 
 if (-not [System.IO.Path]::IsPathRooted($OutDir)) { $OutDir = Join-Path $repo $OutDir }
 if (Test-Path $OutDir) { Remove-Item $OutDir -Recurse -Force }
