@@ -141,7 +141,8 @@ namespace PowerPane.UI
                 InputName = "New tab name",
                 Validate = NewTabValidator(group)
             });
-            if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v));
+            // select: the new tab becomes the selected one, so the next "Add folder" lands in it (#253).
+            if (!string.IsNullOrWhiteSpace(v)) App.Groups.PostEdit(store => store.AddTab(group, v, select: true));
         }
 
         private static void AddGroupBelow(PinnedGroup group, PromptAnchor? anchor)
