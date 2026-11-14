@@ -718,7 +718,7 @@ namespace PowerPane.Tests
             {
                 f.Store.ScanOnce();
                 var third = Path.Combine(f.GroupA, "03_Third");
-                f.Store.RequestSelect(third, System.DateTime.UtcNow);
+                f.Store.RequestSelect(third, System.DateTime.MaxValue);   // never expires during the test
 
                 f.Store.ScanOnce();
                 Assert.That(f.Store.PendingSelectCount, Is.EqualTo(1));
@@ -737,7 +737,7 @@ namespace PowerPane.Tests
             using (var f = new TwoProfiles())
             {
                 f.Store.ScanOnce();
-                f.Store.RequestSelect(Path.Combine(f.GroupA, "02_Second"), System.DateTime.UtcNow.AddSeconds(-11));
+                f.Store.RequestSelect(Path.Combine(f.GroupA, "02_Second"), System.DateTime.MinValue);   // long expired
 
                 f.Store.ScanOnce();
 
@@ -754,7 +754,7 @@ namespace PowerPane.Tests
             {
                 f.Store.ScanOnce();
                 var second = Path.Combine(f.GroupA, "02_Second");
-                f.Store.RequestSelect(second, System.DateTime.UtcNow);
+                f.Store.RequestSelect(second, System.DateTime.MaxValue);
                 f.SwitchToB();
 
                 var selections = new Dictionary<string, int> { { f.GroupA, 1 } };
