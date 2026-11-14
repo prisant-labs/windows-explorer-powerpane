@@ -89,6 +89,17 @@ namespace PowerPane.Tests
             Assert.That(DialogInsidePane.WantsSharedWidth(dialog, pane, min), Is.EqualTo(expected));
         }
 
+        // The sweep runs a relayout pass about once a second. Repainting the dialog on a pass that moved
+        // nothing made it erase and redraw everything, synchronously, for as long as it was open.
+        [TestCase(0, false, false, false, Description = "an idle pass")]
+        [TestCase(1, false, false, true)]
+        [TestCase(0, true, false, true)]
+        [TestCase(0, false, true, true)]
+        public void NeedsRepaint_OnlyWhenThePassChangedSomething(int moved, bool hostResized, bool sizeChanged, bool expected)
+        {
+            Assert.That(DialogInsidePane.NeedsRepaint(moved, hostResized, sizeChanged), Is.EqualTo(expected));
+        }
+
         // A shared-width dialog restored partly off its work area is brought on screen before the pane
         // attaches at its left edge (Codex review, 2026-11-13).
         [TestCase(100, 1200, 0, 1920, 100, Description = "already inside")]

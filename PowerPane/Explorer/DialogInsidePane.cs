@@ -329,8 +329,11 @@ namespace PowerPane.Explorer
         // Only move a control that is not already at its shifted position. Re-setting a window to the
         // place it already occupies still emits a location-change event, and that event is what fed the
         // oscillation; skipping no-op moves stops the feedback once the layout has settled.
-        private void ShiftChildren()
+        /// <summary>Move every recorded control to its shifted place, and say how many had to move,
+        /// counting controls brought back inside their parent. Zero means the pass changed nothing.</summary>
+        private int ShiftChildren()
         {
+            int moved = 0;
             foreach (var kv in _orig)
             {
                 if (!NM.IsWindow(kv.Key)) continue;
@@ -347,8 +350,9 @@ namespace PowerPane.Explorer
                 }
                 NM.SetWindowPos(kv.Key, IntPtr.Zero, tx, ty, r.Width, r.Height,
                     NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                moved++;
             }
-            FitOverhangs();
+            return moved + FitOverhangs();
         }
 
         /// <summary>Bring back inside its parent any control one level below a shifted control that now
@@ -361,8 +365,9 @@ namespace PowerPane.Explorer
         /// it lay its bands out for the width they now have. Only visible controls that begin inside
         /// their parent are touched, and one that already fits is left alone, so a pass that changes
         /// nothing moves nothing.</summary>
-        private void FitOverhangs()
+        private int FitOverhangs()
         {
+            int fitted = 0;
             foreach (var parent in _orig.Keys)
             {
                 if (!NM.IsWindow(parent) || !NM.IsWindowVisible(parent)) continue;
@@ -373,12 +378,14 @@ namespace PowerPane.Explorer
                     if (!NM.IsWindowVisible(c)) continue;
                     NM.RECT cr;
                     if (!NM.GetWindowRect(c, out cr)) continue;
-                    int fitted = FittedWidth(cr.Left, cr.Right, pr.Left, pr.Right);
-                    if (fitted == cr.Width) continue;
-                    NM.SetWindowPos(c, IntPtr.Zero, 0, 0, fitted, cr.Height,
+                    int width = FittedWidth(cr.Left, cr.Right, pr.Left, pr.Right);
+                    if (width == cr.Width) continue;
+                    NM.SetWindowPos(c, IntPtr.Zero, 0, 0, width, cr.Height,
                         NM.SWP_NOMOVE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                    fitted++;
                 }
             }
+            return fitted;
         }
 
         /// <summary>The width a child spanning childLeft to childRight should have to end at its parent's
@@ -493,16 +500,31 @@ namespace PowerPane.Explorer
                 return;
             }
 
+            int moved;
             _applying = true;
-            try { CaptureNewChildren(); ShiftChildren(); }
+            try { CaptureNewChildren(); moved = ShiftChildren(); }
             finally { _applying = false; }
 
-            NM.RECT client;
-            if (NM.GetClientRect(_dlg, out client))
-                NM.SetWindowPos(_host.Handle, NM.HWND_TOP, 0, 0, _width, client.Height,
-                    NM.SWP_NOACTIVATE);
+            bool hostResized = false;
+            NM.RECT client, host;
+            if (NM.GetClientRect(_dlg, out client) &&
+                (!NM.GetWindowRect(_host.Handle, out host) || host.Width != _width || host.Height != client.Height))
+            {
+                NM.SetWindowPos(_host.Handle, NM.HWND_TOP, 0, 0, _width, client.Height, NM.SWP_NOACTIVATE);
+                hostResized = true;
+            }
 
-            Repaint();
+            // A pass that moved nothing leaves the dialog as it was drawn. Repainting it anyway made the
+            // dialog and every control in it erase and redraw, synchronously, about once a second for
+            // as long as it was open, which was most of PowerPane's idle cost with a dialog open.
+            if (NeedsRepaint(moved, hostResized, sizeChanged)) Repaint();
+        }
+
+        /// <summary>True when a relayout pass changed something on screen: a control moved, the pane's
+        /// host was resized, or the dialog itself changed size.</summary>
+        internal static bool NeedsRepaint(int moved, bool hostResized, bool sizeChanged)
+        {
+            return moved > 0 || hostResized || sizeChanged;
         }
 
         /// <summary>The dialog changed its own size, which the common Save dialog does just after it

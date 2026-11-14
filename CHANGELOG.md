@@ -18,6 +18,7 @@
 - The right-click verb is renamed from "Pin to PowerPane" to "Add to PowerPane", because Explorer already uses "pin" for its own verbs. The window's title reads "Add to PowerPane" and its confirm button reads "Add". Inside the pane, pins are still called pins. On Windows 11 the verb is under "Show more options".
 
 ### Fixed
+- An open Open, Save As, or Select Folder dialog with the pane inside no longer redraws itself about once a second while nothing changes. The redraw cost the app that owns the dialog about half a second of processor time per idle minute in Windows Sandbox, and could show as flicker.
 - Clicking a pin in a **Select Folder** dialog opened in another app now opens that folder. It used to choose the folder and close the dialog, as if you had pressed Select Folder. If a dialog that picks folders cannot be steered safely, the click now does nothing instead.
 - A Select Folder dialog no longer opens one pane width wider each time. The pane now takes its strip from inside a dialog that has room for it, the way it does in an Explorer window, so the dialog closes at the size it opened at. A dialog that had already grown wide also keeps its pane inside instead of moving it beside.
 - The pane stays up while you drag an Explorer window's border. It used to hide until you released, which left an empty strip when Explorer's own navigation pane is turned off. During the drag, the left edge of Explorer's content sits behind the pane, and it moves over beside the pane when you release.
