@@ -59,7 +59,8 @@ namespace PowerPane.Tests
             var d = new Dictionary<string, Color>
             {
                 { "SidebarBackground", Color.FromArgb(0xE6, 0x12, 0x34, 0x56) },
-                { "TextPrimary", Colors.White }, { "SeparatorColor", Colors.Gray }, { "FieldBorder", Colors.Gray }
+                { "TextPrimary", Colors.White }, { "SeparatorColor", Colors.Gray }, { "FieldBorder", Colors.Gray },
+                { "FieldBackground", Colors.Transparent }, { "WarningText", Color.FromRgb(0xFF, 0x99, 0x99) }
             };
             var p = PromptPalette.FromPane(Lookup(d), true, false);
             Assert.That(p.Shell, Is.EqualTo(Color.FromArgb(0xFF, 0x12, 0x34, 0x56)));
