@@ -493,6 +493,284 @@ namespace PowerPane.Tests
             }
         }
 
+        // ---- selecting the new tab (#253) -------------------------------------
+        // "Add tab" from the pane's "+" menu asks the scan to select the tab it made. The paths in the
+        // helper tests are invented; the store tests work in the test's own temp directory.
+
+        private static readonly System.DateTime At = new System.DateTime(2026, 1, 1, 12, 0, 0, System.DateTimeKind.Utc);
+
+        private static readonly string[] AlphaTabs =
+        {
+            @"C:\Demo\Groups\01_Alpha\01_Mira", @"C:\Demo\Groups\01_Alpha\02_Orion", @"C:\Demo\Groups\01_Alpha\03_Vega"
+        };
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        public void PendingSelectionIndex_TabPresent_ReturnsItsIndex(int index)
+        {
+            var pending = new Dictionary<string, System.DateTime> { { AlphaTabs[index], At } };
+            Assert.That(GroupStore.PendingSelectionIndex(AlphaTabs, pending), Is.EqualTo(index));
+        }
+
+        [Test]
+        public void PendingSelectionIndex_PathCaseDiffers_StillMatches()
+        {
+            // Compared ignoring case, like the _activeTabs keys, whatever comparer the map was built with.
+            var pending = new Dictionary<string, System.DateTime> { { AlphaTabs[1].ToUpperInvariant(), At } };
+            Assert.That(GroupStore.PendingSelectionIndex(AlphaTabs, pending), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void PendingSelectionIndex_NoMatch_ReturnsMinusOne()
+        {
+            var other = new Dictionary<string, System.DateTime> { { @"C:\Demo\Groups\02_Gamma\01_Main", At } };
+            Assert.That(GroupStore.PendingSelectionIndex(AlphaTabs, other), Is.EqualTo(-1));
+            Assert.That(GroupStore.PendingSelectionIndex(AlphaTabs, new Dictionary<string, System.DateTime>()), Is.EqualTo(-1));
+            Assert.That(GroupStore.PendingSelectionIndex(AlphaTabs, null), Is.EqualTo(-1));
+        }
+
+        [Test]
+        public void PendingSelectionIndex_TwoRequestsInOneGroup_TheLaterWins()
+        {
+            // Two quick "Add tab" edits whose tabs one scan finds together.
+            var pending = new Dictionary<string, System.DateTime>
+            {
+                { AlphaTabs[2], At.AddSeconds(1) },
+                { AlphaTabs[1], At },
+            };
+            Assert.That(GroupStore.PendingSelectionIndex(AlphaTabs, pending), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void ExpirePending_DropsOnlyOldEntries()
+        {
+            var pending = new Dictionary<string, System.DateTime>
+            {
+                { AlphaTabs[0], At.AddSeconds(-9) },
+                { AlphaTabs[1], At.AddSeconds(-11) },
+                { AlphaTabs[2], At },
+            };
+
+            GroupStore.ExpirePending(pending, At);
+
+            Assert.That(pending.Keys, Is.EquivalentTo(new[] { AlphaTabs[0], AlphaTabs[2] }));
+        }
+
+        [Test]
+        public void AddTab_SelectTrue_NewTabIsActive()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups.First(g => g.Name == "Alpha");
+
+                Assert.That(f.Store.AddTab(alpha, "Ideas", true), Is.Not.Null);
+
+                var after = f.Store.Groups.First(g => g.Name == "Alpha");
+                Assert.That(after.ActiveTab, Is.EqualTo(2));
+                Assert.That(after.Active.Name, Is.EqualTo("Ideas"));
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void AddTab_SelectFalse_KeepsTheSelection()
+        {
+            // The pin picker's new tab, which pins into the tab it made and leaves the pane alone.
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups.First(g => g.Name == "Alpha");
+                f.Store.SetActiveTab(alpha, 1);
+
+                Assert.That(f.Store.AddTab(alpha, "Ideas"), Is.Not.Null);
+
+                var after = f.Store.Groups.First(g => g.Name == "Alpha");
+                Assert.That(after.Tabs.Count, Is.EqualTo(3));
+                Assert.That(after.ActiveTab, Is.EqualTo(1));
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void AddTab_SelectTrue_ThenAddPin_LandsInNewTab()
+        {
+            // GroupAddMenu.Open aims "Add folder" at group.Active, read from the published groups.
+            using (var f = new TwoProfiles(action => action()))
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups.First(g => g.Name == "Alpha");
+                f.Store.PostEdit(s => s.AddTab(alpha, "Ideas", select: true));
+
+                var apollo = MakeFolder(f.Temp, "Apollo");
+                var shown = f.Store.Groups.First(g => g.Name == "Alpha");
+                f.Store.PostEdit(s => s.AddPins(shown.Active, new[] { apollo }));
+
+                var after = f.Store.Groups.First(g => g.Name == "Alpha");
+                Assert.That(after.Tabs[2].Items.Select(i => Path.GetFileName(i.TargetPath)), Is.EqualTo(new[] { "Apollo" }));
+                Assert.That(after.Tabs[0].Items, Is.Empty);
+                Assert.That(after.Tabs[1].Items, Is.Empty);
+            }
+        }
+
+        [Test]
+        public void AddTab_SelectTrue_ProfileSwitchedBeforeEdit_Refused()
+        {
+            var queued = new List<System.Action>();
+            using (var f = new TwoProfiles(queued.Add))
+            {
+                f.Store.ScanOnce();
+                var alpha = f.Store.Groups[0];
+                var before = f.Tree();
+
+                f.Store.PostEdit(s => s.AddTab(alpha, "Ideas", select: true));
+                f.SwitchToB();
+                queued[0]();
+                // A direct call with a group from the old profile is refused the same way.
+                Assert.That(f.Store.AddTab(alpha, "Ideas", true), Is.Null);
+
+                Assert.That(f.Tree(), Is.EqualTo(before));
+                Assert.That(f.Notes.Count, Is.EqualTo(2));
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+
+                f.Store.ScanOnce();
+                Assert.That(f.Store.Groups.Single().ActiveTab, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void AddTab_SelectTrue_SingleTabGroup_SelectsSecondTab()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var gamma = f.Store.Groups.First(g => g.Name == "Gamma");
+                Assert.That(gamma.Tabs.Count, Is.EqualTo(1));
+
+                f.Store.AddTab(gamma, "Ideas", true);
+
+                var after = f.Store.Groups.First(g => g.Name == "Gamma");
+                Assert.That(after.Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Main", "Ideas" }));
+                Assert.That(after.ActiveTab, Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void AddTab_SelectTrue_ImplicitTabGroup_LeavesOnlyTheNewTabSelected()
+        {
+            // A group folder with no tab folder shows one implicit tab pointing at the group folder.
+            // The new tab's folder is then the group's only subfolder, so the implicit tab is gone and
+            // the group has one tab, the new one, at index 0.
+            using (var f = new TwoProfiles())
+            {
+                var delta = Path.Combine(f.RootA, "03_Delta");
+                Directory.CreateDirectory(delta);
+                f.Store.ScanOnce();
+                var group = f.Store.Groups.First(g => g.Name == "Delta");
+                Assert.That(group.Tabs.Single().FolderPath, Is.EqualTo(delta));
+
+                var created = f.Store.AddTab(group, "Ideas", true);
+
+                var after = f.Store.Groups.First(g => g.Name == "Delta");
+                Assert.That(created, Is.Not.Null);
+                Assert.That(after.Tabs.Select(t => t.Name), Is.EqualTo(new[] { "Ideas" }));
+                Assert.That(after.ActiveTab, Is.EqualTo(0));
+                Assert.That(after.Active.FolderPath, Is.EqualTo(Path.Combine(delta, "01_Ideas")));
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void ScanOnce_AfterAConsumedSelection_KeepsTheNewIndex()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                f.Store.AddTab(f.Store.Groups[0], "Ideas", true);
+
+                f.Store.ScanOnce();
+
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+                Assert.That(f.Store.Groups[0].ActiveTab, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void ScanOnce_NoRequest_RestoresTheSelectionAsBefore()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                f.Store.SetActiveTab(f.Store.Groups[0], 1);
+
+                f.Store.ScanOnce();
+
+                Assert.That(f.Store.Groups[0].ActiveTab, Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void ScanOnce_RequestForAFolderNotThereYet_WaitsForTheScanThatFindsIt()
+        {
+            // A watcher scan that runs before the new folder exists must not drop the request.
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var third = Path.Combine(f.GroupA, "03_Third");
+                f.Store.RequestSelect(third, System.DateTime.UtcNow);
+
+                f.Store.ScanOnce();
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(1));
+                Assert.That(f.Store.Groups[0].ActiveTab, Is.EqualTo(0));
+
+                Directory.CreateDirectory(third);
+                f.Store.ScanOnce();
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+                Assert.That(f.Store.Groups[0].ActiveTab, Is.EqualTo(2));
+            }
+        }
+
+        [Test]
+        public void ScanOnce_ExpiredRequest_IsDroppedAndSelectsNothing()
+        {
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                f.Store.RequestSelect(Path.Combine(f.GroupA, "02_Second"), System.DateTime.UtcNow.AddSeconds(-11));
+
+                f.Store.ScanOnce();
+
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+                Assert.That(f.Store.Groups[0].ActiveTab, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void Publish_DiscardedScan_CommitsNoSelection()
+        {
+            // A scan of profile A that found a requested tab, finishing after the switch to B.
+            using (var f = new TwoProfiles())
+            {
+                f.Store.ScanOnce();
+                var second = Path.Combine(f.GroupA, "02_Second");
+                f.Store.RequestSelect(second, System.DateTime.UtcNow);
+                f.SwitchToB();
+
+                var selections = new Dictionary<string, int> { { f.GroupA, 1 } };
+                Assert.That(f.Store.Publish(f.RootA, new List<PinnedGroup>(), selections, new List<string> { second }), Is.False);
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(1));
+
+                // Reload's drop clears the request, so nothing is left to select when A comes back.
+                Assert.That(f.Store.DropIfRootChanged(), Is.True);
+                Assert.That(f.Store.PendingSelectCount, Is.EqualTo(0));
+
+                f.Settings.Current.GroupsPath = f.RootA;
+                f.Store.ScanOnce();
+                Assert.That(f.Store.Groups.First(g => g.Name == "Alpha").ActiveTab, Is.EqualTo(0));
+            }
+        }
+
         [Test]
         public void CreateGroup_ThenAddPinsToItsFirstTab_PinsIntoTheNewGroup()
         {
