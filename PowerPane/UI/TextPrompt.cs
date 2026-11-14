@@ -34,6 +34,10 @@ namespace PowerPane.UI
         /// <summary>Returns a message while the text is not acceptable, and null when it is. While a
         /// message shows, OK is disabled and Enter does nothing.</summary>
         public Func<string, string> Validate { get; set; }
+
+        /// <summary>Colours taken from the pane's theme (#254). Null keeps the registry colours and the
+        /// default text box, which is what the Settings prompts use.</summary>
+        internal PromptPalette Palette { get; set; }
     }
 
     /// <summary>Where a control is on screen, taken on the UI thread before anything that could rebuild
@@ -89,6 +93,9 @@ namespace PowerPane.UI
                 options.Anchor = anchor.Value.Rect;
                 options.AnchorHwnd = anchor.Value.Hwnd;
             }
+            // Every pane prompt passes through here, so the pane's colours are read once, at open, and
+            // not followed afterwards (#254). Null when no theme is loaded, which means the registry look.
+            if (options.Palette == null) options.Palette = PromptPalette.CurrentPane();
             // A hold of its own, not a save and restore of the shared flag: the menu this prompt was
             // opened from clears that flag while the prompt is up, and restoring a saved copy would
             // set it again and leave the dock open for good.
@@ -134,11 +141,15 @@ namespace PowerPane.UI
             string title = options.Title ?? string.Empty;
             var validate = options.Validate;
 
-            bool dark = ReadDark();
-            var bg = dark ? Color.FromRgb(0x24, 0x24, 0x24) : Color.FromRgb(0xF7, 0xF7, 0xF7);
-            var fg = new SolidColorBrush(dark ? Color.FromRgb(0xED, 0xED, 0xED) : Color.FromRgb(0x1A, 0x1A, 0x1A));
-            var border = new SolidColorBrush(dark ? Color.FromRgb(0x3A, 0x3A, 0x3A) : Color.FromRgb(0xCF, 0xCF, 0xCF));
-            var warn = new SolidColorBrush(dark ? Color.FromRgb(0xFF, 0x99, 0x99) : Color.FromRgb(0xB0, 0x00, 0x20));
+            // A pane prompt brings a palette; the Settings prompts keep the registry colours (#254).
+            bool paneLook = options.Palette != null;
+            var p = options.Palette ?? PromptPalette.FromRegistry(ReadDark());
+            var bg = p.Shell;
+            var fg = new SolidColorBrush(p.Text);
+            var border = new SolidColorBrush(p.Border);
+            var warn = new SolidColorBrush(p.Warning);
+            // Buttons in a pane prompt take the field's edge, as the pane's own controls do.
+            var buttonBorder = paneLook ? new SolidColorBrush(p.FieldBorder) : border;
 
             var win = new Window
             {
@@ -177,7 +188,25 @@ namespace PowerPane.UI
 
             var box = new TextBox { Text = options.Initial ?? string.Empty, FontSize = 13, Padding = new Thickness(4, 3, 4, 3) };
             AutomationProperties.SetName(box, options.InputName ?? title);
-            stack.Children.Add(box);
+            if (paneLook)
+            {
+                // A bare TextBox keeps WPF's blue hover and focus edge and its white fill, which would
+                // ignore the palette and a contrast theme. So the box is borderless inside a host that
+                // carries the palette, as the pane's filter box is (#254).
+                box.Background = Brushes.Transparent;
+                box.BorderThickness = new Thickness(0);
+                box.Foreground = fg;
+                box.CaretBrush = fg;
+                stack.Children.Add(new Border
+                {
+                    Background = new SolidColorBrush(p.FieldFill),
+                    BorderBrush = new SolidColorBrush(p.FieldBorder),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(3),
+                    Child = box
+                });
+            }
+            else stack.Children.Add(box);
 
             // The message line keeps room for two lines whether or not a message shows, so the prompt
             // never changes height after it has been placed.
@@ -187,6 +216,8 @@ namespace PowerPane.UI
                 message = new TextBlock
                 {
                     Foreground = warn,
+                    // Under a contrast theme colour cannot tell the message from other text (#254).
+                    FontWeight = p.HighContrast ? FontWeights.SemiBold : FontWeights.Normal,
                     FontSize = 11,
                     TextWrapping = TextWrapping.Wrap,
                     MinHeight = 30,
@@ -204,7 +235,7 @@ namespace PowerPane.UI
             if (options.Browse != null)
             {
                 var browse = options.Browse;
-                var browseBtn = MakeButton("Browse...", fg, border);
+                var browseBtn = MakeButton("Browse...", fg, buttonBorder);
                 AutomationProperties.SetName(browseBtn, "Browse");
                 browseBtn.HorizontalAlignment = HorizontalAlignment.Left;
                 browseBtn.Click += (s, e) =>
@@ -221,8 +252,8 @@ namespace PowerPane.UI
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right
             };
-            var ok = MakeButton("OK", fg, border);
-            var cancel = MakeButton("Cancel", fg, border);
+            var ok = MakeButton("OK", fg, buttonBorder);
+            var cancel = MakeButton("Cancel", fg, buttonBorder);
             AutomationProperties.SetName(ok, "OK");
             AutomationProperties.SetName(cancel, "Cancel");
             cancel.Margin = new Thickness(0, 0, 8, 0);
