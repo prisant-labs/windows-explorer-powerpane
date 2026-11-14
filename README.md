@@ -201,7 +201,7 @@ git clone https://github.com/prisant-labs/windows-explorer-powerpane.git
 
 ### Recommended: hide Explorer's own navigation pane
 
-PowerPane sits alongside Windows' built-in navigation pane rather than replacing it, so the two will show side by side until you turn the native one off. In any Explorer window, open the **View** tab, click **Navigation pane**, and uncheck **Navigation pane** so PowerPane is the only tree on the left.
+PowerPane sits alongside Windows' built-in navigation pane rather than replacing it, so the two will show side by side until you turn the native one off. In any Explorer window, open the **View** tab, click **Navigation pane**, and uncheck **Navigation pane** so PowerPane is the only tree on the left. The **Show navigation pane** quick action flips the same setting from the pane; see [Quick actions and custom commands](#quick-actions-and-custom-commands).
 
 ## Usage
 
