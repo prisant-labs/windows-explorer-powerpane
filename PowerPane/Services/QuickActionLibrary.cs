@@ -11,8 +11,9 @@ namespace PowerPane.Services
     /// external program there. Only picks the pane row's icon glyph; QuickActionRunner is what
     /// actually runs an action, keyed on its Id. FolderAction is anything else done to the folder
     /// itself, today only pinning it. Selection acts on what is selected in Explorer (#191), and
-    /// Custom is a command the user wrote (#190).</summary>
-    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction, Selection, Custom }
+    /// Custom is a command the user wrote (#190). Toggle flips one of Explorer's View > Show options,
+    /// which belong to no folder; its row shows whether the option is on.</summary>
+    internal enum QuickActionKind { CopyPath, NewItem, OpenTool, FolderAction, Selection, Custom, Toggle }
 
     /// <summary>One built-in quick action: a stable <see cref="Id"/> that settings.json stores
     /// (QuickActionSetting carries only this), and the display <see cref="Name"/> and one-line
@@ -115,6 +116,18 @@ namespace PowerPane.Services
                 "A Markdown link to each selected item, one per line.", QuickActionKind.Selection, false),
             new QuickActionDefinition("open-selected-vscode", "Open selection in Visual Studio Code",
                 "Opens the selected items in VS Code. Hidden when \"code\" is not on PATH.", QuickActionKind.Selection, false),
+            // Explorer's View > Show options. They apply to every Explorer window, and the row's check
+            // box shows the current state (ExplorerViewOptions).
+            new QuickActionDefinition(ExplorerViewOptions.HiddenItems, "Show hidden items",
+                "Shows or hides hidden files and folders in every Explorer window.", QuickActionKind.Toggle, false),
+            new QuickActionDefinition(ExplorerViewOptions.Extensions, "Show file name extensions",
+                "Shows or hides extensions such as .txt in every Explorer window.", QuickActionKind.Toggle, false),
+            new QuickActionDefinition(ExplorerViewOptions.CheckBoxes, "Show item check boxes",
+                "Shows or hides a check box beside each item, for selecting with the mouse.", QuickActionKind.Toggle, false),
+            new QuickActionDefinition(ExplorerViewOptions.CompactView, "Compact view",
+                "Turns Explorer's compact view, with less space between items, on or off.", QuickActionKind.Toggle, false),
+            new QuickActionDefinition(ExplorerViewOptions.NavigationPane, "Show navigation pane",
+                "Shows or hides Explorer's own folder tree. An open window changes when it next opens another folder; new windows and tabs change at once.", QuickActionKind.Toggle, false),
         };
 
         public static QuickActionDefinition Find(string id)
@@ -353,10 +366,12 @@ namespace PowerPane.Services
 
         /// <summary>Whether an action belongs in a pinned row's Quick actions submenu. "Pin this folder"
         /// does not, because that row is a pin already. A selection action does not either, because a
-        /// pinned row is not looking at any Explorer window's selection.</summary>
+        /// pinned row is not looking at any Explorer window's selection. A toggle does not, because it
+        /// changes Explorer's settings, not anything about the pinned folder.</summary>
         public static bool AppliesToPinnedRow(QuickActionDefinition def)
         {
-            return def != null && def.Id != "pin-folder" && def.Kind != QuickActionKind.Selection;
+            return def != null && def.Id != "pin-folder" && def.Kind != QuickActionKind.Selection
+                && def.Kind != QuickActionKind.Toggle;
         }
 
         /// <summary>Whether running this action needs the Explorer selection read first. A custom command

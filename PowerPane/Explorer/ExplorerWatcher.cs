@@ -52,9 +52,10 @@ namespace PowerPane.Explorer
         // Holding the split from the enforcer only shortened each jump and made the border trail the
         // cursor, because each correction waits for Explorer's thread to finish its own layout first. So
         // the dragged window is left to Explorer until the drag ends, and the split is reapplied once on
-        // release (prisant-labs/windows-explorer-powerpane#99). Leaving Explorer's layout alone put its
-        // tree under the pane for the whole drag, so the pane, being the add-on, hides for the drag
-        // instead (#102). Capped, so a lost end event cannot leave a window unmanaged.
+        // release (prisant-labs/windows-explorer-powerpane#99). Leaving Explorer's layout alone puts the
+        // left side of its content behind the pane for the drag. #102 hid the pane instead, but with
+        // Explorer's own navigation pane off that showed an empty strip, so the pane now stays up.
+        // Capped, so a lost end event cannot leave a window unmanaged.
         private ExplorerWindow _sizing;
         private int _sizingSinceTick;
         internal const int DragYieldCapMs = 30000;
@@ -212,16 +213,13 @@ namespace PowerPane.Explorer
 
             if (eventType == NM.EVENT_SYSTEM_MOVESIZESTART)
             {
-                // A title-bar move raises the same events but never resizes, so the pane stays up for a
-                // move and hides only for a resize. The cursor on the border tells them apart at once;
-                // a keyboard resize is caught at its first size change instead. A window still marked
-                // from a drag whose end event was lost is released first, so it cannot stay unmanaged
-                // until the cap.
+                // A window still marked from a drag whose end event was lost is released first, so it
+                // cannot stay unmanaged until the cap.
                 var previous = _sizing;
                 if (previous != null && previous != win) ForgetSizing(previous);
                 _sizingSinceTick = Environment.TickCount;
                 _sizing = win;
-                win.BeginDrag(ResizeBorder.CursorOn(hwnd));
+                win.BeginDrag();
                 return;
             }
 
@@ -231,7 +229,7 @@ namespace PowerPane.Explorer
         }
 
         // Manage a window normally again: its drag ended, its end event was lost, or it closed. EndDrag
-        // reapplies the split and shows the pane again; on a closed window both are no-ops.
+        // reapplies the split; on a closed window that is a no-op.
         private void ForgetSizing(ExplorerWindow win)
         {
             if (_sizing == win) _sizing = null;

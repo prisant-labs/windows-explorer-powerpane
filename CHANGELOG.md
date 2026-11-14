@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Five quick actions flip Explorer's own **View > Show** options: **Show hidden items**, **Show file name extensions**, **Show item check boxes**, **Compact view**, and **Show navigation pane**. Each row shows a check box that matches the setting, including a change made from Explorer's own menu. The settings apply to every Explorer window. The first four change open windows at once; the navigation pane changes in an open window when it next opens another folder, and in new windows and tabs at once. They start off, under Settings > Quick actions.
 - A **Sort pins** submenu on a tab's right-click menu, and on the header menu of a group that has one tab. **A to Z (keep sorted)** and **Recently added (keep sorted)** keep a tab ordered by themselves, so a pin added by any other route than a drop at a line lands in its place. **Sort A to Z once** reorders the tab one time, and **Manual order** turns keep-sorted off without moving anything. A tab stays in manual order until you choose otherwise. Dropping a pin, file, or folder at a line, or using Move up or Move down, puts a sorted tab back in manual order with the order you left on screen ([#241](https://github.com/prisant-labs/windows-explorer-powerpane/issues/241)).
 - The right-click verb now appears on files and on drives as well as on folders and folder backgrounds ([#242](https://github.com/prisant-labs/windows-explorer-powerpane/issues/242)).
 - The verb's window lets you choose a tab as well as a group, with "New group..." and "New tab..." entries, and remembers the group and tab you used last. It is reachable by keyboard and its controls are named for screen readers.
@@ -16,6 +17,7 @@
 - The right-click verb is renamed from "Pin to PowerPane" to "Add to PowerPane", because Explorer already uses "pin" for its own verbs. The window's title reads "Add to PowerPane" and its confirm button reads "Add". Inside the pane, pins are still called pins. On Windows 11 the verb is under "Show more options".
 
 ### Fixed
+- The pane stays up while you drag an Explorer window's border. It used to hide until you released, which left an empty strip when Explorer's own navigation pane is turned off. During the drag, the left edge of Explorer's content sits behind the pane, and it moves over beside the pane when you release.
 - A Quick actions row darkens when you click it or press Enter or Space on it, so a click shows it landed even for an action with nothing else to show, such as a copy.
 - The name box for a new tab, a new group, a rename, or a pin's path now opens next to the control you used, on the pane's own monitor, instead of at the bottom of the screen. The box for a new tab says which group it goes into ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
 - A tab or group name is checked as you type. An invalid character, a trailing dot or space, or a tab name already in the group shows a message and turns off OK, where the name used to be changed without a word ([#243](https://github.com/prisant-labs/windows-explorer-powerpane/issues/243)).
