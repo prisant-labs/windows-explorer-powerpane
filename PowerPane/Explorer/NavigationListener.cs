@@ -36,6 +36,8 @@ namespace PowerPane.Explorer
         private const int FallbackCheckMs = 5000;
         private const int RetryAfterFailureMs = 3000;
         private const int MaxWindows = 64;
+        private const int MaxQuickRetries = 5;
+        private int _failedSyncs;
 
         private readonly AutoResetEvent _wake = new AutoResetEvent(false);
         private volatile bool _stop;
@@ -110,21 +112,27 @@ namespace PowerPane.Explorer
             _dirty = true;
         }
 
-        /// <summary>Subscribes to every shell window not already followed. The same COM object comes
-        /// back as the same RCW on this thread, so a window seen before is recognized by reference and
-        /// never subscribed twice; a second subscription would record every navigation twice.</summary>
+        /// <summary>Subscribes to every shell window not already followed, and lets go of every one the
+        /// shell no longer lists. The same COM object comes back as the same RCW on this thread, so a
+        /// window seen before is recognized by reference and never subscribed twice; a second
+        /// subscription would record every navigation twice. Letting go here, and not only on OnQuit,
+        /// keeps a tab that closed without announcing it from holding one of the MaxWindows places
+        /// for good, which would leave later tabs unfollowed.</summary>
         private void Sync(int count)
         {
             _dirty = false;
             _lastCount = count;
             int added = 0;
-            for (int i = 0; i < count && _subs.Count < MaxWindows; i++)
+            bool complete = true;   // every listed window was read, so a followed one missing from it is gone
+            var listed = new List<object>(count);
+            for (int i = 0; i < count; i++)
             {
                 object w = null;
                 try { w = Call(_windows, "Item", i); }
-                catch { }
+                catch { complete = false; }
                 if (w == null) continue;
-                if (Followed(w)) continue;
+                if (Followed(w)) { listed.Add(w); continue; }
+                if (_subs.Count >= MaxWindows) { Release(w); continue; }
 
                 var container = w as IConnectionPointContainer;
                 if (container == null) { Release(w); continue; }
@@ -142,20 +150,42 @@ namespace PowerPane.Explorer
                     int cookie;
                     point.Advise(sink, out cookie);
                     _subs.Add(new Subscription { Window = w, Point = point, Cookie = cookie, Sink = sink });
+                    listed.Add(w);
                     added++;
                 }
                 catch (Exception ex)
                 {
                     Log.Event("navigation listener", "could not follow a shell window", ex);
                     Release(w);
+                    complete = false;
                 }
             }
-            if (added > 0)
+            // A window that could not be read or followed is tried again: the count alone would not
+            // change, so without this the tab stayed unfollowed for as long as no window opened or
+            // closed. A few quick retries, then the slow check keeps trying.
+            if (!complete)
             {
-                var windows = new List<string>();
-                foreach (var sub in _subs) windows.Add(sub.Sink.Window.ToString("X"));
-                Log.Event("navigation listener", "following " + _subs.Count + " Explorer tab(s) in window(s) " + string.Join(",", windows));
+                _dirty = true;
+                if (++_failedSyncs <= MaxQuickRetries) _retrySoon = true;
             }
+            else _failedSyncs = 0;
+
+            int removed = 0;
+            for (int i = _subs.Count - 1; i >= 0 && complete; i--)
+            {
+                if (listed.Exists(x => ReferenceEquals(x, _subs[i].Window))) continue;
+                Drop(_subs[i], unadvise: true);
+                _subs.RemoveAt(i);
+                removed++;
+            }
+            if (added > 0 || removed > 0) LogFollowing();
+        }
+
+        private void LogFollowing()
+        {
+            var windows = new List<string>();
+            foreach (var sub in _subs) windows.Add(sub.Sink.Window.ToString("X"));
+            Log.Event("navigation listener", "following " + _subs.Count + " Explorer tab(s) in window(s) " + string.Join(",", windows));
         }
 
         // Raised on a COM worker thread when a window or tab opens or closes.
@@ -171,13 +201,15 @@ namespace PowerPane.Explorer
         /// courtesy that may fail.</summary>
         private void PruneClosed()
         {
+            int removed = 0;
             for (int i = _subs.Count - 1; i >= 0; i--)
             {
                 if (!_subs[i].Sink.Quit) continue;
                 Drop(_subs[i], unadvise: true);
                 _subs.RemoveAt(i);
-                _dirty = true;
+                removed++;
             }
+            if (removed > 0) { _dirty = true; LogFollowing(); }
         }
 
         private void Reset(bool unadvise)
