@@ -46,6 +46,10 @@ namespace PowerPane.Explorer
         /// dialog itself can make, says nothing about the app (#103).</summary>
         public bool AppFightsLayout { get; private set; }
 
+        /// <summary>What the app was doing when the fight was seen, read before Restore resets the
+        /// breadcrumb, so the watcher's glitch line can say what came just before it.</summary>
+        public string FightContext { get; private set; }
+
         private int _ownResizeRefits;    // times the pane was refitted after the dialog resized itself
         private const int MaxOwnResizeRefits = 3;
         private const int MinContentPx = 600; // at 96 DPI; narrower and the pane is fitted by widening
@@ -114,7 +118,8 @@ namespace PowerPane.Explorer
             {
                 int newW;
                 int minContent = MinContentPx * NM.DpiForWindow(_dlg) / 96;
-                if (WantsSharedWidth(win.Width, _width, minContent) && ShareWidth(win))
+                bool share = WantsSharedWidth(win.Width, _width, minContent);
+                if (share && ShareWidth(win))
                 {
                     // The pane took its strip from inside the dialog's own width, the way it does in an
                     // Explorer window, so the dialog keeps the size it opened at.
@@ -463,6 +468,7 @@ namespace PowerPane.Explorer
                     // moved back at the same width count against the app.
                     Failed = true;
                     AppFightsLayout = controlsBack && !widthOff;
+                    FightContext = Log.ActivitySnapshot();
                     Restore();
                     return;
                 }
@@ -479,6 +485,7 @@ namespace PowerPane.Explorer
             {
                 Failed = true;
                 AppFightsLayout = true;
+                FightContext = Log.ActivitySnapshot();
                 Restore();
                 Log.Event("glitch", "the " + PowerPane.Interop.DialogNavigator.Owner(_dlg) + " dialog " +
                     _dlg.ToString("X") + " moved its controls back " + _relayoutCount +

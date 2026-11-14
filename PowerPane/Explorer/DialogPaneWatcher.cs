@@ -275,6 +275,27 @@ namespace PowerPane.Explorer
         private static readonly HashSet<string> _besideApps =
             new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // Separate dialogs per app that moved their controls back over the inside pane this session.
+        private static readonly Dictionary<string, int> _fights =
+            new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Dialogs an app must fight the inside pane in before all its dialogs go beside. One
+        /// was enough before, and a single unexplained fight in a Select Folder dialog then sent every
+        /// later dialog from that app beside while other apps' dialogs kept the pane inside, which read
+        /// as the pane changing its mind. A truly hostile app costs one more inside attempt.</summary>
+        internal const int FightsBeforeBeside = 2;
+
+        /// <summary>Count one more dialog from <paramref name="owner"/> that fought the inside pane, and
+        /// say whether the app now joins the beside list.</summary>
+        internal static bool RecordFight(Dictionary<string, int> fights, string owner, int threshold)
+        {
+            if (fights == null || string.IsNullOrEmpty(owner) || owner == "unknown") return false;
+            int n;
+            fights.TryGetValue(owner, out n);
+            fights[owner] = ++n;
+            return n >= threshold;
+        }
+
         private void Attach(IntPtr hwnd)
         {
             if (_mode == "off" || Attached(hwnd)) return;
@@ -467,17 +488,21 @@ namespace PowerPane.Explorer
         private void DemoteToBeside(IntPtr hwnd)
         {
             bool fights = false;
+            string context = null;
             if (_inside.TryGetValue(hwnd, out var win))
             {
                 fights = win.AppFightsLayout;
+                context = win.FightContext;
                 _inside.Remove(hwnd);
                 try { win.Dispose(); } catch { }
             }
-            // Remember the app, so its later dialogs skip the inside attempt entirely, only when this
-            // dialog moved its controls back over the pane. Remembering it for a width change put Edge
-            // on the list for the session after one resize of its Save dialog (#103).
+            // Remember the app, so its later dialogs skip the inside attempt entirely, only when its
+            // dialogs moved their controls back over the pane in FightsBeforeBeside separate dialogs.
+            // Remembering it for a width change put Edge on the list for the session after one resize
+            // of its Save dialog (#103).
             var owner = DialogNavigator.Owner(hwnd);
-            if (fights && !string.IsNullOrEmpty(owner) && owner != "unknown") _besideApps.Add(owner);
+            bool listed = fights && RecordFight(_fights, owner, FightsBeforeBeside);
+            if (listed) _besideApps.Add(owner);
             if (!NM.IsWindow(hwnd) || _beside.ContainsKey(hwnd)) return;
             // owner (computed above) must reach FollowerPane's hostApp parameter the same way the two
             // other FollowerPane(hwnd, nav, owner) call sites in this file do: without it, the pane's
@@ -489,8 +514,9 @@ namespace PowerPane.Explorer
             PositionBeside(hwnd, pane);
             Log.Event("glitch", fights
                 ? "the " + owner + " dialog " + hwnd.ToString("X") + " ran its own layout over the inside " +
-                  "pane, so it was handed to the beside follower and that app's later dialogs skip the " +
-                  "inside attempt for the rest of this session."
+                  "pane (" + (context ?? "no recorded action") + "), so it was handed to the beside follower" +
+                  (listed ? " and that app's later dialogs skip the inside attempt for the rest of this session."
+                          : "; that app's next dialog still tries inside.")
                 : "the " + owner + " dialog " + hwnd.ToString("X") + " changed width under the inside pane, " +
                   "so this dialog alone was handed to the beside follower.");
         }

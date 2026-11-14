@@ -38,5 +38,44 @@ namespace PowerPane.Tests
 
             Assert.That(DialogPaneWatcher.ResolveMode(windowMode, dialogMode), Is.EqualTo(expected));
         }
+
+        // ---- the beside list ----------------------------------------------------------------------
+
+        [Test]
+        public void RecordFight_OneDialogDoesNotListTheApp_TheSecondDoes()
+        {
+            var fights = new Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+            Assert.That(DialogPaneWatcher.RecordFight(fights, "demoapp", DialogPaneWatcher.FightsBeforeBeside), Is.False);
+            Assert.That(DialogPaneWatcher.RecordFight(fights, "DemoApp", DialogPaneWatcher.FightsBeforeBeside), Is.True,
+                "the process name is matched without case");
+            Assert.That(DialogPaneWatcher.RecordFight(fights, "otherapp", DialogPaneWatcher.FightsBeforeBeside), Is.False,
+                "each app is counted on its own");
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("unknown")]
+        public void RecordFight_NeverListsAnUnnamedApp(string owner)
+        {
+            var fights = new Dictionary<string, int>();
+            for (int i = 0; i < 5; i++)
+                Assert.That(DialogPaneWatcher.RecordFight(fights, owner, 2), Is.False);
+        }
+
+        [Test]
+        public void FightsBeforeBeside_IsMoreThanOne()
+        {
+            Assert.That(DialogPaneWatcher.FightsBeforeBeside, Is.GreaterThan(1));
+        }
+
+        [Test]
+        public void DescribeActivity_SaysWhatAndHowLongAgo()
+        {
+            var at = new System.DateTime(2026, 1, 2, 3, 4, 5);
+            Assert.That(PowerPane.Services.Log.DescribeActivity(@"dialog navigate 1A2B to C:\Demo", at, at.AddMilliseconds(2140)),
+                Is.EqualTo(@"last action ""dialog navigate 1A2B to C:\Demo"", 2.1 s earlier"));
+            Assert.That(PowerPane.Services.Log.DescribeActivity(null, at, at), Is.EqualTo("no recorded action"));
+            Assert.That(PowerPane.Services.Log.DescribeActivity("idle", at, at.AddSeconds(-1)), Does.EndWith("0.0 s earlier"));
+        }
     }
 }
