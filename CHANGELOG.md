@@ -8,6 +8,7 @@
 - The right-click verb now appears on files and on drives as well as on folders and folder backgrounds ([#242](https://github.com/prisant-labs/windows-explorer-powerpane/issues/242)).
 - The verb's window lets you choose a tab as well as a group, with "New group..." and "New tab..." entries, and remembers the group and tab you used last. It is reachable by keyboard and its controls are named for screen readers.
 - Selecting several items and choosing the verb opens one window for all of them, however Explorer starts the verb, and an item whose launch arrives while the window is open joins it.
+- The verb's window skips items already pinned in the chosen tab and says so before you confirm, such as "1 of 3 items is already in this tab and will be skipped." When every item is already there, **Add** is turned off, so you choose another tab or cancel. A path matches whatever its letter case, a trailing backslash, or a forward slash ([#252](https://github.com/prisant-labs/windows-explorer-powerpane/issues/252)).
 
 ### Changed
 - Releases are numbered with [Semantic Versioning](https://semver.org) from this release on, with three-part tags such as v4.1.0. The program's own version still has four parts, such as 4.1.0.0, because Windows requires them, and the About page shows it as 4.1.0. The update check compares the two shapes correctly, so a copy of 4.0.0.1 is offered 4.1.0.
