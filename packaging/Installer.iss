@@ -8,12 +8,13 @@
 ;
 ; To build: run scripts/build.ps1, then scripts/package.ps1, which compiles this script and puts the
 ; installer in dist\. Opening this file in Inno Setup and pressing Compile also works once the Release
-; build exists; the installer then lands in Output\.
+; build exists; the installer then lands in packaging\Output\. Paths below are relative to this file,
+; which lives in packaging\, so the build and LICENSE are one folder up.
 
 ; The version is read from the built program, so AssemblyInfo.cs stays the one place to set it and the
 ; installer can never disagree with the exe it carries. package.ps1 passes both values explicitly.
 #ifndef MyBinDir
-  #define MyBinDir AddBackslash(SourcePath) + "PowerPane\bin\x64\Release"
+  #define MyBinDir AddBackslash(SourcePath) + "..\PowerPane\bin\x64\Release"
 #endif
 #ifndef MyAppVersion
   #define MyAppVersion GetVersionNumbersString(MyBinDir + "\PowerPane.exe")
@@ -70,7 +71,7 @@ Source: "{#MyBinDir}\{#MyAppExe}"; DestDir: "{app}"; Flags: ignoreversion
 ; The .config carries the per-monitor DPI switch, so it ships beside the executable.
 Source: "{#MyBinDir}\{#MyAppExe}.config"; DestDir: "{app}"; Flags: ignoreversion
 ; MIT requires the copyright notice to travel with every copy, the installed one included.
-Source: "LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
 
 [Icons]
 ; PowerPane spends its life in the tray, so without a launcher here the only way back in after the app

@@ -49,7 +49,7 @@ if (-not $NoInstaller) {
     if (-not $iscc) { throw 'Inno Setup 6 (ISCC.exe) was not found. Install it from https://jrsoftware.org/isinfo.php, or pass -NoInstaller.' }
     # Both values are passed so the installer carries exactly the build checked above, whatever the
     # configuration, rather than whatever Installer.iss would find on its own.
-    & $iscc /Qp "/DMyAppVersion=$Version" "/DMyBinDir=$bin" "/O$OutDir" (Join-Path $repo 'Installer.iss')
+    & $iscc /Qp "/DMyAppVersion=$Version" "/DMyBinDir=$bin" "/O$OutDir" (Join-Path $repo 'packaging\Installer.iss')
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
     $setup = Join-Path $OutDir "PowerPane-$Version-x64-setup.exe"
     if (-not (Test-Path $setup)) { throw "Inno Setup did not produce $setup." }

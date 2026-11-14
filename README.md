@@ -14,7 +14,7 @@ A folder sidebar for Windows File Explorer. PowerPane embeds a pinned-folders pa
 
 [![Latest release](https://img.shields.io/github/v/release/prisant-labs/windows-explorer-powerpane?label=Latest%20release&style=for-the-badge&logo=windows&color=0078D6)](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest)
 
-![PowerPane inside a File Explorer window, showing pinned groups with tabs, Recent, This PC, Network, Recent Apps, and Quick actions](screens/pane-inside-light.png)
+![PowerPane inside a File Explorer window, showing pinned groups with tabs, Recent, This PC, Network, Recent Apps, and Quick actions](docs/images/pane-inside-light.png)
 
 PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by lso2 (PlexPixel), released under the MIT license. It is developed here under its own name, and [CHANGELOG.md](CHANGELOG.md) lists every version since.
 
@@ -57,7 +57,7 @@ Three ways to show the pane, chosen in Settings:
 - **Beside** floats a follower pane against the left edge of each window without shifting its content. The pane is an owned window of its Explorer window, so Windows keeps it at that window's z-level, on that window's virtual desktop, and hides it when the window is minimized.
 - **Off** uses only the desktop dock and leaves Explorer windows untouched.
 
-![Beside mode: the pane floats against the left edge of an Explorer window](screens/pane-beside.png)
+![Beside mode: the pane floats against the left edge of an Explorer window](docs/images/pane-beside.png)
 
 ### Pinned folder groups
 
@@ -71,9 +71,9 @@ Folders live in groups, and a group can hold several tabs.
 - A group with a single tab renders like a plain list; with several tabs it shows a horizontally scrollable tab row
 - A seeded default group appears on first run so the pane is never empty
 
-![The + menu on a group adds a tab, a group, a folder, or a file](screens/plus-menu.png)
+![The + menu on a group adds a tab, a group, a folder, or a file](docs/images/plus-menu.png)
 
-![The Sort pins submenu on a tab](screens/sort-pins.png)
+![The Sort pins submenu on a tab](docs/images/sort-pins.png)
 
 ### Sections
 
@@ -101,13 +101,13 @@ An optional AppBar at the left or right screen edge, independent of the window p
 - An Edge setting puts it on the left (the default) or right edge of its display. On an edge shared with another display, auto-hide waits briefly before opening, so crossing between displays does not open it ([#177](https://github.com/prisant-labs/windows-explorer-powerpane/issues/177))
 - Clicking a folder navigates the active Explorer window and brings it forward, or opens a new window when none is open
 
-![The desktop dock on the left edge of the screen](screens/desktop-dock.png)
+![The desktop dock on the left edge of the screen](docs/images/desktop-dock.png)
 
 ### Open and Save dialog support
 
 PowerPane attaches to file Open, Save As, and Select Folder common dialogs and honors the same pane mode as real windows. Inside mode shifts every one of the dialog's controls so nothing overlaps the pane. A dialog with room shares its own width with the pane, as an Explorer window does, and a dialog too narrow to share is widened instead. Beside mode floats a pane against the dialog's edge. Both the classic dialog and the modern common item dialog navigate to the clicked folder, including in a Select Folder dialog, where a click opens the folder rather than choosing it. If a dialog that picks folders cannot be steered safely, the click does nothing.
 
-![The pane inside a Save As dialog](screens/save-dialog.png)
+![The pane inside a Save As dialog](docs/images/save-dialog.png)
 
 ### Search
 
@@ -138,7 +138,7 @@ An optional shortcut moves focus into the pane, where the arrow keys move betwee
 
 A second optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front. Type part of a pin, a Recent folder, a drive, or a quick action, and press Enter. The Explorer window or Open or Save dialog in front goes to that folder, or the action runs against that Explorer window. With neither in front, the folder opens in a new Explorer window. Escape closes the box. Pins rank above Recent folders when both match equally well. The shortcut also stays off until it is switched on under Settings, Keyboard.
 
-![The quick switcher finding a pinned folder](screens/quick-switcher.png)
+![The quick switcher finding a pinned folder](docs/images/quick-switcher.png)
 
 ### Profiles
 
@@ -160,7 +160,7 @@ Section headers, groups, and folder subtrees remember whether they are open, key
 - Adjustable pane width from 160 to 400 px, dragged from the inner edge
 - Settings apply live with no Apply button
 
-![The pane in dark mode](screens/pane-inside-dark.png)
+![The pane in dark mode](docs/images/pane-inside-dark.png)
 
 ## Requirements
 
@@ -197,7 +197,7 @@ git clone https://github.com/prisant-labs/windows-explorer-powerpane.git
 1. Build the app first, then run `pwsh -File scripts/package.ps1`
 2. The single-file `PowerPane-<version>-x64-setup.exe` is produced in `dist\`, beside the zip and `SHA256SUMS.txt`
 
-> `package.ps1` passes the build's folder and version to `Installer.iss`, so it works for `-Configuration Debug` too. Opening `Installer.iss` in Inno Setup and pressing **Compile** packages the `Release\x64` build.
+> `package.ps1` passes the build's folder and version to `packaging/Installer.iss`, so it works for `-Configuration Debug` too. Opening `packaging/Installer.iss` in Inno Setup and pressing **Compile** packages the `Release\x64` build.
 
 ### Recommended: hide Explorer's own navigation pane
 
@@ -212,7 +212,7 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 - The window asks for a group and a tab, with "New group..." and "New tab..." to make one on the spot, and remembers your last choice. The Add button pins the items into that tab
 - Click a pinned folder to navigate the current Explorer window to it
 
-![The Add to PowerPane window, asking for a group and a tab](screens/add-picker.png)
+![The Add to PowerPane window, asking for a group and a tab](docs/images/add-picker.png)
 
 ### Groups and tabs
 
@@ -226,7 +226,7 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 
 Turn on the **Quick actions** section under **Pane sections** in Settings. Then choose its rows on the **Quick actions** page, where you can also reorder them and reset them to their defaults.
 
-![The Quick actions page in Settings](screens/settings-quick-actions.png)
+![The Quick actions page in Settings](docs/images/settings-quick-actions.png)
 
 A row acts on the folder on screen, unless its name says "selected". Those rows act on the files selected in Explorer, and say "Nothing selected" when there are none. **Copy path** and the other copy rows that have a form for each item copy the selected items, one per line, when anything is selected, and the folder otherwise. After you go up a level, Explorer selects the folder you came from by itself, and that one selection is ignored, so the folder you are in is copied.
 
@@ -257,7 +257,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 
 ### Settings
 
-![The Pane page of the Settings window](screens/settings-pane.png)
+![The Pane page of the Settings window](docs/images/settings-pane.png)
 
 - Open Settings from the tray icon or the gear in the pane
 - A navigation pane lists the pages, and a search box jumps to a setting
@@ -370,9 +370,9 @@ PowerPane is a tray application built on WPF and documented Win32 interop only; 
 ```
 PowerPane/
 ├── PowerPane.sln              # Visual Studio solution
-├── Installer.iss              # Inno Setup installer script
+├── packaging/                 # Inno Setup installer script, and Install.ps1 and Uninstall.ps1 for a build
 ├── CHANGELOG.md               # Version history
-├── screens/                   # Screenshots used in this README (taken in Windows Sandbox)
+├── docs/images/               # Screenshots used in this README (taken in Windows Sandbox)
 └── PowerPane/
     ├── PowerPane.csproj       # Project (.NET Framework 4.8, x64, WPF)
     ├── app.manifest           # Per-monitor DPI, runs without elevation

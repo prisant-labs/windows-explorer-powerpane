@@ -80,13 +80,13 @@ foreach ($f in Get-SourceFiles 'tests' @('*.cs')) {
     }
 }
 
-# 5. The "Add to PowerPane" verb is registered by three files that no compiler links: Installer.iss
+# 5. The "Add to PowerPane" verb is registered by three files in packaging/ that no compiler links: Installer.iss
 #    (the installer), Install.ps1 (the zip install), and Uninstall.ps1 (the zip uninstall). A verb
 #    added to one and not the others leaves a menu entry that installs but never uninstalls, or the
 #    reverse. Each file must name the same set of PowerPanePin class keys, and none may keep the old
 #    "Pin to PowerPane" text.
 function Get-VerbKeys([string]$file, [string]$pattern) {
-    $text = Get-Content (Join-Path $root $file) -Raw
+    $text = Get-Content (Join-Path $root "packaging\$file") -Raw
     $keys = @()
     foreach ($m in [regex]::Matches($text, $pattern)) { $keys += $m.Groups[1].Value }
     return @($keys | Sort-Object -Unique)
@@ -95,7 +95,7 @@ $verbSets = [ordered]@{
     'Installer.iss' = Get-VerbKeys 'Installer.iss' 'Software\\Classes\\(.+?)\\shell\\PowerPanePin"'
     'Install.ps1'   = Get-VerbKeys 'Install.ps1' "Register-AddVerb\s+'([^']+)'"
 }
-$uninstallText = Get-Content (Join-Path $root 'Uninstall.ps1') -Raw
+$uninstallText = Get-Content (Join-Path $root 'packaging\Uninstall.ps1') -Raw
 $uninstallList = [regex]::Match($uninstallText, '\$classKey\s+in\s+@\(([^)]*)\)')
 $uninstallKeys = @()
 if ($uninstallList.Success) {
@@ -113,7 +113,7 @@ foreach ($name in $verbSets.Keys) {
 }
 foreach ($name in @('Installer.iss', 'Install.ps1', 'Uninstall.ps1')) {
     $n = 0
-    foreach ($line in Get-Content (Join-Path $root $name)) {
+    foreach ($line in Get-Content (Join-Path $root "packaging\$name")) {
         $n++
         if ($line -match 'Pin to PowerPane') {
             $failures.Add("${name}:$n still says ""Pin to PowerPane"". The verb is ""Add to PowerPane"".")
