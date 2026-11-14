@@ -87,5 +87,28 @@ namespace PowerPane.Tests
         {
             Assert.That(UpdateService.Display(null), Is.EqualTo(""));
         }
+
+        // ---- comparing a tag with the running program -----------------------------------------------
+
+        [TestCase("v4.1.0", "4.0.0.1", true, Description = "the first Semantic Versioning release reaches 4.0.0.1")]
+        [TestCase("v4.1.0", "4.1.0.0", false, Description = "a program never offers itself as an update")]
+        [TestCase("v4.1.1", "4.1.0.0", true)]
+        [TestCase("v4.1.0", "4.1.1.0", false)]
+        [TestCase("v5.0.0", "4.9.9.0", true)]
+        [TestCase("v4.0.0.1", "4.1.0.0", false, Description = "an older four-part tag is not newer")]
+        [TestCase("v4.0.0.2", "4.0.0.1", true)]
+        public void IsNewer_ComparesThreeAndFourPartVersions(string tag, string current, bool expected)
+        {
+            System.Version latest;
+            Assert.That(UpdateService.TryParseTag(tag, out latest), Is.True);
+            Assert.That(UpdateService.IsNewer(latest, new System.Version(current)), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void Display_SpellsAVersionAsItsTagDoes()
+        {
+            Assert.That(UpdateService.Display(new System.Version(4, 1, 0, 0)), Is.EqualTo("4.1.0"));
+            Assert.That(UpdateService.Display(new System.Version(4, 0, 0, 1)), Is.EqualTo("4.0.0.1"));
+        }
     }
 }

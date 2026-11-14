@@ -145,7 +145,7 @@ namespace PowerPane.Services
                 }
 
                 r.Latest = latest;
-                r.Available = latest > Current;
+                r.Available = IsNewer(latest, Current);
                 r.DownloadUrl = PickDownload(release);
                 return r;
             }
@@ -193,6 +193,22 @@ namespace PowerPane.Services
             }
             catch (Exception ex) { Log.Error("pick update download", ex); }
             return string.IsNullOrEmpty(release.HtmlUrl) ? ReleasesPage : release.HtmlUrl;
+        }
+
+        /// <summary>True when <paramref name="latest"/> is a later release than <paramref name="current"/>.
+        /// A missing part counts as 0. Tags have three parts from Semantic Versioning on (v4.1.0) while
+        /// the running program's version always has four (4.1.0.0), and System.Version ranks a missing
+        /// part below 0, so a plain comparison happened to give the right answer only by that accident.</summary>
+        internal static bool IsNewer(Version latest, Version current)
+        {
+            if (latest == null) return false;
+            if (current == null) return true;
+            return Normalize(latest) > Normalize(current);
+        }
+
+        private static Version Normalize(Version v)
+        {
+            return new Version(v.Major, v.Minor, Math.Max(v.Build, 0), Math.Max(v.Revision, 0));
         }
 
         /// <summary>
