@@ -75,5 +75,38 @@ namespace PowerPane.Tests
         {
             Assert.That(DialogInsidePane.FitWidth(300, 700, 600), Is.EqualTo(160));
         }
+
+        // A dialog wide enough to keep 600 px of its own beside the pane shares its width, so it closes
+        // at the size it opened at. Widening it made a Select Folder dialog reopen one pane wider each
+        // time, because the shell records the size before the pane's width comes back off.
+        [TestCase(1420, 220, 600, true)]
+        [TestCase(820, 220, 600, true, Description = "exactly the minimum")]
+        [TestCase(819, 220, 600, false, Description = "one pixel short, so it is widened")]
+        [TestCase(2520, 400, 600, true, Description = "a dialog grown near the screen's width")]
+        [TestCase(1420, 0, 600, false, Description = "no pane width")]
+        public void WantsSharedWidth_OnlyWhenTheContentKeepsTheMinimum(int dialog, int pane, int min, bool expected)
+        {
+            Assert.That(DialogInsidePane.WantsSharedWidth(dialog, pane, min), Is.EqualTo(expected));
+        }
+
+        // A shared-width dialog restored partly off its work area is brought on screen before the pane
+        // attaches at its left edge (Codex review, 2026-11-13).
+        [TestCase(100, 1200, 0, 1920, 100, Description = "already inside")]
+        [TestCase(-300, 1200, 0, 1920, 0, Description = "partly off the left edge")]
+        [TestCase(1000, 1200, 0, 1920, 720, Description = "partly off the right edge")]
+        [TestCase(-2900, 1200, -2560, 0, -2560, Description = "a monitor left of the primary one")]
+        [TestCase(-1500, 1200, -2560, 0, -1500, Description = "inside a monitor with negative coordinates")]
+        [TestCase(50, 2500, 0, 1920, 0, Description = "wider than the area")]
+        public void ClampStart_KeepsTheWindowInsideTheArea(int start, int length, int areaStart, int areaEnd, int expected)
+        {
+            Assert.That(DialogInsidePane.ClampStart(start, length, areaStart, areaEnd), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void PointParam_PacksXLowAndYHigh()
+        {
+            Assert.That(PowerPane.Interop.DialogNavigator.PointParam(1841, 17).ToInt64(), Is.EqualTo((17L << 16) | 1841L));
+            Assert.That(PowerPane.Interop.DialogNavigator.PointParam(0, 0).ToInt64(), Is.EqualTo(0L));
+        }
     }
 }

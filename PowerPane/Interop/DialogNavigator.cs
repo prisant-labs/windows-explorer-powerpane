@@ -139,20 +139,34 @@ namespace PowerPane.Interop
                 // the File name box, so it cannot trigger a save. This is the only safe route for app
                 // dialogs such as Photoshop's, whose File name box commits a save on Enter regardless of
                 // what it holds.
-                IntPtr addr = FindAddressEdit(dlg);
+                IntPtr band = FindDescendant(dlg, "Address Band Root");
+                IntPtr addr = FindAddressEdit(band);
+                // A Select Folder dialog builds its address bar's path box only when the bar is first
+                // activated, where Save As builds it at once, hidden. Without it, the route below used to
+                // be the File name box, which in a Select Folder dialog is the "Folder:" box: OK there
+                // chose the folder and closed the dialog under the user.
+                bool built = false;
+                if (band != IntPtr.Zero && addr == IntPtr.Zero) { addr = OpenAddressEdit(band); built = addr != IntPtr.Zero; }
                 if (addr != IntPtr.Zero && WriteAndVerify(addr, typed, "address bar"))
                 {
                     SendEnter(addr);
                     string after;
-                    if (Consumed(addr, typed, out after)) return true;
+                    bool done = Consumed(addr, typed, out after) || IsAlreadyCanonical(typed);
+                    // Building the path box moved the keyboard focus into the address bar, and it stays
+                    // on the bar after the navigation. Escape then no longer closed the dialog in Windows
+                    // Sandbox, even pressed twice. F6 moves the focus on to the file view, as it does for
+                    // someone using the keyboard, and one Escape closes the dialog again. Save As keeps
+                    // its focus, because writing its hidden path box never moves it.
+                    if (built) PostKey(addr, NM.VK_F6);
+                    if (done) return true;
 
                     // An address bar that still holds what was written normally means the Enter was
                     // dropped, because the shell rewrites a path it accepts. A path already in the form
                     // the shell displays has nothing to rewrite, so the text is identical after a
-                    // navigation that worked. Scoring that as a failure is what sent a drive root on to
-                    // the File name box, where pressing Open closed the dialog under the user and then
-                    // barred that app from the route for the rest of the session.
-                    if (IsAlreadyCanonical(typed)) return true;
+                    // navigation that worked; IsAlreadyCanonical counts that as done above. Scoring it
+                    // as a failure is what sent a drive root on to the File name box, where pressing Open
+                    // closed the dialog under the user and then barred that app from the route for the
+                    // rest of the session.
 
                     // The write landed and the Enter did not, which is the case that made Save As look
                     // intermittent: the pane reported a navigation the dialog never performed. Naming it
@@ -167,6 +181,16 @@ namespace PowerPane.Interop
                     // so only a modern dialog missing one is worth a line.
                     Log.Event("dialog", "no usable address bar on the " + Owner(dlg) + " dialog " +
                         dlg.ToString("X") + ", so the File name box is used instead.");
+                }
+
+                // A dialog that picks folders has no file type list, and its File name box chooses
+                // whatever it holds. Doing nothing is the only safe answer there.
+                if (band != IntPtr.Zero && !HasFileTypeList(dlg))
+                {
+                    Log.Event("dialog", "the File name box is not used on the " + Owner(dlg) + " dialog " +
+                        dlg.ToString("X") + ", which has no file type list and so may choose \"" + typed +
+                        "\" rather than open it; the folder did not change.");
+                    return false;
                 }
 
                 // The File name box is the only route a classic comdlg32 dialog has, so what is safe to
@@ -327,6 +351,13 @@ namespace PowerPane.Interop
                 NM.SMTO_ABORTIFHUNG, SendTimeoutMs, out result);
         }
 
+        // Post a key press to a control in another process's dialog, without waiting on it.
+        private static void PostKey(IntPtr hwnd, int vk)
+        {
+            NM.PostMessage(hwnd, NM.WM_KEYDOWN, new IntPtr(vk), IntPtr.Zero);
+            NM.PostMessage(hwnd, NM.WM_KEYUP, new IntPtr(vk), IntPtr.Zero);
+        }
+
         // Press Enter inside a path box. Sending the key directly to the edit lets the address bar (or the
         // modern File name combo) navigate into a directory without committing the dialog.
         private static void SendEnter(IntPtr edit)
@@ -340,9 +371,8 @@ namespace PowerPane.Interop
         /// pressing Enter changes the dialog's folder without touching the File name box, so it can never
         /// trigger a save. Only an enabled Edit with real width counts, because the band also carries
         /// collapsed and placeholder edits that swallow a write and report nothing back.</summary>
-        private static IntPtr FindAddressEdit(IntPtr dlg)
+        private static IntPtr FindAddressEdit(IntPtr band)
         {
-            IntPtr band = FindDescendant(dlg, "Address Band Root");
             if (band == IntPtr.Zero) return IntPtr.Zero;
 
             IntPtr best = IntPtr.Zero;
@@ -360,6 +390,60 @@ namespace PowerPane.Interop
             }, IntPtr.Zero);
 
             return bestWidth >= 40 ? best : IntPtr.Zero;
+        }
+
+        /// <summary>Make the address bar build its path box, as a click on the bar's empty end does, and
+        /// return the box once it exists. The click is posted to the breadcrumb toolbar rather than
+        /// sent: a toolbar can track the mouse after a button-down, and a sent message would wait on
+        /// that. Windows Sandbox showed the box appearing within a second, with the foreground window
+        /// unchanged. Zero when it never appears.</summary>
+        private static IntPtr OpenAddressEdit(IntPtr band)
+        {
+            IntPtr parent = FindDescendant(band, "Breadcrumb Parent");
+            IntPtr crumbs = parent != IntPtr.Zero ? NM.FindWindowEx(parent, IntPtr.Zero, "ToolbarWindow32", null) : IntPtr.Zero;
+            NM.RECT r;
+            if (crumbs == IntPtr.Zero || !NM.GetWindowRect(crumbs, out r) || r.Width < 20) return IntPtr.Zero;
+
+            // The empty end of the bar, past the last crumb. The breadcrumbs collapse from the left when
+            // the path is long, so the right end stays free of them.
+            IntPtr point = PointParam(r.Width - 4, r.Height / 2);
+            NM.PostMessage(crumbs, NM.WM_LBUTTONDOWN, new IntPtr(NM.MK_LBUTTON), point);
+            NM.PostMessage(crumbs, NM.WM_LBUTTONUP, IntPtr.Zero, point);
+
+            for (int i = 0; i < 10; i++)
+            {
+                System.Threading.Thread.Sleep(100);
+                IntPtr edit = FindAddressEdit(band);
+                if (edit != IntPtr.Zero) return edit;
+            }
+            Log.Event("dialog", "the address bar of a dialog built no path box after a click on its empty end.");
+            return IntPtr.Zero;
+        }
+
+        /// <summary>A mouse message's lParam: x in the low word and y in the high word, client
+        /// coordinates.</summary>
+        internal static IntPtr PointParam(int x, int y)
+        {
+            return new IntPtr(((y & 0xFFFF) << 16) | (x & 0xFFFF));
+        }
+
+        /// <summary>True when the dialog has a file type list, a ComboBox with no Edit inside it. Open and
+        /// Save dialogs with a filter have one; a dialog that picks folders never does, and its File name
+        /// box chooses the folder it holds instead of opening it.</summary>
+        private static bool HasFileTypeList(IntPtr dlg)
+        {
+            bool found = false;
+            NM.EnumChildWindows(dlg, (h, l) =>
+            {
+                if (NM.ClassOf(h) == "ComboBox" && NM.IsWindowVisible(h) &&
+                    NM.FindWindowEx(h, IntPtr.Zero, "Edit", null) == IntPtr.Zero)
+                {
+                    found = true;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+            return found;
         }
 
         // The editable File name control: ComboBoxEx32 -> ComboBox -> Edit, nested anywhere in the tree.

@@ -52,6 +52,14 @@ namespace PowerPane.Interop
         [DllImport("user32.dll")]
         public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
 
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool PostMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+
+        public const int WM_LBUTTONDOWN = 0x0201;
+        public const int WM_LBUTTONUP = 0x0202;
+        public const int MK_LBUTTON = 0x0001;
+
         // Timeout variants for driving other apps' dialogs. A plain SendMessage to a busy target
         // (Photoshop mid-save) blocks the caller indefinitely, and our caller shares Explorer's
         // input queue, so every cross-process send must be able to give up.
@@ -87,6 +95,7 @@ namespace PowerPane.Interop
         public const int WM_KEYUP = 0x0101;
         public const int WM_CHAR = 0x0102;
         public const int VK_RETURN = 0x0D;
+        public const int VK_F6 = 0x75;
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
