@@ -30,5 +30,16 @@ namespace PowerPane.Tests
             Assert.That(SectionsPage.Friendly("ssh"), Is.EqualTo(SshSection.DefaultTitle));
             Assert.That(SshSection.DefaultTitle, Is.EqualTo(new SshPage().Title));
         }
+
+        // A pressed row is the hover color at twice its opacity, so a click is visible against hover.
+        [TestCase((byte)0x26, (byte)0x4C)]
+        [TestCase((byte)0x40, (byte)0x80)]
+        [TestCase((byte)0x90, (byte)0xFF)]
+        public void PressedColor_DoublesHoverOpacityAndKeepsItsColor(byte hoverAlpha, byte expectedAlpha)
+        {
+            var pressed = QuickActionsSection.PressedColor(System.Windows.Media.Color.FromArgb(hoverAlpha, 0x00, 0x78, 0xD4));
+            Assert.That(pressed.A, Is.EqualTo(expectedAlpha));
+            Assert.That(new[] { pressed.R, pressed.G, pressed.B }, Is.EqualTo(new byte[] { 0x00, 0x78, 0xD4 }));
+        }
     }
 }

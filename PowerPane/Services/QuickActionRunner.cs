@@ -28,7 +28,59 @@ namespace PowerPane.Services
             if (def == null) return null;
             if (def.Kind == QuickActionKind.Custom) return RunCustom(def, folder, selection);
             if (def.Kind == QuickActionKind.Selection) return RunOnSelection(def, folder, selection);
+            if (def.Kind == QuickActionKind.CopyPath && selection != null && selection.Count > 0
+                && QuickActionLibrary.SelectionCopyId(def.Id) != null)
+                return CopySelection(def.Id, selection);
             Run(def.Id, folder);
+            return null;
+        }
+
+        /// <summary>Runs an action against an Explorer window, the way its pane row and the quick switcher
+        /// both do: the folder and, for an action that uses it, the selection are read now, and a failed
+        /// selection read stops the action rather than falling back to the folder. For a copy action,
+        /// the selection Explorer makes by itself after a move up counts as no selection. Cross-process
+        /// COM, so the caller is already on the general work lane.</summary>
+        public static string RunInWindow(QuickActionDefinition def, IntPtr hostWindow)
+        {
+            if (def == null) return null;
+            var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
+            List<string> selection = null;
+            var status = SelectionReadStatus.Ok;
+            if (QuickActionLibrary.UsesSelection(def))
+                status = ExplorerNavigator.GetSelectedPaths(hostWindow, out selection);
+            string problem = SelectionProblem(status);
+            if (problem != null) return problem;
+
+            if (def.Kind == QuickActionKind.CopyPath
+                && WindowFolderHistory.IsUpSelection(folder, selection, WindowFolderHistory.Recent(hostWindow)))
+            {
+                Log.Info("quick action '" + def.Id + "': the one selected folder is the one just left; copying the folder.");
+                selection = null;
+            }
+            WindowFolderHistory.Record(hostWindow, folder);
+            return Run(def, folder, selection);
+        }
+
+        /// <summary>The clipboard text a copy action makes: each selected item in the action's format,
+        /// one per line, when it has a per-item form and anything is selected, or else the folder's.
+        /// Null when there is nothing sensible to copy.</summary>
+        internal static string CopyTextFor(string actionId, string folder, IList<string> selection)
+        {
+            string selectionId = QuickActionLibrary.SelectionCopyId(actionId);
+            if (selectionId != null && selection != null && selection.Count > 0)
+                return SelectionTextFor(selectionId, selection);
+            return string.IsNullOrEmpty(folder) ? null : ClipboardTextFor(actionId, folder);
+        }
+
+        private static string CopySelection(string actionId, IList<string> selection)
+        {
+            string text = CopyTextFor(actionId, null, selection);
+            if (text == null)
+            {
+                Log.Info("quick action '" + actionId + "': nothing to copy for this selection.");
+                return "Nothing to copy";
+            }
+            WorkQueue.PostUI(() => CopyToClipboard(text));
             return null;
         }
 

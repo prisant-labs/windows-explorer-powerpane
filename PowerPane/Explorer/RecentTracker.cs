@@ -99,6 +99,7 @@ namespace PowerPane.Explorer
                 try
                 {
                     var path = ExplorerNavigator.GetCurrentPath(hwnd);
+                    WindowFolderHistory.Record(hwnd, path);
                     if (!string.IsNullOrEmpty(path) &&
                         !(hwnd == _lastHwnd && string.Equals(path, _lastPath, StringComparison.OrdinalIgnoreCase)))
                     {

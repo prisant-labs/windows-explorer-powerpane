@@ -32,6 +32,7 @@ namespace PowerPane
         private ExplorerFollowerWatcher _follower;
         private AppBarHost _appbar;
         private RecentTracker _recentTracker;
+        private Explorer.NavigationListener _navigationListener;
         private DialogPaneWatcher _dialogPanes;
         private StaleSourceGuard _staleSources;
         private Window _settingsWindow;
@@ -191,6 +192,10 @@ namespace PowerPane
 
             _recentTracker = new RecentTracker();
             _recentTracker.Start();   // records the folder of whichever Explorer window is browsed
+
+            // Hears every Explorer folder change, however brief, for the Copy path guard.
+            _navigationListener = new Explorer.NavigationListener();
+            _navigationListener.Start();
 
             // Before any pane exists, so no window of ours is ever left where a dead parent can
             // crash WPF's text-input hook (#148).
@@ -680,6 +685,7 @@ namespace PowerPane
             UpdateNotifier.Stop();
 
             try { _recentTracker?.Dispose(); } catch (Exception ex) { Log.Error("recent tracker dispose", ex); }
+            try { _navigationListener?.Dispose(); } catch (Exception ex) { Log.Error("navigation listener dispose", ex); }
             try { _dialogPanes?.Dispose(); } catch (Exception ex) { Log.Error("dialog panes dispose", ex); }
             try { _watcher?.Dispose(); } catch (Exception ex) { Log.Error("watcher dispose", ex); }
             try { _follower?.Dispose(); } catch (Exception ex) { Log.Error("follower dispose", ex); }

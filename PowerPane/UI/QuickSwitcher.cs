@@ -419,12 +419,7 @@ namespace PowerPane.UI
                 string message;
                 try
                 {
-                    var folder = ExplorerNavigator.GetCurrentPath(hostWindow);
-                    List<string> selection = null;
-                    var status = SelectionReadStatus.Ok;
-                    if (QuickActionLibrary.UsesSelection(def))
-                        status = ExplorerNavigator.GetSelectedPaths(hostWindow, out selection);
-                    message = QuickActionRunner.SelectionProblem(status) ?? QuickActionRunner.Run(def, folder, selection);
+                    message = QuickActionRunner.RunInWindow(def, hostWindow);
                 }
                 catch (Exception ex) { Log.Error("quick switcher action", ex); message = "The action could not run."; }
 

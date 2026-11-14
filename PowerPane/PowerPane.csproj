@@ -74,6 +74,7 @@
     <Compile Include="Explorer\AppBarHost.cs" />
     <Compile Include="Explorer\MonitorPicker.cs" />
     <Compile Include="Explorer\RecentTracker.cs" />
+    <Compile Include="Explorer\NavigationListener.cs" />
     <Compile Include="Explorer\DialogPaneWatcher.cs" />
     <Compile Include="Explorer\DialogInsidePane.cs" />
     <Compile Include="Interop\VirtualDesktop.cs" />
@@ -138,6 +139,7 @@
     <Compile Include="UI\DropLineAdorner.cs" />
     <Compile Include="UI\DragGhostAdorner.cs" />
     <Compile Include="Services\KnownFolders.cs" />
+    <Compile Include="Services\WindowFolderHistory.cs" />
   </ItemGroup>
   <ItemGroup>
     <Page Include="Themes\Controls.xaml">
