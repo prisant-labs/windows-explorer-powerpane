@@ -197,7 +197,7 @@ git clone https://github.com/prisant-labs/windows-explorer-powerpane.git
 1. Build the app first, then run `pwsh -File scripts/package.ps1`
 2. The single-file `PowerPane-<version>-x64-setup.exe` is produced in `dist\`, beside the zip and `SHA256SUMS.txt`
 
-> `package.ps1` passes the build's folder and version to `Installer.iss`, so it works for `-Configuration Debug` too. Opening `Installer.iss` in Inno Setup and pressing **Compile** packages the `Release\x64` build.
+> `package.ps1` passes the build's folder and version to `packaging/Installer.iss`, so it works for `-Configuration Debug` too. Opening `packaging/Installer.iss` in Inno Setup and pressing **Compile** packages the `Release\x64` build.
 
 ### Recommended: hide Explorer's own navigation pane
 
@@ -370,7 +370,7 @@ PowerPane is a tray application built on WPF and documented Win32 interop only; 
 ```
 PowerPane/
 ├── PowerPane.sln              # Visual Studio solution
-├── Installer.iss              # Inno Setup installer script
+├── packaging/                 # Inno Setup installer script, and Install.ps1 and Uninstall.ps1 for a build
 ├── CHANGELOG.md               # Version history
 ├── screens/                   # Screenshots used in this README (taken in Windows Sandbox)
 └── PowerPane/

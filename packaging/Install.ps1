@@ -7,7 +7,7 @@
     and launches the app.
 
     Run it by right-clicking and choosing "Run with PowerShell", or from a console:
-        powershell -ExecutionPolicy Bypass -File .\Install.ps1
+        powershell -ExecutionPolicy Bypass -File .\packaging\Install.ps1
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -17,11 +17,15 @@ $AppData    = Join-Path $env:APPDATA   'PowerPane'
 $ExeName    = 'PowerPane.exe'
 
 function Find-SourceExe {
-    $here = Split-Path -Parent $MyInvocation.MyCommand.Definition
+    # $PSScriptRoot, not $MyInvocation.MyCommand.Definition: inside a function the latter is the
+    # function's own text, so the old lookup never found the script's folder. This script lives in
+    # packaging\, one folder below the repository root that holds the build.
+    $here = $PSScriptRoot
+    $repo = Split-Path -Parent $here
     $candidates = @(
         (Join-Path $here $ExeName),
-        (Join-Path $here "PowerPane\bin\x64\Release\$ExeName"),
-        (Join-Path $here "PowerPane\bin\x64\Debug\$ExeName")
+        (Join-Path $repo "PowerPane\bin\x64\Release\$ExeName"),
+        (Join-Path $repo "PowerPane\bin\x64\Debug\$ExeName")
     )
     foreach ($c in $candidates) { if (Test-Path $c) { return $c } }
     throw "Could not find $ExeName. Build the solution in Visual Studio first (Ctrl+Shift+B), or place $ExeName next to this script."

@@ -3,7 +3,7 @@
     It deliberately leaves %APPDATA%\PowerPane in place so your groups and settings survive a
     reinstall. Delete that folder by hand if you want a clean wipe.
 
-        powershell -ExecutionPolicy Bypass -File .\Uninstall.ps1
+        powershell -ExecutionPolicy Bypass -File .\packaging\Uninstall.ps1
 #>
 
 $ErrorActionPreference = 'SilentlyContinue'
