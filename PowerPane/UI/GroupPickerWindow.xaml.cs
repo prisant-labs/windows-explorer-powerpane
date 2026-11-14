@@ -378,8 +378,9 @@ namespace PowerPane.UI
                 {
                     // An existing tab is checked again here, from the same snapshot the note used, so a
                     // duplicate is never written even if Add was enabled from an older state (#252). A
-                    // tab the picker just created holds no pins, so everything is added.
-                    var toAdd = _paths.ToList();
+                    // tab the picker just created holds no pins, but its batch still collapses repeats
+                    // such as C:\Demo\Apollo and C:\Demo\Apollo\ to one pin.
+                    var toAdd = PinPickerModel.SplitDuplicates(Enumerable.Empty<string>(), _paths).ToAdd;
                     if (SelectedExistingTab() == tab)
                     {
                         var split = PinPickerModel.SplitDuplicates(tab.Items.Select(i => i.TargetPath), _paths);
