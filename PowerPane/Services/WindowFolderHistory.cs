@@ -4,31 +4,51 @@ using System.IO;
 
 namespace PowerPane.Services
 {
-    /// <summary>The last two folders each Explorer window was seen showing, so a copy action can tell
-    /// a selection the user made from one Explorer made for them. Going up a level, or Back to a parent,
-    /// selects the folder just left; a "Copy path" that preferred the selection would copy that
-    /// subfolder instead of the folder on screen (#191).
+    /// <summary>The last few folders each Explorer window showed, so a copy action can tell a selection
+    /// the user made from one Explorer made for them. Going up a level, or Back to a parent, selects the
+    /// folder just left; a "Copy path" that preferred the selection would copy that subfolder instead of
+    /// the folder on screen (#191).
     ///
-    /// RecentTracker records here whenever it reads a window's folder, and a quick action records the
-    /// folder it read when clicked. The tracker polls every two seconds, so at click time the newest
-    /// entry may still be the folder the user just left; <see cref="IsUpSelection"/> is written to work
-    /// whether or not the tracker has caught up. Keyed by window handle and capped, so a reused handle
-    /// at worst carries two old paths that also have to pass IsUpSelection's parent test.</summary>
+    /// NavigationListener records every folder change as Explorer reports it, so a visit of any length
+    /// is here; a two-second poll alone missed an in-and-back visit, which a Codex review found and
+    /// Windows Sandbox reproduced. RecentTracker's poll and each quick action click still record as a
+    /// second source. The history is per Explorer window, not per tab, because the listener cannot read
+    /// a tab's handle from its apartment, so it keeps <see cref="Depth"/> folders: enough for a tab left
+    /// in a subfolder while another tab of the same window moves a few times. Keyed by window handle
+    /// and capped, so a reused handle at worst carries old paths that also have to pass
+    /// IsUpSelection's parent test.</summary>
     internal static class WindowFolderHistory
     {
         private const int MaxWindows = 32;
+        internal const int Depth = 6;
         private static readonly object Gate = new object();
         private static readonly LruCache<IntPtr, string[]> Seen = new LruCache<IntPtr, string[]>(MaxWindows);
 
+        /// <summary>Records a folder as the window's newest. Called from COM worker threads, the work
+        /// lane, and RecentTracker, so everything happens under the lock and nothing here blocks.</summary>
         public static void Record(IntPtr window, string folder)
         {
             if (window == IntPtr.Zero || string.IsNullOrEmpty(folder)) return;
             lock (Gate)
             {
                 string[] last;
-                if (Seen.TryGetValue(window, out last) && last.Length > 0 && SamePath(last[0], folder)) return;
-                Seen.Set(window, last != null && last.Length > 0 ? new[] { folder, last[0] } : new[] { folder });
+                if (!Seen.TryGetValue(window, out last)) last = new string[0];
+                if (last.Length > 0 && SamePath(last[0], folder)) return;
+                Seen.Set(window, Push(last, folder));
             }
+        }
+
+        /// <summary>The history with <paramref name="folder"/> in front, the oldest dropped past
+        /// <see cref="Depth"/>. A folder seen again moves up rather than taking a second place.</summary>
+        internal static string[] Push(string[] last, string folder)
+        {
+            var next = new List<string>(Depth) { folder };
+            foreach (var f in last)
+            {
+                if (next.Count == Depth) break;
+                if (!SamePath(f, folder)) next.Add(f);
+            }
+            return next.ToArray();
         }
 
         public static IList<string> Recent(IntPtr window)
@@ -41,23 +61,28 @@ namespace PowerPane.Services
         }
 
         /// <summary>True when <paramref name="selection"/> is what Explorer selects by itself after a move
-        /// up: exactly one item, directly inside <paramref name="folder"/>, that is one of the window's
-        /// recent folders or holds one of them. "Holds" covers going up two levels faster than the
-        /// tracker polls. A deliberate click on that same folder looks identical and is also treated as
-        /// no selection; any other item, two items, or a file is never touched.</summary>
+        /// up: exactly one item, directly inside <paramref name="folder"/>, when the window's newest
+        /// recorded navigation is to <paramref name="folder"/> and the one before it was that item or a
+        /// folder inside it. "Inside it" covers going up two levels at once. A deliberate click on that
+        /// same folder right after the move looks identical and is also treated as no selection; any
+        /// other item, two items, or a file is never touched.
+        ///
+        /// Only the latest move counts, because the history is kept per window, not per tab. Matching
+        /// any recent folder dropped a deliberate selection in tab B of a folder that tab A had visited
+        /// (Codex review, 2026-11-13). A tab switch records nothing, so after one the newest entry is the
+        /// other tab's folder and this is false. The cost: going up in tab A after navigating in tab B
+        /// no longer catches Explorer's selection, and Copy path copies the selected folder, as it did
+        /// before this guard existed.</summary>
         internal static bool IsUpSelection(string folder, IList<string> selection, IList<string> recentFolders)
         {
-            if (string.IsNullOrEmpty(folder) || selection == null || selection.Count != 1 || recentFolders == null) return false;
+            if (string.IsNullOrEmpty(folder) || selection == null || selection.Count != 1) return false;
+            if (recentFolders == null || recentFolders.Count < 2 || !SamePath(recentFolders[0], folder)) return false;
             string item = Normalize(selection[0]);
             if (item == null || !SamePath(ParentOf(item), folder)) return false;
-            foreach (var recent in recentFolders)
-            {
-                string r = Normalize(recent);
-                if (r == null) continue;
-                if (string.Equals(r, item, StringComparison.OrdinalIgnoreCase)) return true;
-                if (r.StartsWith(item + @"\", StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            return false;
+            string left = Normalize(recentFolders[1]);
+            return left != null &&
+                   (string.Equals(left, item, StringComparison.OrdinalIgnoreCase) ||
+                    left.StartsWith(item + @"\", StringComparison.OrdinalIgnoreCase));
         }
 
         internal static bool SamePath(string a, string b)
