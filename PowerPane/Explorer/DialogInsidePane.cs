@@ -46,6 +46,10 @@ namespace PowerPane.Explorer
         /// dialog itself can make, says nothing about the app (#103).</summary>
         public bool AppFightsLayout { get; private set; }
 
+        /// <summary>What the app was doing when the fight was seen, read before Restore resets the
+        /// breadcrumb, so the watcher's glitch line can say what came just before it.</summary>
+        public string FightContext { get; private set; }
+
         private int _ownResizeRefits;    // times the pane was refitted after the dialog resized itself
         private const int MaxOwnResizeRefits = 3;
         private const int MinContentPx = 600; // at 96 DPI; narrower and the pane is fitted by widening
@@ -84,7 +88,11 @@ namespace PowerPane.Explorer
             // strip off screen, which reads as the pane simply never appearing.
             var wa = NM.WorkAreaFor(_dlg);
             if (wa.Width <= 0 || wa.Height <= 0) return false;
-            int room = wa.Width - _origWinW;
+            // Room beside the dialog matters only when it is to be widened. A dialog that shares its
+            // width with the pane needs none, and one grown close to the screen's width used to be sent
+            // beside here for want of it.
+            int room = WantsSharedWidth(_origWinW, _width, MinContentPx * NM.DpiForWindow(_dlg) / 96)
+                ? int.MaxValue : wa.Width - _origWinW;
             if (_width > room) _width = room;
             if (_width > wa.Width / 3) _width = wa.Width / 3;
             if (_width < 160)
@@ -108,18 +116,55 @@ namespace PowerPane.Explorer
 
             try
             {
-                // Widen the dialog by the pane width (grow the right edge), then push every child right so
-                // the left strip is free. The full-width file view ends up filling the wider area exactly.
-                int newW = _origWinW + _width;
-                int left = win.Left, top = win.Top;
-                if (left + newW > wa.Right) left = wa.Right - newW;
-                if (left < wa.Left) left = wa.Left;
-                if (top + _origWinH > wa.Bottom) top = wa.Bottom - _origWinH;
-                if (top < wa.Top) top = wa.Top;
-                _moved = left != win.Left || top != win.Top;
+                int newW;
+                int minContent = MinContentPx * NM.DpiForWindow(_dlg) / 96;
+                bool share = WantsSharedWidth(win.Width, _width, minContent);
+                if (share && ShareWidth(win))
+                {
+                    // The pane took its strip from inside the dialog's own width, the way it does in an
+                    // Explorer window, so the dialog keeps the size it opened at.
+                    newW = win.Width;
+                    // The pane sits at the dialog's left edge, so a dialog restored partly off the work
+                    // area (after a monitor was removed, say) is brought on screen, as a widened one is,
+                    // and Restore puts it back where it was.
+                    int left = ClampStart(win.Left, newW, wa.Left, wa.Right);
+                    int top = ClampStart(win.Top, win.Height, wa.Top, wa.Bottom);
+                    if (left != win.Left || top != win.Top)
+                    {
+                        NM.SetWindowPos(_dlg, IntPtr.Zero, left, top, 0, 0,
+                            NM.SWP_NOSIZE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                        _moved = true;
+                    }
+                }
+                else
+                {
+                    // A dialog that would not shrink is widened after all, so the room beside it that
+                    // was not checked for sharing has to be checked now, or it would grow off screen.
+                    if (share)
+                    {
+                        _width = Math.Min(_width, Math.Min(wa.Width - _origWinW, wa.Width / 3));
+                        if (_width < 160)
+                        {
+                            Failed = true;
+                            Log.Info("the " + PowerPane.Interop.DialogNavigator.Owner(_dlg) + " dialog " +
+                                _dlg.ToString("X") + " would not shrink to share its width and has no room to " +
+                                "widen, so it goes beside.");
+                            return false;
+                        }
+                    }
+                    // Widen the dialog by the pane width (grow the right edge), then push every child right so
+                    // the left strip is free. The full-width file view ends up filling the wider area exactly.
+                    newW = _origWinW + _width;
+                    int left = win.Left, top = win.Top;
+                    if (left + newW > wa.Right) left = wa.Right - newW;
+                    if (left < wa.Left) left = wa.Left;
+                    if (top + _origWinH > wa.Bottom) top = wa.Bottom - _origWinH;
+                    if (top < wa.Top) top = wa.Top;
+                    _moved = left != win.Left || top != win.Top;
 
-                NM.SetWindowPos(_dlg, IntPtr.Zero, left, top, newW, _origWinH,
-                    NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                    NM.SetWindowPos(_dlg, IntPtr.Zero, left, top, newW, _origWinH,
+                        NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                }
 
                 ShiftChildren();
                 Repaint();
@@ -154,9 +199,10 @@ namespace PowerPane.Explorer
                 _attached = true;
                 _shiftedOnce = true;
                 _attachTick = Environment.TickCount;
-                _lastW = _origWinW + _width;
+                _lastW = newW;
                 _lastH = _origWinH;
-                Log.Info("dialog inside pane attached to " + _dlg.ToString("X"));
+                Log.Info("dialog inside pane attached to " + _dlg.ToString("X") +
+                    (_keepWinW > 0 ? " within its own width" : ", widened by the pane"));
                 Log.Activity("idle");
                 return true;
             }
@@ -191,6 +237,56 @@ namespace PowerPane.Explorer
             if (!NM.IsWindow(_dlg)) return;
             NM.RedrawWindow(_dlg, IntPtr.Zero, IntPtr.Zero,
                 NM.RDW_INVALIDATE | NM.RDW_ERASE | NM.RDW_ALLCHILDREN | NM.RDW_UPDATENOW);
+        }
+
+        /// <summary>True when a dialog this wide can give up the pane's width and keep at least
+        /// <paramref name="minContent"/> pixels for its own controls. Widening a dialog that could share
+        /// is what made it reopen wider each time: the shell records the dialog's size as it closes,
+        /// before the restore takes the pane's width back off, so a Select Folder dialog grew by exactly
+        /// one pane width per open (1640, 1860, 2080, ... px in Windows Sandbox).</summary>
+        internal static bool WantsSharedWidth(int dialogWidth, int paneWidth, int minContent)
+        {
+            return paneWidth > 0 && dialogWidth - paneWidth >= minContent;
+        }
+
+        /// <summary>Where a window of <paramref name="length"/> pixels starts so that it lies inside the
+        /// area from <paramref name="areaStart"/> to <paramref name="areaEnd"/>, preferring its own start.
+        /// A window longer than the area starts at the area's start. Works on negative coordinates, which
+        /// a monitor left of or above the primary one has.</summary>
+        internal static int ClampStart(int start, int length, int areaStart, int areaEnd)
+        {
+            if (start + length > areaEnd) start = areaEnd - length;
+            if (start < areaStart) start = areaStart;
+            return start;
+        }
+
+        /// <summary>At attach, make room for the pane inside the dialog's width, as FitInside does after
+        /// the dialog resizes itself: shrink the dialog by the pane width so it lays its controls out for
+        /// the space beside the pane, record those places, and return it to its own width. False, with
+        /// the dialog at its own width and its controls recorded there, when it will not shrink.</summary>
+        private bool ShareWidth(NM.RECT win)
+        {
+            int fullW = win.Width, h = win.Height, inner = fullW - _width;
+            const uint keepPlace = NM.SWP_NOMOVE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE;
+            _applying = true;
+            try
+            {
+                NM.SetWindowPos(_dlg, IntPtr.Zero, 0, 0, inner, h, keepPlace);
+                NM.RECT sr;
+                bool shrank = NM.GetWindowRect(_dlg, out sr) && Math.Abs(sr.Width - inner) <= 4;
+                if (shrank) CaptureChildren();
+                NM.SetWindowPos(_dlg, IntPtr.Zero, 0, 0, fullW, h, keepPlace);
+                if (!shrank || _orig.Count == 0)
+                {
+                    CaptureChildren();
+                    return false;
+                }
+            }
+            finally { _applying = false; }
+
+            _origWinW = inner; _origWinH = h; _origWinX = win.Left; _origWinY = win.Top;
+            _keepWinW = fullW; _moved = false;
+            return true;
         }
 
         private void CaptureChildren()
@@ -233,8 +329,11 @@ namespace PowerPane.Explorer
         // Only move a control that is not already at its shifted position. Re-setting a window to the
         // place it already occupies still emits a location-change event, and that event is what fed the
         // oscillation; skipping no-op moves stops the feedback once the layout has settled.
-        private void ShiftChildren()
+        /// <summary>Move every recorded control to its shifted place, and say how many had to move,
+        /// counting controls brought back inside their parent. Zero means the pass changed nothing.</summary>
+        private int ShiftChildren()
         {
+            int moved = 0;
             foreach (var kv in _orig)
             {
                 if (!NM.IsWindow(kv.Key)) continue;
@@ -251,8 +350,9 @@ namespace PowerPane.Explorer
                 }
                 NM.SetWindowPos(kv.Key, IntPtr.Zero, tx, ty, r.Width, r.Height,
                     NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                moved++;
             }
-            FitOverhangs();
+            return moved + FitOverhangs();
         }
 
         /// <summary>Bring back inside its parent any control one level below a shifted control that now
@@ -265,8 +365,9 @@ namespace PowerPane.Explorer
         /// it lay its bands out for the width they now have. Only visible controls that begin inside
         /// their parent are touched, and one that already fits is left alone, so a pass that changes
         /// nothing moves nothing.</summary>
-        private void FitOverhangs()
+        private int FitOverhangs()
         {
+            int fitted = 0;
             foreach (var parent in _orig.Keys)
             {
                 if (!NM.IsWindow(parent) || !NM.IsWindowVisible(parent)) continue;
@@ -277,12 +378,14 @@ namespace PowerPane.Explorer
                     if (!NM.IsWindowVisible(c)) continue;
                     NM.RECT cr;
                     if (!NM.GetWindowRect(c, out cr)) continue;
-                    int fitted = FittedWidth(cr.Left, cr.Right, pr.Left, pr.Right);
-                    if (fitted == cr.Width) continue;
-                    NM.SetWindowPos(c, IntPtr.Zero, 0, 0, fitted, cr.Height,
+                    int width = FittedWidth(cr.Left, cr.Right, pr.Left, pr.Right);
+                    if (width == cr.Width) continue;
+                    NM.SetWindowPos(c, IntPtr.Zero, 0, 0, width, cr.Height,
                         NM.SWP_NOMOVE | NM.SWP_NOZORDER | NM.SWP_NOACTIVATE);
+                    fitted++;
                 }
             }
+            return fitted;
         }
 
         /// <summary>The width a child spanning childLeft to childRight should have to end at its parent's
@@ -372,6 +475,7 @@ namespace PowerPane.Explorer
                     // moved back at the same width count against the app.
                     Failed = true;
                     AppFightsLayout = controlsBack && !widthOff;
+                    FightContext = Log.ActivitySnapshot();
                     Restore();
                     return;
                 }
@@ -388,6 +492,7 @@ namespace PowerPane.Explorer
             {
                 Failed = true;
                 AppFightsLayout = true;
+                FightContext = Log.ActivitySnapshot();
                 Restore();
                 Log.Event("glitch", "the " + PowerPane.Interop.DialogNavigator.Owner(_dlg) + " dialog " +
                     _dlg.ToString("X") + " moved its controls back " + _relayoutCount +
@@ -395,16 +500,31 @@ namespace PowerPane.Explorer
                 return;
             }
 
+            int moved;
             _applying = true;
-            try { CaptureNewChildren(); ShiftChildren(); }
+            try { CaptureNewChildren(); moved = ShiftChildren(); }
             finally { _applying = false; }
 
-            NM.RECT client;
-            if (NM.GetClientRect(_dlg, out client))
-                NM.SetWindowPos(_host.Handle, NM.HWND_TOP, 0, 0, _width, client.Height,
-                    NM.SWP_NOACTIVATE);
+            bool hostResized = false;
+            NM.RECT client, host;
+            if (NM.GetClientRect(_dlg, out client) &&
+                (!NM.GetWindowRect(_host.Handle, out host) || host.Width != _width || host.Height != client.Height))
+            {
+                NM.SetWindowPos(_host.Handle, NM.HWND_TOP, 0, 0, _width, client.Height, NM.SWP_NOACTIVATE);
+                hostResized = true;
+            }
 
-            Repaint();
+            // A pass that moved nothing leaves the dialog as it was drawn. Repainting it anyway made the
+            // dialog and every control in it erase and redraw, synchronously, about once a second for
+            // as long as it was open, which was most of PowerPane's idle cost with a dialog open.
+            if (NeedsRepaint(moved, hostResized, sizeChanged)) Repaint();
+        }
+
+        /// <summary>True when a relayout pass changed something on screen: a control moved, the pane's
+        /// host was resized, or the dialog itself changed size.</summary>
+        internal static bool NeedsRepaint(int moved, bool hostResized, bool sizeChanged)
+        {
+            return moved > 0 || hostResized || sizeChanged;
         }
 
         /// <summary>The dialog changed its own size, which the common Save dialog does just after it

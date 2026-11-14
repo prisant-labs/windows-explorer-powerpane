@@ -105,7 +105,7 @@ An optional AppBar at the left or right screen edge, independent of the window p
 
 ### Open and Save dialog support
 
-PowerPane attaches to file Open and Save common dialogs and honors the same pane mode as real windows. Inside mode shifts every one of the dialog's controls and widens the dialog so nothing overlaps the pane, and beside mode floats a pane against the dialog's edge. Both the classic dialog and the modern common item dialog navigate to the clicked folder.
+PowerPane attaches to file Open, Save As, and Select Folder common dialogs and honors the same pane mode as real windows. Inside mode shifts every one of the dialog's controls so nothing overlaps the pane. A dialog with room shares its own width with the pane, as an Explorer window does, and a dialog too narrow to share is widened instead. Beside mode floats a pane against the dialog's edge. Both the classic dialog and the modern common item dialog navigate to the clicked folder, including in a Select Folder dialog, where a click opens the folder rather than choosing it. If a dialog that picks folders cannot be steered safely, the click does nothing.
 
 ![The pane inside a Save As dialog](screens/save-dialog.png)
 

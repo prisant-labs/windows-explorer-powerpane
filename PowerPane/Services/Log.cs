@@ -129,6 +129,21 @@ namespace PowerPane.Services
             _activityAt = DateTime.Now;
         }
 
+        /// <summary>The breadcrumb and how long ago it was set, for a line that should say what the app
+        /// was doing just before something went wrong. Read it before anything resets the breadcrumb.</summary>
+        public static string ActivitySnapshot()
+        {
+            return DescribeActivity(_activity, _activityAt, DateTime.Now);
+        }
+
+        internal static string DescribeActivity(string what, DateTime at, DateTime now)
+        {
+            if (string.IsNullOrEmpty(what)) return "no recorded action";
+            double s = (now - at).TotalSeconds;
+            if (s < 0) s = 0;
+            return "last action \"" + what + "\", " + s.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s earlier";
+        }
+
         /// <summary>Flatten an exception and its inner chain into one readable block.</summary>
         public static string Describe(Exception ex)
         {
