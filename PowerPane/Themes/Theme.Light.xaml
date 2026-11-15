@@ -15,6 +15,8 @@
     <SolidColorBrush x:Key="ChevronColor"      Color="#FF707070" />
     <SolidColorBrush x:Key="DriveBarTrack"     Color="#FFDDDDDD" />
     <SolidColorBrush x:Key="BrokenLinkColor"   Color="#FFB03030" />
+    <!-- Validation message in the name prompt (#254). Not BrokenLinkColor, which turns to disabled grey under contrast themes. -->
+    <SolidColorBrush x:Key="WarningText"       Color="#FFB00020" />
 
     <!-- Text fields, taking the colors Windows reports for its own: Window for the fill and
          ControlDark for the edge, which is the white field on a gray toolbar that Explorer shows. -->

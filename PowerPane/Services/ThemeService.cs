@@ -238,6 +238,7 @@ namespace PowerPane.Services
                 { "ChevronColor", windowText },
                 { "DriveBarTrack", grayText },
                 { "BrokenLinkColor", grayText },
+                { "WarningText", windowText },
                 { "FieldBackground", window },
                 { "FieldBorder", windowText },
                 { "BadgeBackground", WithAlpha(highlight, 0x66) },
