@@ -26,6 +26,10 @@ namespace PowerPane.Services
 
         private readonly SettingsStore _settings;
         private readonly Dictionary<string, int> _activeTabs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        // New tab folders that "Add tab" asked to select, with the UTC time each was asked (#253). The
+        // index of a new tab is only known once a scan sorts it among the others, so the scan that
+        // finds the folder selects it. Guarded by _gate, like _activeTabs.
+        private readonly Dictionary<string, DateTime> _pendingSelect = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private List<PinnedGroup> _groups = new List<PinnedGroup>();
         private string _publishedRoot;   // the groups folder _groups was read from; null before the first scan
         private FileSystemWatcher _watcher;
@@ -123,6 +127,9 @@ namespace PowerPane.Services
                 if (SameRoot(_publishedRoot, Root)) return false;
                 _groups = new List<PinnedGroup>();
                 _publishedRoot = null;
+                // A tab waiting to be selected belongs to the old folder and can never be found in
+                // the new one (#253).
+                _pendingSelect.Clear();
                 return true;
             }
         }
@@ -192,6 +199,18 @@ namespace PowerPane.Services
             var result = new List<PinnedGroup>();
             string root = null;
             bool complete = false;
+            // Tabs "Add tab" asked to select (#253). The scan works on a copy, and Publish commits
+            // what it found only when the scan is kept, so a scan a profile switch discards never
+            // writes _activeTabs or consumes a request.
+            Dictionary<string, DateTime> pending = null;
+            var selections = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var consumed = new List<string>();
+            lock (_gate)
+            {
+                ExpirePending(_pendingSelect, DateTime.UtcNow);
+                if (_pendingSelect.Count > 0)
+                    pending = new Dictionary<string, DateTime>(_pendingSelect, StringComparer.OrdinalIgnoreCase);
+            }
             try
             {
                 root = Root;
@@ -240,10 +259,19 @@ namespace PowerPane.Services
                         }
                     }
 
-                    int active;
+                    int active = -1;
+                    if (pending != null)
+                    {
+                        active = PendingSelectionIndex(group.Tabs.Select(t => t.FolderPath).ToList(), pending);
+                        if (active >= 0)
+                        {
+                            selections[dir] = active;
+                            consumed.AddRange(group.Tabs.Select(t => t.FolderPath).Where(pending.ContainsKey));
+                        }
+                    }
                     // _activeTabs is written on the UI thread (SetActiveTab) and read here on the
                     // worker; both sides take _gate (#75).
-                    lock (_gate) { _activeTabs.TryGetValue(dir, out active); }
+                    if (active < 0) lock (_gate) { _activeTabs.TryGetValue(dir, out active); }
                     group.ActiveTab = Math.Max(0, Math.Min(active, group.Tabs.Count - 1));
                     result.Add(group);
                 }
@@ -254,7 +282,7 @@ namespace PowerPane.Services
             }
             catch (Exception ex) { Log.Error("ScanOnce failed", ex); }
 
-            return Publish(root, result) && complete;
+            return Publish(root, result, selections, consumed) && complete;
         }
 
         /// <summary>Publish a scan of scannedRoot, unless the groups folder changed while it ran. Its
@@ -262,14 +290,87 @@ namespace PowerPane.Services
         /// publishes instead (#68).</summary>
         internal bool Publish(string scannedRoot, List<PinnedGroup> groups)
         {
+            return Publish(scannedRoot, groups, null, null);
+        }
+
+        /// <summary>Publish, and on the same branch, under the same lock, record the tabs the scan
+        /// selected for "Add tab" and drop the requests it answered (#253). A discarded scan commits
+        /// neither.</summary>
+        internal bool Publish(string scannedRoot, List<PinnedGroup> groups,
+            IDictionary<string, int> selections, ICollection<string> consumed)
+        {
             lock (_gate)
             {
                 if (scannedRoot == null || !SameRoot(scannedRoot, Root)) return false;
                 _groups = groups;
                 _publishedRoot = scannedRoot;
+                if (selections != null) foreach (var s in selections) _activeTabs[s.Key] = s.Value;
+                if (consumed != null) foreach (var path in consumed) _pendingSelect.Remove(path);
                 return true;
             }
         }
+
+        /// <summary>How long a request to select a new tab waits for a scan to find it (#253). The scan
+        /// AddTab runs next answers it, so this only stops a request whose scan was discarded from
+        /// lingering.</summary>
+        internal static readonly TimeSpan PendingSelectLifetime = TimeSpan.FromSeconds(10);
+
+        /// <summary>The index in tabFolders, the group's tab folders in display order, of the tab a
+        /// pending request asks to select, or -1. Paths compare ignoring case, as _activeTabs keys do.
+        /// When two requests match one group, as after two quick "Add tab" edits, the later one wins
+        /// (#253).</summary>
+        internal static int PendingSelectionIndex(IList<string> tabFolders, IDictionary<string, DateTime> pending)
+        {
+            if (tabFolders == null || pending == null || pending.Count == 0) return -1;
+            int best = -1;
+            DateTime bestAt = DateTime.MinValue;
+            for (int i = 0; i < tabFolders.Count; i++)
+            {
+                var folder = tabFolders[i];
+                if (folder == null) continue;
+                foreach (var p in pending)
+                {
+                    if (!string.Equals(p.Key, folder, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (best < 0 || p.Value > bestAt) { best = i; bestAt = p.Value; }
+                }
+            }
+            return best;
+        }
+
+        /// <summary>Drop requests older than PendingSelectLifetime at <paramref name="now"/>. The
+        /// caller passes the time, so a test never reads the clock (#253).</summary>
+        internal static void ExpirePending(IDictionary<string, DateTime> pending, DateTime now)
+        {
+            if (pending == null || pending.Count == 0) return;
+            var old = pending.Where(p => now - p.Value > PendingSelectLifetime).Select(p => p.Key).ToList();
+            foreach (var key in old) pending.Remove(key);
+        }
+
+        /// <summary>Ask the next scan that finds tabFolder to select it (#253). AddTab calls this;
+        /// tests pass their own time.</summary>
+        internal void RequestSelect(string tabFolder, DateTime requestedUtc)
+        {
+            if (string.IsNullOrEmpty(tabFolder)) return;
+            lock (_gate)
+            {
+                // A profile switch can land while AddTab creates the folder. DropIfRootChanged clears
+                // requests under this same lock, so checking the root here closes the gap from either
+                // side: a request recorded before the switch is cleared, and one after it is refused
+                // (#253 review).
+                if (!IsUnderRoot(tabFolder, Root)) return;
+                _pendingSelect[tabFolder] = requestedUtc;
+            }
+        }
+
+        /// <summary>True when path lies inside root, ignoring case and a trailing separator.</summary>
+        internal static bool IsUnderRoot(string path, string root)
+        {
+            if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(root)) return false;
+            var r = root.TrimEnd('\\', '/') + "\\";
+            return path.StartsWith(r, StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal int PendingSelectCount { get { lock (_gate) return _pendingSelect.Count; } }
 
         /// <summary>True when two groups folder paths name the same folder, ignoring case and a
         /// trailing separator.</summary>
@@ -625,7 +726,11 @@ namespace PowerPane.Services
         }
 
         // ---- tabs ------------------------------------------------------------
-        public PinnedTab AddTab(PinnedGroup group, string name)
+        /// <summary>Create a tab at the end of group. With <paramref name="select"/>, the new tab
+        /// becomes the group's selected tab, so the pane's "Add tab" leaves the next "Add folder"
+        /// aimed at it (#253). The pin picker keeps the default: it pins into the tab it made and
+        /// closes, and the pane's selection stays as the user left it.</summary>
+        public PinnedTab AddTab(PinnedGroup group, string name, bool select = false)
         {
             if (group == null || StaleGroup(group.FolderPath)) return null;
             name = Sanitize(name);
@@ -633,6 +738,9 @@ namespace PowerPane.Services
             int order = NextTabOrder(group.FolderPath);
             var dir = UniqueDir(group.FolderPath, order, name);
             Directory.CreateDirectory(dir);
+            // Recorded before the scan and outside _scanLock: a watcher scan that runs first and
+            // finds the folder answers the request just as this one would.
+            if (select) RequestSelect(dir, DateTime.UtcNow);
             ScanOnce(); RaiseChanged();
             return _groups.SelectMany(g => g.Tabs).FirstOrDefault(t => string.Equals(t.FolderPath, dir, StringComparison.OrdinalIgnoreCase));
         }
