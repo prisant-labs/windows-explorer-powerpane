@@ -261,5 +261,127 @@ namespace PowerPane.Tests
                 Assert.That(new PinMemory { GroupFolder = Root + @"\01_Apollo" }.Save(asFolder), Is.False);
             }
         }
+
+        // ---- duplicate pins (#252) ----
+
+        [TestCase(@"C:\Demo\Apollo", @"c:\demo\APOLLO")]
+        [TestCase(@"C:\Demo\Apollo", @"C:\Demo\Apollo\")]
+        [TestCase(@"C:\Demo\Apollo", "C:/Demo/Apollo")]
+        [TestCase(@"C:\", "C:")]
+        [TestCase(@"C:\", "c:/")]
+        [TestCase(@"\\Srv\Share", @"\\srv\share\")]
+        public void PathKey_SameFolderSpellings_Match(string a, string b)
+        {
+            Assert.That(PinPickerModel.PathKey(a), Is.EqualTo(PinPickerModel.PathKey(b)));
+        }
+
+        [Test]
+        public void PathKey_DifferentFolders_DoNotMatch()
+        {
+            Assert.That(PinPickerModel.PathKey(@"C:\Demo\Apollo"), Is.Not.EqualTo(PinPickerModel.PathKey(@"C:\Demo\Apollo2")));
+        }
+
+        [Test]
+        public void PathKey_NullAndEmpty_AreEmpty()
+        {
+            Assert.That(PinPickerModel.PathKey(null), Is.EqualTo(string.Empty));
+            Assert.That(PinPickerModel.PathKey(string.Empty), Is.EqualTo(string.Empty));
+        }
+
+        [Test]
+        public void LiveTargets_LeavesOutPinsWhoseShortcutIsGone()
+        {
+            // A pin deleted while the picker is open must not make its item look pinned (#252 review).
+            var pins = new[]
+            {
+                new PinnedFolder { TargetPath = @"C:\Demo\Apollo", LinkPath = @"C:\Demo\Groups\01_A\001_Apollo.lnk" },
+                new PinnedFolder { TargetPath = @"C:\Demo\Borealis", LinkPath = @"C:\Demo\Groups\01_A\002_Borealis.lnk" },
+                new PinnedFolder { TargetPath = @"C:\Demo\Contoso", LinkPath = null },
+                null
+            };
+            var live = PinPickerModel.LiveTargets(pins, link => link.EndsWith("001_Apollo.lnk"));
+            Assert.That(live, Is.EqualTo(new[] { @"C:\Demo\Apollo" }));
+            var split = PinPickerModel.SplitDuplicates(live, new[] { @"C:\Demo\Apollo", @"C:\Demo\Borealis" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"C:\Demo\Borealis" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(1));
+            Assert.That(PinPickerModel.LiveTargets(null, link => true), Is.Empty);
+        }
+
+        [Test]
+        public void SplitDuplicates_NoExisting_KeepsAll()
+        {
+            var split = PinPickerModel.SplitDuplicates(new string[0], new[] { @"C:\Demo\A", @"C:\Demo\B" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"C:\Demo\A", @"C:\Demo\B" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SplitDuplicates_OneOfThree_KeepsTwoInOrder()
+        {
+            var split = PinPickerModel.SplitDuplicates(new[] { @"C:\Demo\B" },
+                new[] { @"C:\Demo\A", @"C:\Demo\B", @"C:\Demo\C" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"C:\Demo\A", @"C:\Demo\C" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SplitDuplicates_AllPresent_AddsNothing()
+        {
+            var split = PinPickerModel.SplitDuplicates(new[] { @"C:\Demo\A", @"C:\Demo\B" },
+                new[] { @"C:\Demo\A", @"C:\Demo\B" });
+            Assert.That(split.ToAdd, Is.Empty);
+            Assert.That(split.AlreadyPinned, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void SplitDuplicates_ExistingCaseAndTrailingBackslash_StillMatch()
+        {
+            var split = PinPickerModel.SplitDuplicates(new[] { @"c:\demo\apollo\" }, new[] { @"C:\Demo\Apollo" });
+            Assert.That(split.ToAdd, Is.Empty);
+            Assert.That(split.AlreadyPinned, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SplitDuplicates_NullAndEmptyExisting_NeverMatch()
+        {
+            var split = PinPickerModel.SplitDuplicates(new string[] { null, string.Empty }, new[] { @"C:\Demo\A" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"C:\Demo\A" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SplitDuplicates_BatchRepeats_CollapseWithoutCounting()
+        {
+            var split = PinPickerModel.SplitDuplicates(new string[0], new[] { @"C:\Demo\Apollo", @"C:\Demo\Apollo\" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"C:\Demo\Apollo" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SplitDuplicates_DriveAndUncRoots_Match()
+        {
+            var split = PinPickerModel.SplitDuplicates(new[] { @"D:\", @"\\Srv\Share\Docs\" },
+                new[] { "D:", @"\\srv\share\docs", @"\\Srv\Share\Other" });
+            Assert.That(split.ToAdd, Is.EqualTo(new[] { @"\\Srv\Share\Other" }));
+            Assert.That(split.AlreadyPinned, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void SplitDuplicates_NullInputs_DoNotThrow()
+        {
+            Assert.That(PinPickerModel.SplitDuplicates(null, null).ToAdd, Is.Empty);
+            Assert.That(PinPickerModel.SplitDuplicates(null, new[] { @"C:\Demo\A" }).ToAdd, Is.EqualTo(new[] { @"C:\Demo\A" }));
+            Assert.That(PinPickerModel.SplitDuplicates(new[] { @"C:\Demo\A" }, null).AlreadyPinned, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DuplicateNote_Wording()
+        {
+            Assert.That(PinPickerModel.DuplicateNote(3, 0), Is.Null);
+            Assert.That(PinPickerModel.DuplicateNote(1, 1), Is.EqualTo("This item is already in this tab."));
+            Assert.That(PinPickerModel.DuplicateNote(3, 2), Is.EqualTo("2 of 3 items are already in this tab and will be skipped."));
+            Assert.That(PinPickerModel.DuplicateNote(3, 3), Is.EqualTo("All 3 items are already in this tab."));
+            Assert.That(PinPickerModel.DuplicateNote(4, 1), Is.EqualTo("1 of 4 items is already in this tab and will be skipped."));
+        }
     }
 }

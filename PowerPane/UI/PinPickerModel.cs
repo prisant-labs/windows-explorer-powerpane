@@ -162,6 +162,80 @@ namespace PowerPane.UI
             return -1;
         }
 
+        // ---- duplicate pins (#252) --------------------------------------------
+
+        /// <summary>The key two paths share when they name the same folder: case ignored, '/' read as
+        /// '\', and trailing separators removed, so "C:\", "C:" and "c:/" agree and a UNC share root
+        /// "\\srv\share\" keys as "\\srv\share". It does no disk access and no GetFullPath, so a short
+        /// name or a link is a miss, which only leaves today's behaviour (a second pin).</summary>
+        internal static string PathKey(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            return path.Replace('/', '\\').TrimEnd('\\').ToUpperInvariant();
+        }
+
+        /// <summary>The candidates split by whether the tab already pins them.</summary>
+        internal sealed class DuplicateSplit
+        {
+            /// <summary>Candidates not yet pinned, in their original order, with repeats inside the batch collapsed.</summary>
+            public List<string> ToAdd = new List<string>();
+            /// <summary>Candidates skipped because the tab already holds them.</summary>
+            public int AlreadyPinned;
+        }
+
+        /// <summary>Splits <paramref name="candidates"/> into the ones to write and the count already in the
+        /// tab. A null or empty existing target (a dead shortcut) never matches. Two candidates that
+        /// differ only by a trailing backslash are one item, so the second is dropped without being
+        /// counted as a skipped duplicate.</summary>
+        /// <summary>The targets of the pins whose shortcut file still exists, by <paramref name="exists"/>.
+        /// The picker's tab snapshot is taken when it opens, so a pin deleted while it is open would
+        /// otherwise make its item look already pinned and be skipped (#252 review). A pin with no link
+        /// path is left out, which can only cause a second pin, never a missing one.</summary>
+        internal static List<string> LiveTargets(IEnumerable<PinnedFolder> pins, Func<string, bool> exists)
+        {
+            var result = new List<string>();
+            if (pins == null || exists == null) return result;
+            foreach (var pin in pins)
+                if (pin != null && !string.IsNullOrEmpty(pin.LinkPath) && exists(pin.LinkPath)) result.Add(pin.TargetPath);
+            return result;
+        }
+
+        internal static DuplicateSplit SplitDuplicates(IEnumerable<string> existingTargets, IList<string> candidates)
+        {
+            var split = new DuplicateSplit();
+            if (candidates == null) return split;
+
+            var existing = new HashSet<string>(StringComparer.Ordinal);
+            if (existingTargets != null)
+            {
+                foreach (var t in existingTargets)
+                {
+                    var key = PathKey(t);
+                    if (key.Length > 0) existing.Add(key);
+                }
+            }
+
+            var batch = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var c in candidates)
+            {
+                var key = PathKey(c);
+                if (key.Length == 0 || !batch.Add(key)) continue;
+                if (existing.Contains(key)) split.AlreadyPinned++;
+                else split.ToAdd.Add(c);
+            }
+            return split;
+        }
+
+        /// <summary>The note shown under the tab list, or null when there is nothing to say.</summary>
+        internal static string DuplicateNote(int total, int alreadyPinned)
+        {
+            if (alreadyPinned <= 0 || total <= 0) return null;
+            if (alreadyPinned >= total)
+                return total == 1 ? "This item is already in this tab." : "All " + total + " items are already in this tab.";
+            return alreadyPinned + " of " + total + (alreadyPinned == 1 ? " items is" : " items are")
+                + " already in this tab and will be skipped.";
+        }
+
         private static bool SamePath(string a, string b)
         {
             if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
