@@ -44,7 +44,7 @@ Two fixes for the pane inside Open, Save As, and Select Folder dialogs.
 
 ## [4.0.0.0] - 2026-11-11
 
-QuickPane is now Explorer PowerPane. This release changes the name, the icon, and where the program and its data live, and it installs beside QuickPane rather than over it. See the [release notes](docs/releases/4.0.0.0.md), which describe moving your groups, pins, and settings across.
+With this release, this fork of QuickPane was renamed Explorer PowerPane, to go its own way as a separate project. QuickPane itself continues under its original author. The release changes the name, the icon, and where the program and its data are stored, and it installs beside QuickPane rather than over it. See the [release notes](docs/releases/4.0.0.0.md), which describe moving your groups, pins, and settings across.
 
 ### Changed
 - The app is Explorer PowerPane in the Start menu, Add/Remove Programs, the installer, and About, and PowerPane in the pane header, the tray, and window titles. The program lives in `%LOCALAPPDATA%\PowerPane`, settings and pins in `%APPDATA%\PowerPane`, and the folder verb is "Pin to PowerPane". The repository is now `prisant-labs/windows-explorer-powerpane`, and the old address redirects.
