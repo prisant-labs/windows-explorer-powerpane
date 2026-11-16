@@ -22,14 +22,22 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.0.0.1";
+        public const string Version = "4.1.0";
 
         public static readonly Item[] Items =
         {
-            new Item("Search box kept in file dialogs",
-                "An Open, Save As, or Select Folder dialog with the pane inside keeps its search box, which making room for the pane used to cut off."),
-            new Item("Width grip in file dialogs",
-                "Dragging the pane's width grip in a file dialog resizes that dialog's pane. The dialog keeps its size."),
+            new Item("Add to PowerPane on files and drives",
+                "The right-click verb, renamed from \"Pin to PowerPane\", works on files and drives too. It lets you choose a tab, and skips items already in it."),
+            new Item("A + menu on each group",
+                "The + in a group's tab strip adds a tab, a group, a folder, or a file. A new tab becomes the selected one."),
+            new Item("Sort pins",
+                "A tab's right-click menu can keep the tab sorted A to Z or by date added, or sort it once."),
+            new Item("Explorer's Show options as quick actions",
+                "Five quick actions turn hidden items, file name extensions, item check boxes, compact view, and the navigation pane on and off. They start off."),
+            new Item("Copy path copies the selection",
+                "Copy path and the other folder copies use the items selected in Explorer, one per line, and the folder when nothing is selected."),
+            new Item("Select Folder dialogs and name boxes",
+                "Clicking a pin in a Select Folder dialog opens the folder instead of choosing it. Name boxes open beside the control you used, in the pane's colours."),
         };
     }
 }

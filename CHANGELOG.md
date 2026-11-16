@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [4.1.0] - 2026-11-15
+
+The first release numbered with Semantic Versioning. The right-click verb becomes "Add to PowerPane" and works on files and drives, each group gains a **+** menu and **Sort pins**, and the pane inside Open, Save As, and Select Folder dialogs gets several fixes. See the [release notes](docs/releases/4.1.0.md).
 
 ### Added
 - Five quick actions flip Explorer's own **View > Show** options: **Show hidden items**, **Show file name extensions**, **Show item check boxes**, **Compact view**, and **Show navigation pane**. Each row shows a check box that matches the setting, including a change made from Explorer's own menu. The settings apply to every Explorer window. The first four change open windows at once; the navigation pane changes in an open window when it next opens another folder, and in new windows and tabs at once. They start off, under Settings > Quick actions.
