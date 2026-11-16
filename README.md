@@ -18,6 +18,8 @@ A folder sidebar for Windows File Explorer. PowerPane embeds a pinned-folders pa
 
 PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by lso2 (PlexPixel), released under the MIT license. It is developed here under its own name, and [CHANGELOG.md](CHANGELOG.md) lists every version since.
 
+To support QuickPane's author, see [plexpixel.com/donate](https://plexpixel.com/donate).
+
 ## What's new
 
 <!-- Keep the three newest releases here, one line each, and replace "Next release" with its version and date when tagging. CHANGELOG.md holds every version. -->
