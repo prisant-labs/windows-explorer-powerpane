@@ -24,7 +24,7 @@ PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by l
 
 - **4.1.0** (2026-11-15): the **Add to PowerPane** verb works on files and drives as well as folders, lets you choose a tab, and skips items already in it. A **+** menu on each group adds a tab, a group, a folder, or a file, and **Sort pins** keeps a tab in order by itself. Five quick actions flip Explorer's own Show options, and Select Folder dialogs get fixes. The [release notes](docs/releases/4.1.0.md) list everything.
 - **4.0.0.1** (2026-11-12): the pane inside Open and Save dialogs no longer pushes the dialog's search box off the edge, and dragging the pane's width works there.
-- **4.0.0.0** (2026-11-11): QuickPane became Explorer PowerPane, with a new name, a new icon, and a new install location. The [release notes](docs/releases/4.0.0.0.md) describe moving your groups across.
+- **4.0.0.0** (2026-11-11): this fork of QuickPane was renamed. The [release notes](docs/releases/4.0.0.0.md) describe moving your groups across.
 
 [Full changelog](CHANGELOG.md)
 
