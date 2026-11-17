@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- The About page in Settings has a **Support QuickPane's author** link, below the Licence card's credit. It opens the donation page of PlexPixel, who created QuickPane, the app PowerPane began from. The pane itself still has no donation link ([#266](https://github.com/prisant-labs/windows-explorer-powerpane/issues/266)).
+
+### Changed
+- The README has an **Author** section again. It names QuickPane's creator and links to their donation page, in place of the single line under the credit ([#266](https://github.com/prisant-labs/windows-explorer-powerpane/issues/266)).
+
 ## [4.1.0] - 2026-11-15
 
 The first release numbered with Semantic Versioning. The right-click verb becomes "Add to PowerPane" and works on files and drives, each group gains a **+** menu and **Sort pins**, and the pane inside Open, Save As, and Select Folder dialogs gets several fixes. See the [release notes](docs/releases/4.1.0.md).

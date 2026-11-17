@@ -19,7 +19,7 @@ namespace PowerPane.UI.Settings.Pages
 
     /// <summary>App header, an Updates card (status, "Check for updates", Download when an update
     /// exists), a Links card (source, changelog, report an issue), a What's new card, a Licence card,
-    /// and a Third-party notices card. Last item in the navigation pane.</summary>
+    /// a link to support QuickPane's author, and a Third-party notices card. Last item in the navigation pane.</summary>
     internal sealed class AboutPage : SettingsPage
     {
         public override string Id => "about";
@@ -36,6 +36,7 @@ namespace PowerPane.UI.Settings.Pages
         private const string GlyphDocument = "\uE8A5";   // Document (licence)
         private const string GlyphCertificate = "\uE8EF"; // Certificate-ish (third-party notices)
         private const string GlyphWhatsNew = "\uE789";    // Megaphone
+        private const string GlyphHeart = "\uEB51";       // Heart (support the original author)
 
         // The fork's own repository, matching UpdateService's own repo (not upstream's: offering
         // upstream's release notes or issue tracker to someone running a fork build would point them
@@ -47,6 +48,13 @@ namespace PowerPane.UI.Settings.Pages
 
         private const string AppDescription = "Pinned folders inside File Explorer and file dialogs";
         private const string LicenceText = "MIT License. Based on QuickPane by PlexPixel.";
+
+        // The one link on this page that leaves PowerPane's own repository, on purpose: it credits
+        // the person who created QuickPane, the project PowerPane began from (#266). It lives here in
+        // Settings and never in the pane, which carries no donation link for anyone (#18).
+        internal const string SupportAuthorUrl = "https://plexpixel.com/donate";
+        internal const string SupportAuthorTitle = "Support QuickPane's author";
+        private const string SupportAuthorCardId = "support-author";
         private const string ThirdPartyNoticeText =
             "The Settings window's styles are adapted from Microsoft's WPF Fluent theme (dotnet/wpf, MIT). " +
             "Full notice: PowerPane/Themes/Fluent/NOTICE.md.";
@@ -68,6 +76,8 @@ namespace PowerPane.UI.Settings.Pages
                     "Links to the repository, the changelog, and the issue tracker.", "github", "changelog", "issue");
                 yield return new SettingsSearchEntry(Id, WhatsNewCardId, "What's new",
                     "What changed in this version, with a link to its full release notes.", "new", "release notes", "changes");
+                yield return new SettingsSearchEntry(Id, SupportAuthorCardId, SupportAuthorTitle,
+                    "A link to the donation page of PlexPixel, who created QuickPane.", "donate", "support", "quickpane", "credit");
             }
         }
 
@@ -84,6 +94,7 @@ namespace PowerPane.UI.Settings.Pages
             panel.Children.Add(BuildLinksCard(ctx));
             panel.Children.Add(BuildWhatsNewCard(ctx));
             panel.Children.Add(ctx.Cards.Card("licence", GlyphDocument, "Licence", LicenceText, null));
+            panel.Children.Add(BuildSupportAuthorCard(ctx));
             panel.Children.Add(ctx.Cards.Card("third-party-notices", GlyphCertificate, "Third-party notices", ThirdPartyNoticeText, null));
             return panel;
         }
@@ -306,6 +317,20 @@ namespace PowerPane.UI.Settings.Pages
             border.MouseEnter += (s, e) => border.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorSecondaryBrush");
             border.MouseLeave += (s, e) => border.Background = Brushes.Transparent;
             return SettingsCards.Invokable(border, accessibleName, () => OpenUrl(url));
+        }
+
+        // ---- support card ----------------------------------------------------
+
+        /// <summary>One link row, directly under the Licence card's "Based on QuickPane by PlexPixel",
+        /// so the credit and the way to support its author sit together. Built as its own card rather
+        /// than a row in <see cref="Links"/>, because every row there must point at this repository.</summary>
+        private static FrameworkElement BuildSupportAuthorCard(SettingsPageContext ctx)
+        {
+            var link = BuildLinkRow(GlyphHeart, SupportAuthorTitle, SupportAuthorUrl,
+                SupportAuthorTitle + ", opens in your browser");
+            var shell = ctx.Cards.CardShell(link, hoverable: false);
+            ctx.Cards.Register(SupportAuthorCardId, link);
+            return shell;
         }
 
         // ---- what's new card -------------------------------------------------
