@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [4.1.1] - 2026-11-17
+
+A small release that restores credit to QuickPane's author: a support link on the About page and an Author section in the README. Nothing else changes.
 
 ### Added
 - The About page in Settings has a **Support QuickPane's author** link, below the Licence card's credit. It opens the donation page of PlexPixel, who created QuickPane, the app PowerPane began from. The pane itself still has no donation link ([#266](https://github.com/prisant-labs/windows-explorer-powerpane/issues/266)).
