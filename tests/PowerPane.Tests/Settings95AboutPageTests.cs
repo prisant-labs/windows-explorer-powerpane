@@ -75,6 +75,16 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void SupportAuthorLink_PointsAtTheOriginalAuthorsDonationPage()
+        {
+            // The one deliberate exception to the rule above (#266): it credits QuickPane's author.
+            Assert.That(AboutPage.SupportAuthorUrl, Is.EqualTo("https://plexpixel.com/donate"));
+            Assert.That(AboutPage.SupportAuthorTitle, Is.EqualTo("Support QuickPane's author"));
+            Assert.That(Array.ConvertAll(AboutPage.Links, l => l.Url), Has.None.EqualTo(AboutPage.SupportAuthorUrl),
+                "the support link has its own card, so the Links card stays on this repository");
+        }
+
+        [Test]
         public void SearchEntries_CoverUpdateAndVersionAndLinks()
         {
             var page = new AboutPage();
@@ -88,6 +98,7 @@ namespace PowerPane.Tests
             Assert.That(entries, Has.Some.Contains("Check for updates"));
             Assert.That(entries, Has.Some.Contains("licence"));
             Assert.That(entries, Has.Some.Contains("Source code"));
+            Assert.That(entries, Has.Some.Contains("Support QuickPane's author"));
         }
     }
 }

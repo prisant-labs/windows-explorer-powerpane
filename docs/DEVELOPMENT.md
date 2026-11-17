@@ -152,7 +152,7 @@ PerfView takes the name directly: `PerfView /OnlyProviders=*PowerPane collect`.
 
 ## The original project
 
-Explorer PowerPane began as a fork of `lso2/QuickPane` and was renamed in 4.0.0.0. Changes no longer flow between the two, so a clone needs no `upstream` remote. Three things stay as written, because they credit the original or record history: `LICENSE` with its original copyright notice, the About page's "Based on QuickPane by PlexPixel" line, and citations of `lso2/QuickPane` issues. `CHANGELOG.md` entries and `docs/releases/` documents before 4.0.0.0 also keep the QuickPane name.
+Explorer PowerPane began as a fork of `lso2/QuickPane` and was renamed in 4.0.0.0. Changes no longer flow between the two, so a clone needs no `upstream` remote. These things stay as written, because they credit the original or record history: `LICENSE` with its original copyright notice, the About page's "Based on QuickPane by PlexPixel" line and its "Support QuickPane's author" link, the README's Author section, and citations of `lso2/QuickPane` issues. The support link is the About page's only link outside this repository, and the pane carries no donation link for anyone (#18, #266). QuickPane is GPL-3.0 since 2026-11-14, so no code from its later versions may be copied into PowerPane, which stays MIT. `CHANGELOG.md` entries and `docs/releases/` documents before 4.0.0.0 also keep the QuickPane name.
 
 ## Releasing
 

@@ -16,9 +16,7 @@ A folder sidebar for Windows File Explorer. PowerPane embeds a pinned-folders pa
 
 ![PowerPane inside a File Explorer window, showing pinned groups with tabs, Recent, This PC, Network, Recent Apps, and Quick actions](docs/images/pane-inside-light.png)
 
-PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by lso2 (PlexPixel), released under the MIT license. It is developed here under its own name, and [CHANGELOG.md](CHANGELOG.md) lists every version since.
-
-To support QuickPane's author, see [plexpixel.com/donate](https://plexpixel.com/donate).
+PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by lso2 (PlexPixel), released under the MIT license. It is developed here under its own name, and [CHANGELOG.md](CHANGELOG.md) lists every version since. See [Author](#author) to support QuickPane's author.
 
 ## What's new
 
@@ -296,7 +294,7 @@ PowerPane makes one network request of its own, an update check:
 
 Two other features reach the network only when you use them:
 
-- **Links**: the About page's links and the Remote drives page's download buttons open in your default browser when you click them.
+- **Links**: the About page's links, including the link to support QuickPane's author, and the Remote drives page's download buttons open in your default browser when you click them.
 - **Remote drives (SSH)**: `sshfs` connects to the servers you enter, when you connect a drive.
 
 ### settings.json format
@@ -440,6 +438,16 @@ PowerPane/
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
+
+## Author
+
+QuickPane, the app PowerPane began from, was created by lso2 ([PlexPixel](https://plexpixel.com)). PowerPane would not exist without it.
+
+### ☕ Support QuickPane's author
+
+If PowerPane saves you time, consider supporting the person who created QuickPane. The About page in PowerPane's Settings has the same link.
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://plexpixel.com/donate)
 
 ## License
 
