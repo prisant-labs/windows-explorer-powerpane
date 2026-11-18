@@ -26,6 +26,13 @@ namespace PowerPane.Tests
             Assert.That(SettingsWindow.RootMarginFor(state, border), Is.EqualTo(new Thickness(0)));
         }
 
+        [Test]
+        public void RootMarginFor_MaximizedWithoutChrome_IsZero()
+        {
+            // High contrast or no Mica: a standard frame, whose client area is inside the monitor.
+            Assert.That(SettingsWindow.RootMarginFor(WindowState.Maximized, new Thickness(8), false), Is.EqualTo(new Thickness(0)));
+        }
+
         // #276: the icon and title centre on the caption buttons' band, not on the 48 px row.
 
         [Test]

@@ -370,16 +370,19 @@ namespace PowerPane.UI.Settings
                 WindowChrome.SetWindowChrome(this, null);
                 if (_titleRowDef != null) _titleRowDef.Height = new GridLength(0);
                 SetResourceReference(BackgroundProperty, "SolidBackgroundFillColorBaseBrush");
+                UpdateMaximizedMargin();
             }
         }
 
         /// <summary>Compensates for the resize-frame overhang WindowChrome leaves when maximized:
         /// without this, a maximized window extends past the monitor
         /// edge by its own resize-border thickness, clipping the title row and the content's left
-        /// and top edges. A pure decision, so it is unit-testable with no window at all.</summary>
-        internal static Thickness RootMarginFor(WindowState state, Thickness resizeBorder)
+        /// and top edges. Without the chrome (high contrast, or no Mica), Windows draws a standard
+        /// frame whose client area already sits inside the monitor, so a margin there would only
+        /// inset the content. A pure decision, so it is unit-testable with no window at all.</summary>
+        internal static Thickness RootMarginFor(WindowState state, Thickness resizeBorder, bool hasChrome = true)
         {
-            return state == WindowState.Maximized ? resizeBorder : new Thickness(0);
+            return hasChrome && state == WindowState.Maximized ? resizeBorder : new Thickness(0);
         }
 
         /// <summary>How far the window rectangle reaches past its visible frame on each side, in
@@ -421,7 +424,7 @@ namespace PowerPane.UI.Settings
                 var measured = OverhangFor(window, visible, VisualTreeHelper.GetDpi(this).PixelsPerDip);
                 if (measured.Top > 0 || measured.Left > 0) border = measured;
             }
-            _rootGrid.Margin = RootMarginFor(WindowState, border);
+            _rootGrid.Margin = RootMarginFor(WindowState, border, WindowChrome.GetWindowChrome(this) != null);
         }
 
         // ---- layout --------------------------------------------------------
