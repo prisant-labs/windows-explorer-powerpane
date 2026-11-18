@@ -152,6 +152,10 @@ namespace PowerPane.Interop
 
         public const int DWMWA_EXTENDED_FRAME_BOUNDS = 9;
 
+        // Where DWM draws the minimize, maximize, and close buttons, in physical pixels relative to
+        // the window's top-left corner. The Settings window centres its title row on them (#276).
+        public const int DWMWA_CAPTION_BUTTON_BOUNDS = 5;
+
         // A dark title bar for a window with a standard frame. Windows 10 builds before 20H1 used 19
         // for the same switch.
         [DllImport("dwmapi.dll")]
