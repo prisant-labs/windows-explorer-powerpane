@@ -47,7 +47,12 @@ namespace PowerPane.UI.Settings.Pages
         private const string IssueTrackerUrl = RepoUrl + "/issues/new";
 
         private const string AppDescription = "Pinned folders inside File Explorer and file dialogs";
-        private const string LicenceText = "MIT License. Based on QuickPane by PlexPixel.";
+        // The same account of the fork as the README's opening (#273): "Based on QuickPane" alone did
+        // not say what QuickPane is, so the support link below read as a request with no reason.
+        internal const string LicenceText = "MIT License. PowerPane began as a fork of QuickPane by lso2 (PlexPixel), " +
+            "an open-source folder pane for Explorer, and is developed here under its own name.";
+        internal const string SupportAuthorDescription =
+            "QuickPane is the app PowerPane began from. This opens the donation page of its creator, PlexPixel.";
 
         // The one link on this page that leaves PowerPane's own repository, on purpose: it credits
         // the person who created QuickPane, the project PowerPane began from (#266). It lives here in
@@ -77,7 +82,8 @@ namespace PowerPane.UI.Settings.Pages
                 yield return new SettingsSearchEntry(Id, WhatsNewCardId, "What's new",
                     "What changed in this version, with a link to its full release notes.", "new", "release notes", "changes");
                 yield return new SettingsSearchEntry(Id, SupportAuthorCardId, SupportAuthorTitle,
-                    "A link to the donation page of PlexPixel, who created QuickPane.", "donate", "support", "quickpane", "credit");
+                    "PowerPane began as a fork of QuickPane. A link to the donation page of PlexPixel, who created it.",
+                    "donate", "support", "quickpane", "credit", "fork", "plexpixel");
             }
         }
 
@@ -287,13 +293,26 @@ namespace PowerPane.UI.Settings.Pages
         /// <summary>One row: an icon, a title, an "opens externally" glyph, and the whole row
         /// clickable (and Enter/Space-able, through <see cref="SettingsCards.Invokable"/>) to open
         /// <paramref name="url"/> in the default browser.</summary>
-        private static Button BuildLinkRow(string glyph, string title, string url, string accessibleName)
+        private static Button BuildLinkRow(string glyph, string title, string url, string accessibleName,
+            string description = null)
         {
             var icon = GlyphText(glyph, 20);
             icon.Margin = new Thickness(0, 0, 20, 0);
 
-            var text = new TextBlock { Text = title, FontSize = 14 };
-            text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+            var titleBlock = new TextBlock { Text = title, FontSize = 14, TextWrapping = TextWrapping.Wrap };
+            titleBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+            FrameworkElement text = titleBlock;
+            if (!string.IsNullOrEmpty(description))
+            {
+                // A line of context under the title, in the same secondary style as a card's own
+                // description, so the support link says what it is for (#273).
+                var desc = new TextBlock { Text = description, FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 12, 0) };
+                desc.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+                var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                stack.Children.Add(titleBlock);
+                stack.Children.Add(desc);
+                text = stack;
+            }
 
             var external = GlyphText(GlyphExternal, 13);
             external.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
@@ -321,13 +340,13 @@ namespace PowerPane.UI.Settings.Pages
 
         // ---- support card ----------------------------------------------------
 
-        /// <summary>One link row, directly under the Licence card's "Based on QuickPane by PlexPixel",
+        /// <summary>One link row, directly under the Licence card that says PowerPane began as a fork of QuickPane,
         /// so the credit and the way to support its author sit together. Built as its own card rather
         /// than a row in <see cref="Links"/>, because every row there must point at this repository.</summary>
         private static FrameworkElement BuildSupportAuthorCard(SettingsPageContext ctx)
         {
             var link = BuildLinkRow(GlyphHeart, SupportAuthorTitle, SupportAuthorUrl,
-                SupportAuthorTitle + ", opens in your browser");
+                SupportAuthorTitle + ", opens in your browser", SupportAuthorDescription);
             var shell = ctx.Cards.CardShell(link, hoverable: false);
             ctx.Cards.Register(SupportAuthorCardId, link);
             return shell;
