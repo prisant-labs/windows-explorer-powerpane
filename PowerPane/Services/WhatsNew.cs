@@ -22,14 +22,14 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.1.1";
+        public const string Version = "4.2.0";
 
         public static readonly Item[] Items =
         {
-            new Item("Support QuickPane's author",
-                "A link below the credit on this page opens the donation page of PlexPixel, who created QuickPane, the app PowerPane began from."),
-            new Item("New in 4.1.0",
-                "The Add to PowerPane verb works on files and drives, each group has a + menu and Sort pins, and five quick actions flip Explorer's Show options."),
+            new Item("Choose what each click does",
+                "Under Keyboard and mouse, the Clicking a folder and Clicking a file cards let middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click open a new window, open the parent folder, copy the path, or run a quick action."),
+            new Item("Small fixes",
+                "The Settings icon is sharp, the pane's gear sits at the bottom right, and this page says that PowerPane began as a fork of QuickPane."),
         };
     }
 }
