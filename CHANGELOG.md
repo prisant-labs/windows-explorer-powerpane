@@ -7,6 +7,11 @@
 
 ### Changed
 - The **Keyboard** page in Settings is now called **Keyboard and mouse**.
+- The pane's Settings gear sits at the bottom right of an expanded pane, below the collapse button. A collapsed pane still shows it centred in its strip ([#272](https://github.com/prisant-labs/windows-explorer-powerpane/issues/272)).
+- The About page says what QuickPane is. The Licence card says PowerPane began as a fork of QuickPane by lso2 (PlexPixel) and is developed under its own name, and the **Support QuickPane's author** link says it opens the donation page of QuickPane's creator ([#273](https://github.com/prisant-labs/windows-explorer-powerpane/issues/273)).
+
+### Fixed
+- The icon at the top left of the Settings window was the large icon shrunk to fit, so it looked blurred. It now uses the icon drawn for its size, matching the pane's own header at every display scale, and the taskbar and Alt+Tab get their own sizes too ([#271](https://github.com/prisant-labs/windows-explorer-powerpane/issues/271)).
 - A click on a pane row counts only when the button is pressed and released on that same row. Pressing in empty space and releasing over a row used to open it, and now does nothing. This also applies to Recent Apps rows and the This PC row. The App Folders rows in an Open or Save dialog follow the click settings too ([#269](https://github.com/prisant-labs/windows-explorer-powerpane/issues/269)).
 
 ## [4.1.1] - 2026-11-17

@@ -136,6 +136,7 @@
     <Compile Include="UI\RecentAppsSection.cs" />
     <Compile Include="UI\AppDefaultsSection.cs" />
     <Compile Include="UI\QuickActionsSection.cs" />
+    <Compile Include="UI\AppIconFrames.cs" />
     <Compile Include="UI\QuickSwitcher.cs" />
     <Compile Include="UI\RowClick.cs" />
     <Compile Include="UI\SshSection.cs" />

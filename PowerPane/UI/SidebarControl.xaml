@@ -44,10 +44,11 @@
                     <StackPanel x:Name="SectionsPanel" />
                 </ScrollViewer>
 
-                <!-- Settings gear, bottom-left. The 4 px margin centres it under the title icon, which is
-                     also the centre of the 36 px collapsed strip, so it stays put when the pane collapses. -->
+                <!-- Settings gear, bottom-right of an expanded pane (#272). The 10 px right margin keeps it
+                     clear of the 8 px scroll bar. SetPaneCollapsed centres it in the 36 px collapsed strip
+                     instead, where it has always sat. -->
                 <Button Grid.Row="1" x:Name="GearButton" Width="28" Height="28" Opacity="0.4"
-                        HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4,0,0,8"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,10,8"
                         Background="Transparent" BorderThickness="0" Cursor="Hand"
                         ToolTip="Settings" AutomationProperties.Name="Settings" Click="OnGearClick">
                     <TextBlock Text="&#xE713;" FontFamily="{DynamicResource IconFont}" FontSize="15"

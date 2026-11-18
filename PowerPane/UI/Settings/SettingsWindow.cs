@@ -207,7 +207,10 @@ namespace PowerPane.UI.Settings
             ShowInTaskbar = true;
             Background = Brushes.Transparent;   // lets the Mica/flat backdrop (ApplyBackdrop) show through
 
-            if (appIcon != null)
+            // The whole frame set of powerpane.ico, so the taskbar and Alt+Tab each get a frame drawn
+            // for their size (#271). The tray's extracted icon is only the fallback.
+            Icon = AppIconFrames.ForWindow();
+            if (Icon == null && appIcon != null)
             {
                 try { Icon = Imaging.CreateBitmapSourceFromHIcon(appIcon.Handle, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions()); }
                 catch (Exception ex) { Log.Error("SettingsWindow: title icon failed", ex); }
@@ -421,7 +424,18 @@ namespace PowerPane.UI.Settings
 
             if (Icon != null)
             {
-                panel.Children.Add(new Image { Source = Icon, Width = 16, Height = 16, Margin = new Thickness(0, 0, 10, 0) });
+                // The frame drawn for 16 px at this display's scale, not the window icon shrunk to fit
+                // (#271). The scale is only known once the window is on a display, and it changes when
+                // the window moves to a monitor with another scale.
+                var image = new Image { Source = AppIconFrames.At(16, 1) ?? Icon, Width = 16, Height = 16, Margin = new Thickness(0, 0, 10, 0) };
+                Action pick = () =>
+                {
+                    var frame = AppIconFrames.At(16, VisualTreeHelper.GetDpi(image).PixelsPerDip);
+                    if (frame != null) image.Source = frame;
+                };
+                image.Loaded += (s, e) => pick();
+                DpiChanged += (s, e) => pick();
+                panel.Children.Add(image);
             }
 
             var caption = new TextBlock { Text = "PowerPane Settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };

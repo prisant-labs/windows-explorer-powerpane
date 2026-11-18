@@ -694,6 +694,13 @@ namespace PowerPane.UI
                 Grid.SetColumnSpan(TitleToggleButton, collapsed ? 2 : 1);
                 TitleToggleButton.HorizontalAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             }
+            if (GearButton != null)
+            {
+                // Bottom-right when expanded, clear of the scroll bar; centred in the collapsed strip,
+                // where it sat before it moved right (#272).
+                GearButton.HorizontalAlignment = collapsed ? HorizontalAlignment.Center : HorizontalAlignment.Right;
+                GearButton.Margin = collapsed ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 10, 8);
+            }
             if (TitleToggleGlyph != null) TitleToggleGlyph.Text = ToggleGlyph(collapsed, _toggleChevronMirrored);
             if (TitleToggleButton != null)
             {
