@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Each click gesture on a folder or file in the pane can do its own thing. Under **Settings > Keyboard and mouse**, the **Clicking a folder** and **Clicking a file** cards set left click, middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click separately. A folder click can open the folder here, open it in a new window, open its parent folder, copy its path, or run a quick action that is switched on. A file click can open the file, open its containing folder, or copy its path. Nothing changes until you choose: left click and the modified clicks open, as before, and middle click does nothing. In an Open or Save dialog, a new window opens the folder in the dialog instead ([#269](https://github.com/prisant-labs/windows-explorer-powerpane/issues/269)).
+
+### Changed
+- The **Keyboard** page in Settings is now called **Keyboard and mouse**.
+- A click on a pane row counts only when the button is pressed and released on that same row. Pressing in empty space and releasing over a row used to open it, and now does nothing. This also applies to Recent Apps rows and the This PC row. The App Folders rows in an Open or Save dialog follow the click settings too ([#269](https://github.com/prisant-labs/windows-explorer-powerpane/issues/269)).
+
 ## [4.1.1] - 2026-11-17
 
 A small release that restores credit to QuickPane's author: a support link on the About page and an Author section in the README. Nothing else changes.

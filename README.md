@@ -132,11 +132,33 @@ Right-click a folder while an app's Save or Open dialog is open and choose "Alwa
 
 ### Keyboard navigation
 
-An optional shortcut moves focus into the pane, where the arrow keys move between folders and Enter opens one. It stays off until it is switched on under Settings, Keyboard, so no key combination is taken from the rest of the system by default.
+An optional shortcut moves focus into the pane, where the arrow keys move between folders and Enter opens one. It stays off until it is switched on under Settings, Keyboard and mouse, so no key combination is taken from the rest of the system by default.
+
+### Click actions
+
+Each way of clicking a folder or file in the pane can do its own thing, for anyone who wants a faster route than the right-click menu to a new window, a copied path, or a quick action. If you only ever left-click to open folders, leave this alone: nothing changes unless you choose.
+
+To set it up, open Settings from the tray icon or the gear in the pane, choose **Keyboard and mouse**, and expand **Clicking a folder** or **Clicking a file**. Each card has a box for five gestures: left click, middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click. A choice applies to the next click, with no restart and no button to press.
+
+| Row | Actions a gesture can have |
+|---|---|
+| Folder | Open here, Open in new window, Open parent folder, Copy path, a quick action, Same as left click, Do nothing |
+| File | Open, Open containing folder, Copy path, Same as left click, Do nothing |
+
+**Same as left click** and **Do nothing** are offered for every gesture except left click itself. The quick actions listed are every quick action except **Pin this folder**, the actions that work on files selected in Explorer, and the toggles for Explorer's view options such as **Show hidden items**, because none of those act on a single folder. An action that is off is listed with "(off)" after its name.
+
+For example, set **Middle click** on a folder to **Open in new window**, then middle-click a pinned folder: a second Explorer window opens on it, and the window you were in stays where it was.
+
+- **Nothing changes until you choose.** Left click and every modified click open, as they always have, and middle click does nothing. Left click cannot be set to Do nothing.
+- **A click counts only when it starts and ends on the same row.** A press in empty space that is released over a row does nothing.
+- **In an Open or Save dialog**, Open in new window opens the folder in the dialog instead, so the dialog keeps its place.
+- **A quick action runs from a click only while it is on.** Its row on the Quick actions page and the Quick actions section must both be on. Otherwise the click does nothing, and `events.log` says why.
+- **Rows that run something else keep their click.** A Recent Apps row still starts its program, and the This PC row still opens This PC.
+- **Not offered:** opening a folder in a new Explorer tab, because Windows has no supported way to do it; Alt + click, which Explorer uses for its own keys; and keyboard versions of these gestures.
 
 ### Quick switcher
 
-A second optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front. Type part of a pin, a Recent folder, a drive, or a quick action, and press Enter. The Explorer window or Open or Save dialog in front goes to that folder, or the action runs against that Explorer window. With neither in front, the folder opens in a new Explorer window. Escape closes the box. Pins rank above Recent folders when both match equally well. The shortcut also stays off until it is switched on under Settings, Keyboard.
+A second optional shortcut, Ctrl+Alt+Space unless you change it, opens a search box over the window in front. Type part of a pin, a Recent folder, a drive, or a quick action, and press Enter. The Explorer window or Open or Save dialog in front goes to that folder, or the action runs against that Explorer window. With neither in front, the folder opens in a new Explorer window. Escape closes the box. Pins rank above Recent folders when both match equally well. The shortcut also stays off until it is switched on under Settings, Keyboard and mouse.
 
 ![The quick switcher finding a pinned folder](docs/images/quick-switcher.png)
 
@@ -210,7 +232,7 @@ PowerPane sits alongside Windows' built-in navigation pane rather than replacing
 - Right-click any folder or file in Explorer, or a drive in This PC, and choose **Add to PowerPane**, or right-click inside a folder's empty background, or drag a folder into the pane. On Windows 11 the verb is under "Show more options", or press Shift+F10 on the item
 - Select several items and choose the verb once. One window opens for all of them
 - The window asks for a group and a tab, with "New group..." and "New tab..." to make one on the spot, and remembers your last choice. The Add button pins the items into that tab
-- Click a pinned folder to navigate the current Explorer window to it
+- Click a pinned folder to navigate the current Explorer window to it. A middle click or a click with Ctrl or Shift held can do something else, such as open a new window or copy the path; see [Click actions](#click-actions)
 
 ![The Add to PowerPane window, asking for a group and a tab](docs/images/add-picker.png)
 
@@ -261,7 +283,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 
 - Open Settings from the tray icon or the gear in the pane
 - A navigation pane lists the pages, and a search box jumps to a setting
-- Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, folders Recent never shows, which apps Recent Apps lists, the keyboard shortcuts, and profiles
+- Adjust mode, theme, pane width, recents count, section visibility and order, the desktop dock and its options, the profile tab row, folders Recent never shows, which apps Recent Apps lists, the keyboard shortcuts, what each click on a folder or file does, and profiles
 - The About page shows the running version and a short summary of what is new in it, and offers a download when a newer release is published
 - Changes apply live
 
@@ -324,6 +346,30 @@ Two other features reach the network only when you use them:
 }
 ```
 
+The file names only the click gestures you changed, under `clickActions`. A gesture that is missing uses its default, so a file without the key behaves as before:
+
+```json
+"clickActions": [
+  { "gesture": "middle", "folder": "new-window", "file": "copy-path" },
+  { "gesture": "ctrl", "folder": "quick:open-terminal" }
+]
+```
+
+`gesture` is `left`, `middle`, `ctrl`, `shift`, or `ctrl-shift`. Each action id stands for one choice in Settings:
+
+| Id | Folder row | File row |
+|---|---|---|
+| `open` | Open here | Open |
+| `new-window` | Open in new window | Not allowed |
+| `open-parent` | Open parent folder | Not allowed |
+| `open-folder` | Not allowed | Open containing folder |
+| `copy-path` | Copy path | Copy path |
+| `quick:<action id>` | That quick action, such as `quick:open-terminal` | Not allowed |
+| `same-as-left` | Same as left click | Same as left click |
+| `none` | Do nothing | Do nothing |
+
+An unknown gesture, an id a row does not allow, or `none` or `same-as-left` for `left` is dropped when the file loads, and that gesture keeps its default. Edit the file with PowerPane closed, because PowerPane rewrites it whenever a setting changes.
+
 ## Compatibility
 
 | OS | Supported | Notes |
@@ -343,6 +389,10 @@ Make sure Pane mode is **Inside** or **Beside** rather than **Off** in Settings.
 ### A Save dialog saves to the wrong place when I click a folder
 
 PowerPane navigates file dialogs through the address bar rather than the File name box, so clicking a folder changes the location without committing a save. If a third-party app runs its own custom dialog that fights the inside layout, PowerPane drops that dialog to the non-invasive beside pane automatically.
+
+### A click on a folder copies it, opens a new window, or does nothing
+
+That gesture has a click action. Open **Settings > Keyboard and mouse** and check the gesture under **Clicking a folder** or **Clicking a file**; **Same as left click** restores the usual behaviour. A gesture bound to a quick action does nothing while that action or the Quick actions section is off, and `events.log` in the `Logs` folder records a line beginning "a click on a row ran nothing" with the reason. A click also does nothing when the press started outside the row.
 
 ### An Explorer window looks shifted after PowerPane closes
 
@@ -405,6 +455,7 @@ PowerPane/
     │   ├── FileDropOps.cs     # Shell move/copy/shortcut drops
     │   ├── ThemeService.cs    # Dark / light theming
     │   ├── FluentThemeService.cs # Ported Fluent theme, scoped to the Settings window
+    │   ├── ClickActions.cs    # Click gestures, their choices, and what each does on a row
     │   ├── QuickActionLibrary.cs # The built-in quick actions and their defaults
     │   ├── QuickActionRunner.cs  # Runs a quick action
     │   ├── CustomCommandTemplate.cs # Custom command templates: placeholders, quoting, refusals
@@ -421,6 +472,7 @@ PowerPane/
         ├── ShellRootSection.cs       # Network and Linux roots
         ├── FolderItem.xaml(.cs)      # One folder row
         ├── FolderTreeNode.cs         # A lazy tree node
+        ├── RowClick.cs               # Runs the click action chosen for a row's gesture
         ├── LazyContextMenu.cs        # Builds a pinned row's menu when it opens
         ├── Settings/                 # The native Settings window, its cards, and its pages
         ├── GroupPickerWindow.xaml(.cs) # The Add to PowerPane picker: group, tab, and items

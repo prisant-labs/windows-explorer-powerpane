@@ -89,6 +89,23 @@ namespace PowerPane.Models
         public bool Enabled { get; set; } = true;
     }
 
+    /// <summary>What one click gesture does on a pane row (#269): <see cref="Gesture"/> is a
+    /// ClickActions gesture id such as "middle", and <see cref="Folder"/> and <see cref="File"/> are
+    /// action ids for a folder row and a file row. A null value means the gesture's default, so an
+    /// entry exists only for a gesture someone changed. ClickActions holds the ids and the rules.</summary>
+    [DataContract]
+    public sealed class ClickActionSetting
+    {
+        [DataMember(Name = "gesture", Order = 0)]
+        public string Gesture { get; set; }
+
+        [DataMember(Name = "folder", Order = 1, EmitDefaultValue = false)]
+        public string Folder { get; set; }
+
+        [DataMember(Name = "file", Order = 2, EmitDefaultValue = false)]
+        public string File { get; set; }
+    }
+
     /// <summary>A quick action the user wrote (#190): a name and a command template. It appears in
     /// AppSettings.QuickActions under the same <see cref="Id"/>, which carries its on/off state and its
     /// place in the order, the same as a built-in action. CustomCommandTemplate reads the template.</summary>
@@ -200,6 +217,12 @@ namespace PowerPane.Models
         public string QuickSwitcherHotkey { get; set; } = DefaultQuickSwitcherHotkey;
 
         public const string DefaultQuickSwitcherHotkey = "ctrl+alt+Space";
+
+        // What each click gesture does on a pane row (#269). Null, or a gesture missing from the
+        // list, means that gesture's default, which is the click behaviour from before this setting:
+        // a settings file from an older release therefore loads with every click unchanged.
+        [DataMember(Name = "clickActions", Order = 55, EmitDefaultValue = false)]
+        public List<ClickActionSetting> ClickActions { get; set; }
 
         // Which apps the Recent Apps section lists: "open" for the ones brought to the front, "dialogs"
         // for the ones whose Save and Open dialogs were used, "both" for either.
@@ -419,6 +442,9 @@ namespace PowerPane.Models
             EnsureSection("recentapps", 6);
             EnsureSection("quickactions", 7, defaultVisible: false);
             NormalizeQuickActions();
+            // After the quick actions, because a click bound to a custom command is checked against
+            // the commands that survived NormalizeCustomCommands.
+            PowerPane.Services.ClickActions.Normalize(this);
             if (SshProfiles == null) SshProfiles = new List<SshProfile>();
             foreach (var sp in SshProfiles)
             {

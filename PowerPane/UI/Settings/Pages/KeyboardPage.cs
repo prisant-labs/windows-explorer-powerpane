@@ -23,7 +23,9 @@ namespace PowerPane.UI.Settings.Pages
         private const string ShortcutCardId = "keyboard-shortcut";
 
         public override string Id => "keyboard";
-        public override string Title => "Keyboard";
+        // The page id stays "keyboard", so a search link or a saved page from before the click
+        // settings (#269) still lands here.
+        public override string Title => "Keyboard and mouse";
         public override string Glyph => "\uE765";   // Segoe Fluent Icons KeyboardClassic
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
@@ -38,6 +40,10 @@ namespace PowerPane.UI.Settings.Pages
                     "Search pins, Recent, drives, and actions from the keyboard.", "quick switcher", "search", "jump", "go to", "palette", "hotkey");
                 yield return new SettingsSearchEntry(Id, SwitcherShortcutCardId, "Quick switcher shortcut",
                     "The key combination that opens the quick switcher.", "hotkey", "shortcut", "ctrl+alt");
+                yield return new SettingsSearchEntry(Id, FolderClicksCardId, "Clicking a folder",
+                    "Choose what each click on a folder row does.", "mouse", "click", "middle click", "new window", "copy path", "ctrl", "shift");
+                yield return new SettingsSearchEntry(Id, FileClicksCardId, "Clicking a file",
+                    "Choose what each click on a file row does.", "mouse", "click", "middle click", "containing folder", "copy path", "ctrl", "shift");
             }
         }
 
@@ -77,7 +83,43 @@ namespace PowerPane.UI.Settings.Pages
                 box, "Keyboard navigation shortcut"));
 
             BuildQuickSwitcher(ctx, panel);
+            BuildClicks(ctx, panel);
             return panel;
+        }
+
+        private const string FolderClicksCardId = "clicks-folder";
+        private const string FileClicksCardId = "clicks-file";
+        private const string MouseGlyph = "\uE962";   // Segoe Fluent Icons Mouse
+
+        /// <summary>One card for folder rows and one for file rows, each with a box per click gesture
+        /// (#269). Each box writes straight through and saves, like the toggles above, and the pane
+        /// reads the choice at click time, so nothing needs rebuilding.</summary>
+        private static void BuildClicks(SettingsPageContext ctx, StackPanel panel)
+        {
+            panel.Children.Add(ctx.Cards.Subheader("Mouse"));
+            panel.Children.Add(BuildClickCard(ctx, false, FolderClicksCardId, "Clicking a folder",
+                "What each click on a folder in the pane does. A quick action is listed once it applies to a folder, and runs only while it and the Quick actions section are on. In an Open or Save dialog, a new window opens the folder in the dialog instead.").Root);
+            panel.Children.Add(BuildClickCard(ctx, true, FileClicksCardId, "Clicking a file",
+                "What each click on a pinned or recent file in the pane does.").Root);
+        }
+
+        private static ExpanderCard BuildClickCard(SettingsPageContext ctx, bool forFile, string cardId, string title, string description)
+        {
+            var settings = ctx.Settings;
+            var s = settings.Current;
+            var card = ctx.Cards.Expander(cardId, MouseGlyph, title, description, initiallyExpanded: false);
+            foreach (var gesture in ClickActions.Gestures)
+            {
+                var g = gesture;
+                var combo = ctx.Cards.Combo(ClickActions.Options(s, g, forFile), ClickActions.Stored(s, g, forFile), id =>
+                {
+                    ClickActions.Set(s, g, forFile, id);
+                    settings.Save();
+                });
+                card.AddChild(ctx.Cards.ChildRow(ClickActions.GestureLabel(g), combo,
+                    ClickActions.GestureLabel(g) + (forFile ? " on a file" : " on a folder")));
+            }
+            return card;
         }
 
         private const string SwitcherToggleCardId = "switcher-enabled";

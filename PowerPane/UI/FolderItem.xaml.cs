@@ -20,14 +20,21 @@ namespace PowerPane.UI
         public string TargetPath { get; private set; }
         public bool IsBroken { get; private set; }
 
+        /// <summary>Raised for Enter or Space on the focused row, and for a mouse click when nothing
+        /// handles <see cref="MouseGesture"/>.</summary>
         public event Action Clicked;
+
+        /// <summary>A completed mouse click on this row with its gesture (#269), so the owner can run
+        /// the click action the user chose. Without a handler, a left click raises
+        /// <see cref="Clicked"/> as before and a middle click does nothing.</summary>
+        internal event Action<ClickGesture> MouseGesture;
 
         public FolderItem()
         {
             InitializeComponent();
             MouseEnter += (s, e) => Root.Background = Brush("ItemHoverBackground");
             MouseLeave += (s, e) => Root.Background = Brushes.Transparent;
-            MouseLeftButtonUp += OnLeftClick;
+            RowClick.Track(this, OnMouseGesture);
 
             // Reachable by keyboard: arrows move between rows and Enter opens the one in focus. Rows are
             // only in the tab order when keyboard navigation is switched on, so nothing changes for
@@ -65,8 +72,11 @@ namespace PowerPane.UI
             }
         }
 
-        private void OnLeftClick(object sender, MouseButtonEventArgs e)
+        private void OnMouseGesture(ClickGesture gesture)
         {
+            var g = MouseGesture;
+            if (g != null) { g(gesture); return; }
+            if (gesture == ClickGesture.Middle) return;
             var h = Clicked;
             if (h != null) h();
         }

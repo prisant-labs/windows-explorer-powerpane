@@ -109,6 +109,7 @@
     <Compile Include="Services\ThemeService.cs" />
     <Compile Include="Services\FluentThemeService.cs" />
     <Compile Include="Services\CustomCommandTemplate.cs" />
+    <Compile Include="Services\ClickActions.cs" />
     <Compile Include="Services\QuickActionLibrary.cs" />
     <Compile Include="Services\QuickActionRunner.cs" />
     <Compile Include="Services\QuickSwitcherSearch.cs" />
@@ -136,6 +137,7 @@
     <Compile Include="UI\AppDefaultsSection.cs" />
     <Compile Include="UI\QuickActionsSection.cs" />
     <Compile Include="UI\QuickSwitcher.cs" />
+    <Compile Include="UI\RowClick.cs" />
     <Compile Include="UI\SshSection.cs" />
     <Compile Include="UI\DropLineAdorner.cs" />
     <Compile Include="UI\DragGhostAdorner.cs" />

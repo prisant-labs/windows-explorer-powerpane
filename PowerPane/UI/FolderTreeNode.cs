@@ -93,6 +93,10 @@ namespace PowerPane.UI
             };
             var chevHit = new Border { Width = 18, Background = Brushes.Transparent, Cursor = Cursors.Hand, Child = _chevGlyph };
             chevHit.MouseLeftButtonUp += (s, e) => { e.Handled = true; Toggle(); };
+            // A middle click on the caret stays a no-op, as it was, instead of reaching the row's
+            // middle-click action (#269).
+            chevHit.MouseDown += (s, e) => { if (e.ChangedButton == MouseButton.Middle) e.Handled = true; };
+            chevHit.MouseUp += (s, e) => { if (e.ChangedButton == MouseButton.Middle) e.Handled = true; };
 
             var icon = new Image
             {
@@ -134,12 +138,10 @@ namespace PowerPane.UI
                 _row.Background = Brushes.Transparent;
                 if (!_expanded && _childProvider == null) _chevGlyph.Opacity = 0;
             };
-            _row.MouseLeftButtonUp += (s, e) =>
-            {
-                if (_onClick != null) { _onClick(); return; }
-                if (exists && !isFile) _navigate(path);
-                else if (isFile) Open(path);
-            };
+            // A click acts on release, and the modifiers held at that moment pick the gesture (#269).
+            // The press must have begun on this same row: a click can now run a quick action, so a
+            // press in blank space that is released over a row must not run anything.
+            RowClick.Track(_row, gesture => OnClick(gesture, exists, isFile));
             if (level > 0 && onClick == null) _row.ContextMenu = BasicMenu(path, isFile);
 
             // Items dropped from Explorer onto a real folder move/copy/link into it (or pin), below.
@@ -372,11 +374,30 @@ namespace PowerPane.UI
             return menu;
         }
 
-        private static void Open(string path)
+        // ---- click actions (#269) ---------------------------------------------
+
+        /// <summary>Carries out the action the user chose for this gesture. A row that runs a program,
+        /// and a row whose children are supplied (This PC), keep the click they always had: any left
+        /// click runs or opens them, and a middle click does nothing. The choice is read at click time,
+        /// so a change in Settings applies to the next click with no rebuild.</summary>
+        private void OnClick(ClickGesture gesture, bool exists, bool isFile)
         {
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
-            catch (Exception ex) { Log.Error("open '" + path + "'", ex); }
+            try
+            {
+                if (_onClick != null || _childProvider != null)
+                {
+                    if (gesture == ClickGesture.Middle) return;
+                    if (_onClick != null) _onClick();
+                    else if (exists) _navigate(_path);
+                    return;
+                }
+
+                RowClick.Run(_row, gesture, _path, exists, isFile, _navigate);
+            }
+            catch (Exception ex) { Log.Error("row click", ex); }
         }
+
+        private static void Open(string path) { RowClick.OpenFile(path); }
 
         private static MenuItem MakeItem(string header, Action action)
         {
