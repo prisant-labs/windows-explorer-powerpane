@@ -7,6 +7,7 @@
 
 ### Changed
 - The **Keyboard** page in Settings is now called **Keyboard and mouse**.
+- A click on a pane row counts only when the button is pressed and released on that same row. Pressing in empty space and releasing over a row used to open it, and now does nothing. This also applies to Recent Apps rows and the This PC row. The App Folders rows in an Open or Save dialog follow the click settings too ([#269](https://github.com/prisant-labs/windows-explorer-powerpane/issues/269)).
 
 ## [4.1.1] - 2026-11-17
 
