@@ -142,10 +142,10 @@ To set it up, open Settings from the tray icon or the gear in the pane, choose *
 
 | Row | Actions a gesture can have |
 |---|---|
-| Folder | Open here, Open in new window, Open parent folder, Copy path, a quick action, Same as left click, Do nothing |
+| Folder | Open here, Open in new window, Open parent folder, a quick action such as **Copy path**, Same as left click, Do nothing |
 | File | Open, Open containing folder, Copy path, Same as left click, Do nothing |
 
-**Same as left click** and **Do nothing** are offered for every gesture except left click itself. The quick actions listed are every quick action except **Pin this folder**, the actions that work on files selected in Explorer, and the toggles for Explorer's view options such as **Show hidden items**, because none of those act on a single folder. An action that is off is listed with "(off)" after its name.
+**Same as left click** and **Do nothing** are offered for every gesture except left click itself. The quick actions listed are every quick action except **Pin this folder**, the actions that work on files selected in Explorer, and the toggles for Explorer's view options such as **Show hidden items**, because none of those act on a single folder. An action that is off is listed with "(off)" after its name, and a click bound to it does nothing until it is on again. To copy a folder's path with a click, choose **Quick action: Copy path**; it needs the Quick actions section and that action switched on.
 
 For example, set **Middle click** on a folder to **Open in new window**, then middle-click a pinned folder: a second Explorer window opens on it, and the window you were in stays where it was.
 

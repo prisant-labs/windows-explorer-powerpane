@@ -69,6 +69,10 @@ namespace PowerPane.Services
         /// "quick:open-terminal" or a custom command's "quick:custom-...".</summary>
         public const string QuickPrefix = "quick:";
 
+        /// <summary>The Copy path quick action, which a folder click saved as the old built-in
+        /// <see cref="CopyPath"/> becomes when settings load (#282).</summary>
+        public const string QuickCopyPath = QuickPrefix + "copy-path";
+
         /// <summary>Every gesture, in the order Settings lists them.</summary>
         public static readonly ClickGesture[] Gestures =
             { ClickGesture.Left, ClickGesture.Middle, ClickGesture.Ctrl, ClickGesture.Shift, ClickGesture.CtrlShift };
@@ -142,8 +146,10 @@ namespace PowerPane.Services
             if (string.IsNullOrEmpty(actionId)) return false;
             if (actionId == SameAsLeft) return g != ClickGesture.Left;
             if (actionId == None) return g != ClickGesture.Left;   // a left click always does something
-            if (actionId == Open || actionId == CopyPath) return true;
-            if (forFile) return actionId == OpenContainingFolder;
+            if (actionId == Open) return true;
+            // A folder click copies its path through the Copy path quick action, which Settings
+            // already listed beside a built-in Copy path that did the same thing (#282).
+            if (forFile) return actionId == OpenContainingFolder || actionId == CopyPath;
             if (actionId == NewWindow || actionId == OpenParent) return true;
             if (actionId.StartsWith(QuickPrefix, StringComparison.Ordinal))
                 return QuickActionLibrary.Resolve(settings, actionId.Substring(QuickPrefix.Length)) != null;
@@ -195,6 +201,8 @@ namespace PowerPane.Services
             {
                 ClickGesture g;
                 if (e == null || !TryParseGesture(e.Gesture, out g) || !seen.Add(e.Gesture)) continue;
+                // 4.2.0 and 4.2.1 offered a built-in Copy path for folders; keep such a click copying.
+                if (e.Folder == CopyPath) e.Folder = QuickCopyPath;
                 if (!IsValid(settings, g, false, e.Folder) || e.Folder == DefaultFor(g)) e.Folder = null;
                 if (!IsValid(settings, g, true, e.File) || e.File == DefaultFor(g)) e.File = null;
                 if (e.Folder != null || e.File != null) cleaned.Add(e);
@@ -202,8 +210,9 @@ namespace PowerPane.Services
             settings.ClickActions = cleaned.Count > 0 ? cleaned : null;
         }
 
-        /// <summary>What a click does on a given row. A folder that does not exist only copies its
-        /// path, as before this setting a click on one did nothing. A file row tries to open even when
+        /// <summary>What a click does on a given row. A folder that does not exist does nothing, as
+        /// before this setting; only the old built-in Copy path copied it, and a folder click no longer
+        /// offers that (#282). A file row tries to open even when
         /// its target looks missing, as it always has: the shell then reports the problem. Inside a
         /// file dialog's pane a new window would leave the dialog, so it opens the folder in the dialog
         /// instead, the same as Open here.</summary>
@@ -276,7 +285,6 @@ namespace PowerPane.Services
                 list.Add(Pair(Open, "Open here"));
                 list.Add(Pair(NewWindow, "Open in new window"));
                 list.Add(Pair(OpenParent, "Open parent folder"));
-                list.Add(Pair(CopyPath, "Copy path"));
                 if (settings != null && settings.QuickActions != null)
                 {
                     foreach (var a in settings.QuickActions)
