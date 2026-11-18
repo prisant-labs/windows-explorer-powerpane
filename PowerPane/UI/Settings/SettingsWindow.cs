@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -237,8 +239,17 @@ namespace PowerPane.UI.Settings
 
             Content = BuildLayout();
             KeyDown += (s, e) => { if (e.Key == Key.Escape) Close(); };
-            SourceInitialized += (s, e) => ApplyBackdrop();
-            StateChanged += (s, e) => UpdateMaximizedMargin();
+            SourceInitialized += (s, e) => { ApplyBackdrop(); UpdateTitleBand(); };
+            StateChanged += (s, e) =>
+            {
+                UpdateMaximizedMargin();
+                // DWM moves the caption buttons as part of the state change, so read their new
+                // place once that has settled rather than in the middle of it.
+                Dispatcher.BeginInvoke(new Action(UpdateTitleBand), DispatcherPriority.Loaded);
+            };
+            Loaded += (s, e) => UpdateTitleBand();
+            DpiChanged += (s, e) => UpdateTitleBand();
+            SizeChanged += (s, e) => Dispatcher.BeginInvoke(new Action(() => { UpdateMaximizedMargin(); UpdateTitleBand(); }), DispatcherPriority.ContextIdle);
 
             // ContentRendered is the window's first real paint, so it is the "open" half of the
             // 500 ms open-time budget. It can fire more than once (e.g. after a later layout pass), so
@@ -371,9 +382,46 @@ namespace PowerPane.UI.Settings
             return state == WindowState.Maximized ? resizeBorder : new Thickness(0);
         }
 
+        /// <summary>How far the window rectangle reaches past its visible frame on each side, in
+        /// DIPs. A maximized window hangs 8 px past the monitor at 100 % scale: the 4 px resize
+        /// border that <see cref="SystemParameters.WindowResizeBorderThickness"/> reports plus a
+        /// 4 px padded border it leaves out, so a margin of the reported 4 px still clipped the
+        /// title row and the content's left edge by 4 px (found while measuring #276). Zero when
+        /// either rectangle is empty. A pure decision, so it is unit-testable with no window.</summary>
+        internal static Thickness OverhangFor(NM.RECT window, NM.RECT visible, double pixelsPerDip)
+        {
+            if (window.Width <= 0 || window.Height <= 0 || visible.Width <= 0 || visible.Height <= 0) return new Thickness(0);
+            double ppd = pixelsPerDip > 0 ? pixelsPerDip : 1;
+            return new Thickness(
+                Math.Max(0, visible.Left - window.Left) / ppd,
+                Math.Max(0, visible.Top - window.Top) / ppd,
+                Math.Max(0, window.Right - visible.Right) / ppd,
+                Math.Max(0, window.Bottom - visible.Bottom) / ppd);
+        }
+
+        /// <summary>The window rectangle and DWM's visible frame, in physical pixels. False when
+        /// either cannot be read, such as before the window has a handle.</summary>
+        private bool TryGetFrames(out NM.RECT window, out NM.RECT visible)
+        {
+            window = default(NM.RECT);
+            visible = default(NM.RECT);
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return false;
+            return NM.GetWindowRect(hwnd, out window)
+                && NM.DwmGetWindowAttribute(hwnd, NM.DWMWA_EXTENDED_FRAME_BOUNDS, out visible, Marshal.SizeOf(typeof(NM.RECT))) == 0;
+        }
+
         private void UpdateMaximizedMargin()
         {
-            if (_rootGrid != null) _rootGrid.Margin = RootMarginFor(WindowState, SystemParameters.WindowResizeBorderThickness);
+            if (_rootGrid == null) return;
+            var border = SystemParameters.WindowResizeBorderThickness;
+            NM.RECT window, visible;
+            if (WindowState == WindowState.Maximized && TryGetFrames(out window, out visible))
+            {
+                var measured = OverhangFor(window, visible, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                if (measured.Top > 0 || measured.Left > 0) border = measured;
+            }
+            _rootGrid.Margin = RootMarginFor(WindowState, border);
         }
 
         // ---- layout --------------------------------------------------------
@@ -410,24 +458,100 @@ namespace PowerPane.UI.Settings
             return root;
         }
 
+        // Microsoft's title bar guidance: the icon 16 px from the left edge, 16 px square, and the
+        // title 16 px after it. A standard title bar is 32 px tall.
+        private const double TitleIconLeft = 16;
+        private const double TitleIconGap = 16;
+        private const double StandardTitleBandHeight = 32;
+        private const double TitleIconSize = 16;
+
+        private StackPanel _titlePanel;
+        private string _titleBandLogged;
+
+        /// <summary>Where the icon and title sit inside the 48 px title row: the band DWM's caption
+        /// buttons occupy, in DIPs from the top of the row. The row is taller than the buttons, so
+        /// centring on the row left the icon and title about 9 px below the minimize, maximize, and
+        /// close glyphs at 100 % scale, which read as off balance (#276). <paramref name="topPx"/>
+        /// and <paramref name="bottomPx"/> are the buttons' bounds in physical pixels from the
+        /// window rectangle's top (DWM's answer plus the visible frame's offset), and <paramref name="rootMarginTop"/> is the shift
+        /// <see cref="RootMarginFor"/> applies when maximized. Bounds DWM could not give, or a band
+        /// too short for the icon, fall back to the standard 32 px title bar from the top. A pure
+        /// decision, so it is unit-testable with no window at all.</summary>
+        internal static void TitleBand(int topPx, int bottomPx, double pixelsPerDip, double rootMarginTop,
+            double rowHeight, out double top, out double height)
+        {
+            double ppd = pixelsPerDip > 0 ? pixelsPerDip : 1;
+            top = 0;
+            height = Math.Min(StandardTitleBandHeight, rowHeight);
+            if (bottomPx <= topPx || rowHeight <= 0) return;
+
+            double t = topPx / ppd - rootMarginTop;
+            double h = (bottomPx - topPx) / ppd;
+            if (t < 0) { h += t; t = 0; }
+            if (t + h > rowHeight) h = rowHeight - t;
+            if (h < TitleIconSize) return;
+            top = t;
+            height = h;
+        }
+
+        /// <summary>Reads the caption buttons' bounds from DWM and moves the title panel onto
+        /// them. Does nothing before the window has a handle, or on the high-contrast path, where
+        /// the title row is collapsed and Windows draws its own title bar.</summary>
+        private void UpdateTitleBand()
+        {
+            if (_titlePanel == null || _titleRowDef == null || _titleRowDef.Height.Value <= 0) return;
+            var hwnd = new WindowInteropHelper(this).Handle;
+            if (hwnd == IntPtr.Zero) return;
+
+            NM.RECT bounds;
+            if (NM.DwmGetWindowAttribute(hwnd, NM.DWMWA_CAPTION_BUTTON_BOUNDS, out bounds, Marshal.SizeOf(typeof(NM.RECT))) != 0)
+                bounds = default(NM.RECT);
+            // DWM gives the buttons' bounds from the top of the visible frame, not of the window
+            // rectangle. The two match for a normal window, and a maximized one starts 8 px above
+            // the monitor at 100 % scale, so add that gap to get the window-relative position.
+            int framePx = 0;
+            NM.RECT window, visible;
+            if (TryGetFrames(out window, out visible)) framePx = Math.Max(0, visible.Top - window.Top);
+            double ppd = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+            double rootTop = _rootGrid != null ? _rootGrid.Margin.Top : 0;
+            double top, height;
+            TitleBand(bounds.Top + framePx, bounds.Bottom + framePx, ppd, rootTop, _titleRowDef.Height.Value, out top, out height);
+            _titlePanel.Margin = new Thickness(TitleIconLeft, top, 0, 0);
+            _titlePanel.Height = height;
+
+            // One line per distinct answer, so a band that comes out wrong can be traced to what DWM
+            // reported. A window normally logs two: normal and maximized.
+            string line = string.Format(CultureInfo.InvariantCulture,
+                "SettingsWindow: caption buttons at y {0}..{1} px, frame offset {2} px, scale {3:0.##}, root top {4:0.#}; title band top {5:0.#}, height {6:0.#}",
+                bounds.Top, bounds.Bottom, framePx, ppd, rootTop, top, height);
+            if (line != _titleBandLogged)
+            {
+                _titleBandLogged = line;
+                Log.Info(line);
+            }
+        }
+
         /// <summary>The 48 px caption row: a 16 px app icon and "PowerPane Settings" at 12 px, on
         /// the same transparent backdrop as everything below it, with WindowChrome treating
-        /// the row as the drag/caption-button area.</summary>
+        /// the row as the drag/caption-button area. The icon and title are centred on the caption
+        /// buttons' band, not on the whole row (see <see cref="TitleBand"/>).</summary>
         private FrameworkElement BuildTitleRow()
         {
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(16, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(TitleIconLeft, 0, 0, 0),
+                Height = StandardTitleBandHeight,
+                VerticalAlignment = VerticalAlignment.Top,
             };
+            _titlePanel = panel;
 
             if (Icon != null)
             {
                 // The frame drawn for 16 px at this display's scale, not the window icon shrunk to fit
                 // (#271). The scale is only known once the window is on a display, and it changes when
                 // the window moves to a monitor with another scale.
-                var image = new Image { Source = AppIconFrames.At(16, 1) ?? Icon, Width = 16, Height = 16, Margin = new Thickness(0, 0, 10, 0) };
+                var image = new Image { Source = AppIconFrames.At(16, 1) ?? Icon, Width = TitleIconSize, Height = TitleIconSize, Margin = new Thickness(0, 0, TitleIconGap, 0), VerticalAlignment = VerticalAlignment.Center };
                 Action pick = () =>
                 {
                     var frame = AppIconFrames.At(16, VisualTreeHelper.GetDpi(image).PixelsPerDip);
