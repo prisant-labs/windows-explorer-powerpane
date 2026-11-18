@@ -40,7 +40,6 @@ namespace PowerPane.UI
         private readonly Image _icon;
         private bool _loaded;
         private bool _expanded;
-        private bool _middlePressed;
         private readonly bool _hasChildren;
 
         public Border Row { get { return _row; } }
@@ -136,33 +135,13 @@ namespace PowerPane.UI
             _row.MouseEnter += (s, e) => { _row.Background = UiHelpers.AppBrush("ItemHoverBackground"); if (_hasChildren) _chevGlyph.Opacity = 1; };
             _row.MouseLeave += (s, e) =>
             {
-                _middlePressed = false;
                 _row.Background = Brushes.Transparent;
                 if (!_expanded && _childProvider == null) _chevGlyph.Opacity = 0;
             };
-            // A left click still acts on release, as it always has, and the modifiers held at that
-            // moment pick the gesture (#269). A middle click must be pressed and released on this same
-            // row, so a press that drifts off the row, or one that began elsewhere, does nothing.
-            _row.MouseLeftButtonUp += (s, e) =>
-            {
-                var gesture = ClickActions.GestureFor(MouseButton.Left, Keyboard.Modifiers);
-                if (gesture.HasValue) OnClick(gesture.Value, exists, isFile);
-            };
-            _row.MouseDown += (s, e) =>
-            {
-                if (e.ChangedButton != MouseButton.Middle) return;
-                _middlePressed = true;
-                e.Handled = true;
-            };
-            _row.MouseUp += (s, e) =>
-            {
-                if (e.ChangedButton != MouseButton.Middle) return;
-                bool pressed = _middlePressed;
-                _middlePressed = false;
-                if (!pressed) return;
-                e.Handled = true;
-                OnClick(ClickGesture.Middle, exists, isFile);
-            };
+            // A click acts on release, and the modifiers held at that moment pick the gesture (#269).
+            // The press must have begun on this same row: a click can now run a quick action, so a
+            // press in blank space that is released over a row must not run anything.
+            RowClick.Track(_row, gesture => OnClick(gesture, exists, isFile));
             if (level > 0 && onClick == null) _row.ContextMenu = BasicMenu(path, isFile);
 
             // Items dropped from Explorer onto a real folder move/copy/link into it (or pin), below.
@@ -413,71 +392,12 @@ namespace PowerPane.UI
                     return;
                 }
 
-                var settings = App.Settings != null ? App.Settings.Current : null;
-                string action = settings != null
-                    ? ClickActions.Resolve(settings, gesture, isFile)
-                    : (gesture == ClickGesture.Middle ? ClickActions.None : ClickActions.Open);
-                var pane = SidebarControl.Owning(_row);
-                bool inDialog = pane != null && !string.IsNullOrEmpty(pane.HostApp);
-                var path = _path;
-
-                switch (ClickActions.OutcomeFor(action, isFile, exists, inDialog))
-                {
-                    case ClickOutcome.OpenHere:
-                        _navigate(path);
-                        break;
-                    case ClickOutcome.OpenNewWindow:
-                        // Starting explorer.exe is process work, so it leaves the UI thread on the lane
-                        // for navigations the user clicked, as the quick switcher's new window does.
-                        WorkQueue.PostNavigation(() => ExplorerNavigator.OpenNewWindow(path));
-                        break;
-                    case ClickOutcome.OpenParent:
-                        var parent = QuickActionLibrary.ParentPath(path);
-                        if (!string.IsNullOrEmpty(parent)) _navigate(parent);
-                        break;
-                    case ClickOutcome.OpenFile:
-                        Open(path);
-                        break;
-                    case ClickOutcome.OpenContainingFolder:
-                        var folder = QuickActionLibrary.ParentPath(path);
-                        if (!string.IsNullOrEmpty(folder)) _navigate(folder);
-                        break;
-                    case ClickOutcome.CopyPath:
-                        try { Clipboard.SetText(path); }
-                        catch (Exception ex) { Log.Error("copy path on click", ex); }
-                        break;
-                    case ClickOutcome.QuickAction:
-                        RunQuickAction(settings, action, path);
-                        break;
-                }
+                RowClick.Run(_row, gesture, _path, exists, isFile, _navigate);
             }
             catch (Exception ex) { Log.Error("row click", ex); }
         }
 
-        private static void RunQuickAction(Models.AppSettings settings, string action, string folder)
-        {
-            string why;
-            var def = ClickActions.RunnableQuickAction(settings, action, out why);
-            if (def != null && !QuickActionsSection.IsAvailable(def))
-            {
-                why = "the program the quick action \"" + def.Name + "\" needs is not installed";
-                def = null;
-            }
-            if (def == null)
-            {
-                Log.Event("click", "a click on a row ran nothing, because " + why + ".");
-                return;
-            }
-            // Same as the pinned row's Quick actions submenu: the folder is already known, and the
-            // action's own disk or process work runs on the general worker, never the UI thread.
-            WorkQueue.Post(() => QuickActionRunner.Run(def, folder, null));
-        }
-
-        private static void Open(string path)
-        {
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true }); }
-            catch (Exception ex) { Log.Error("open '" + path + "'", ex); }
-        }
+        private static void Open(string path) { RowClick.OpenFile(path); }
 
         private static MenuItem MakeItem(string header, Action action)
         {

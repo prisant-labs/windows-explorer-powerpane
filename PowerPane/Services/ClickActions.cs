@@ -12,6 +12,37 @@ namespace PowerPane.Services
     /// and the pane's host have all been taken into account.</summary>
     internal enum ClickOutcome { Nothing, OpenHere, OpenNewWindow, OpenParent, OpenFile, OpenContainingFolder, CopyPath, QuickAction }
 
+    /// <summary>Whether a button release on a row completes a click that began on that row (#269). A
+    /// click can now run a quick action or a custom command, so a release whose press began elsewhere
+    /// (in blank pane space, or on another row, then dragged over this one) must do nothing. The row
+    /// reports presses and releases, and cancels on entering or leaving, because WPF raises MouseEnter
+    /// for a pointer that arrives with a button already down. No WPF types beyond the button enum, so
+    /// the rule is unit-testable.</summary>
+    internal sealed class RowPress
+    {
+        private bool _left;
+        private bool _middle;
+
+        public void Down(MouseButton button)
+        {
+            if (button == MouseButton.Left) _left = true;
+            else if (button == MouseButton.Middle) _middle = true;
+        }
+
+        /// <summary>Forgets any press, for the pointer entering or leaving the row.</summary>
+        public void Cancel() { _left = false; _middle = false; }
+
+        /// <summary>True when this release completes a press that began on the row. Either way the
+        /// press is used up, so a second release cannot act on the same press.</summary>
+        public bool Up(MouseButton button)
+        {
+            bool pressed = false;
+            if (button == MouseButton.Left) { pressed = _left; _left = false; }
+            else if (button == MouseButton.Middle) { pressed = _middle; _middle = false; }
+            return pressed;
+        }
+    }
+
     /// <summary>
     /// The pure decisions behind click actions (#269): which gesture a button and modifier keys make,
     /// which action the user chose for it, and what that action means on a given row. Nothing here

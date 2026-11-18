@@ -99,7 +99,10 @@ namespace PowerPane.UI
             fi.ToolTip = folder;
             if (emphasize) fi.FontWeight = FontWeights.SemiBold;
             var captured = folder;
+            // Enter on the focused row opens the folder in the dialog; a mouse click runs the action
+            // chosen for its gesture (#269), the same as every other folder row in the pane.
             fi.Clicked += () => { if (_navigate != null) _navigate(captured); };
+            fi.MouseGesture += g => RowClick.Run(fi, g, captured, true, false, _navigate);
 
             var menu = new ContextMenu();
             var clear = new MenuItem { Header = "Forget this folder for " + app };

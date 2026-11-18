@@ -285,6 +285,53 @@ namespace PowerPane.Tests
             Assert.That(ClickActions.OutcomeFor(ClickActions.Open, true, false, false), Is.EqualTo(ClickOutcome.OpenFile));
         }
 
+        // ---- a release counts only after a press on the same row --------------------
+
+        [TestCase(MouseButton.Left)]
+        [TestCase(MouseButton.Middle)]
+        public void RowPress_PressThenRelease_IsAClick(MouseButton button)
+        {
+            var p = new RowPress();
+            p.Down(button);
+            Assert.That(p.Up(button), Is.True);
+        }
+
+        [TestCase(MouseButton.Left)]
+        [TestCase(MouseButton.Middle)]
+        public void RowPress_ReleaseWithNoPressOnTheRow_IsNotAClick(MouseButton button)
+        {
+            Assert.That(new RowPress().Up(button), Is.False);
+        }
+
+        [Test]
+        public void RowPress_PressElsewhereThenEnterAndRelease_IsNotAClick()
+        {
+            // A press left over from an earlier visit is forgotten when the pointer comes back.
+            var p = new RowPress();
+            p.Down(MouseButton.Left);
+            p.Cancel();   // left the row
+            p.Cancel();   // came back with the button still down
+            Assert.That(p.Up(MouseButton.Left), Is.False);
+        }
+
+        [Test]
+        public void RowPress_OneReleasePerPress_AndButtonsAreSeparate()
+        {
+            var p = new RowPress();
+            p.Down(MouseButton.Middle);
+            Assert.That(p.Up(MouseButton.Left), Is.False, "a left release does not complete a middle press");
+            Assert.That(p.Up(MouseButton.Middle), Is.True);
+            Assert.That(p.Up(MouseButton.Middle), Is.False, "the press is used up");
+        }
+
+        [Test]
+        public void RowPress_RightButton_NeverCounts()
+        {
+            var p = new RowPress();
+            p.Down(MouseButton.Right);
+            Assert.That(p.Up(MouseButton.Right), Is.False);
+        }
+
         // ---- when a quick action may run ------------------------------------------
 
         [Test]
