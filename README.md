@@ -507,7 +507,7 @@ MIT, see the [LICENSE](LICENSE) file for details. The license keeps the original
 
 ### Third-party code
 
-The Settings window's visual style (`PowerPane/Themes/Fluent/`) is ported from Microsoft's WPF Fluent theme (`dotnet/wpf`, MIT), itself built from the open-source [WPF-UI](https://github.com/lepoco/wpfui) project. See [`PowerPane/Themes/Fluent/NOTICE.md`](PowerPane/Themes/Fluent/NOTICE.md) for the source commit, the ported files, and both copyright notices.
+The Settings window's visual style (`PowerPane/Themes/Fluent/`) is ported from Microsoft's WPF Fluent theme (`dotnet/wpf`, MIT), itself built from the open-source [WPF-UI](https://github.com/lepoco/wpfui) project. See [`PowerPane/Themes/Fluent/NOTICE.md`](PowerPane/Themes/Fluent/NOTICE.md) for the source commit, the ported files, and both copyright notices. The installer and the release zip carry the same notices and the full MIT text as [`THIRD-PARTY-NOTICES.txt`](THIRD-PARTY-NOTICES.txt), installed beside `PowerPane.exe` in `%LOCALAPPDATA%\PowerPane`.
 
 ---
 
