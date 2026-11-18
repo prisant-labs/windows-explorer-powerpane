@@ -49,7 +49,7 @@ The tests live in `tests/PowerPane.Tests`, an SDK-style `net48` NUnit project. I
 
 - Every `.cs` file under `PowerPane/` is listed in `PowerPane/PowerPane.csproj`.
 - No file other than `WinEventHook.cs` and `NativeMethods.cs` calls `SetWinEventHook`.
-- No `.cs` or `.xaml` file holds a raw private-use character (U+E000 to U+F8FF). Icon glyphs are written as `` in C# and `&#xE713;` in XAML, because some editors and tools drop the raw characters without a trace. One such edit once emptied every icon on the Settings Pane page.
+- No tracked text file holds a raw private-use character (U+E000 to U+F8FF). That covers code, XAML, scripts, and documentation, chosen by file extension so images and icons are skipped. Icon glyphs are written as `"\uE713"` in C# and `&#xE713;` in XAML, because some editors and tools drop the raw characters without a trace. One such edit once emptied every icon on the Settings Pane page.
 - No test uses `SettingsStore`'s default constructor.
 
 A failure lists every file and line that breaks a rule.

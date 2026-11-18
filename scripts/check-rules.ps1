@@ -49,9 +49,28 @@ foreach ($f in Get-SourceFiles 'PowerPane' @('*.cs')) {
 }
 
 # 3. Icon glyphs are private-use characters (U+E000 to U+F8FF). Some editors and tools drop them
-#    without a trace, which once emptied every icon on the Settings Pane page. Source files must
-#    spell them as escapes:  in C#, &#xE713; in XAML.
-$glyphFiles = @(Get-SourceFiles 'PowerPane' @('*.cs', '*.xaml')) + @(Get-SourceFiles 'tests' @('*.cs'))
+#    without a trace, which once emptied every icon on the Settings Pane page. Files must spell
+#    them as escapes: \uE713 in C#, &#xE713; in XAML. Every tracked text file is read, not only
+#    code: AGENTS.md once taught this rule with the raw glyph as its example, so the example read
+#    as "" to any tool that dropped it (#277). Files are chosen by extension, because the bytes of
+#    an icon or an image can decode as private-use characters.
+$textExtensions = @('.cs', '.xaml', '.md', '.ps1', '.psm1', '.iss', '.csproj', '.props', '.targets', '.config',
+                    '.json', '.yml', '.yaml', '.txt', '.sh', '.py', '.xml', '.resx', '.manifest', '.sln', '.editorconfig')
+$tracked = @(git -C $root ls-files 2>$null)
+if ($LASTEXITCODE -eq 0 -and $tracked.Count -gt 0) {
+    $glyphFiles = foreach ($t in $tracked) {
+        $full = Join-Path $root $t
+        $name = [System.IO.Path]::GetFileName($t)
+        $ext = [System.IO.Path]::GetExtension($t).ToLowerInvariant()
+        if (($textExtensions -contains $ext -or $textExtensions -contains $name.ToLowerInvariant()) -and (Test-Path -LiteralPath $full -PathType Leaf)) {
+            Get-Item -LiteralPath $full
+        }
+    }
+} else {
+    # No git (an exported source tree): fall back to the code files, which is what this rule read
+    # before it covered documentation.
+    $glyphFiles = @(Get-SourceFiles 'PowerPane' @('*.cs', '*.xaml')) + @(Get-SourceFiles 'tests' @('*.cs'))
+}
 foreach ($f in $glyphFiles) {
     $rel = Get-RelativePath $f
     $n = 0
