@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- **Clicking a folder** under **Settings > Keyboard and mouse** no longer lists **Copy path** next to **Quick action: Copy path**, which did the same thing. A folder click set to **Copy path** in 4.2.0 or 4.2.1 becomes **Quick action: Copy path**. That quick action works only while it and the Quick actions section are on, and it does nothing on a pinned folder that no longer exists. **Clicking a file** keeps **Copy path** ([#282](https://github.com/prisant-labs/windows-explorer-powerpane/issues/282)).
+
 ## [4.2.1] - 2026-11-18
 
 A small fix release: the Settings window's title lines up with its caption buttons, a maximized Settings window keeps its edges, and the installer and zip carry the third-party notices for the Settings window's styles.

@@ -181,6 +181,33 @@ namespace PowerPane.Tests
             Assert.That(s.ClickActions[0].File, Is.Null);
         }
 
+        // #282: Settings listed a built-in Copy path beside the Copy path quick action for folders.
+
+        [Test]
+        public void Normalize_FolderCopyPathFrom420_BecomesTheCopyPathQuickAction_FileCopyPathStays()
+        {
+            var s = Fresh();
+            s.ClickActions = new List<ClickActionSetting>
+            {
+                new ClickActionSetting { Gesture = "middle", Folder = ClickActions.CopyPath, File = ClickActions.CopyPath },
+            };
+            s.Normalize();
+            Assert.That(ClickActions.Resolve(s, ClickGesture.Middle, false), Is.EqualTo(ClickActions.QuickCopyPath));
+            Assert.That(ClickActions.Resolve(s, ClickGesture.Middle, true), Is.EqualTo(ClickActions.CopyPath));
+        }
+
+        [Test]
+        public void Options_FolderOffersOnlyTheQuickActionCopyPath_FileKeepsCopyPath()
+        {
+            var s = Fresh();
+            var folder = ClickActions.Options(s, ClickGesture.Middle, false).Select(p => p.Key).ToList();
+            Assert.That(folder, Does.Not.Contain(ClickActions.CopyPath));
+            Assert.That(folder, Does.Contain(ClickActions.QuickCopyPath));
+            Assert.That(ClickActions.IsValid(s, ClickGesture.Middle, false, ClickActions.CopyPath), Is.False);
+            var file = ClickActions.Options(s, ClickGesture.Middle, true).Select(p => p.Key).ToList();
+            Assert.That(file, Does.Contain(ClickActions.CopyPath));
+        }
+
         [Test]
         public void Normalize_KeepsAQuickActionThatIsOff_SoTurningItOnAgainRestoresTheClick()
         {
@@ -214,12 +241,12 @@ namespace PowerPane.Tests
             var json = Serialize(s);
             Assert.That(json, Does.Not.Contain("clickActions"));
 
-            ClickActions.Set(s, ClickGesture.Middle, false, ClickActions.CopyPath);
+            ClickActions.Set(s, ClickGesture.Middle, false, ClickActions.QuickCopyPath);
             json = Serialize(s);
             Assert.That(json, Does.Contain("\"clickActions\""));
             var back = Deserialize(json);
             back.Normalize();
-            Assert.That(ClickActions.Resolve(back, ClickGesture.Middle, false), Is.EqualTo(ClickActions.CopyPath));
+            Assert.That(ClickActions.Resolve(back, ClickGesture.Middle, false), Is.EqualTo(ClickActions.QuickCopyPath));
             Assert.That(ClickActions.Resolve(back, ClickGesture.Middle, true), Is.EqualTo(ClickActions.None));
         }
 
