@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [4.2.0] - 2026-11-17
+
+Each click on a folder or file in the pane can do its own thing: middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click can open a new window, open the parent folder, copy the path, or run a quick action. Three small fixes come with it: a sharp Settings icon, the gear at the bottom right of the pane, and an About page that says what QuickPane is.
 
 ### Added
 - Each click gesture on a folder or file in the pane can do its own thing. Under **Settings > Keyboard and mouse**, the **Clicking a folder** and **Clicking a file** cards set left click, middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click separately. A folder click can open the folder here, open it in a new window, open its parent folder, copy its path, or run a quick action that is switched on. A file click can open the file, open its containing folder, or copy its path. Nothing changes until you choose: left click and the modified clicks open, as before, and middle click does nothing. In an Open or Save dialog, a new window opens the folder in the dialog instead ([#269](https://github.com/prisant-labs/windows-explorer-powerpane/issues/269)).
