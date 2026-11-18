@@ -171,7 +171,8 @@ namespace PowerPane.Tests
             "PaneColor", // live through SidebarBackground's DynamicResource binding, no rebuild (#134)
             "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion", // read by UpdateNotifier; the pane shows none of them (#176)
             "QuickSwitcher", "QuickSwitcherHotkey", // read by App.ApplyHotkeys; the switcher is its own window (#226)
-            "RecentHiddenFolders", "RecentClearedTicks" // RecentFoldersService rescans on its own and raises RecentsChanged; no pane rebuild (#224)
+            "RecentHiddenFolders", "RecentClearedTicks", // RecentFoldersService rescans on its own and raises RecentsChanged; no pane rebuild (#224)
+            "ClickActions" // read by FolderTreeNode at click time, so a change applies to the next click with no rebuild (#269)
         };
 
         private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath" };
