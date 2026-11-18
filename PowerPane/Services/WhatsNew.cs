@@ -22,14 +22,14 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.2.1";
+        public const string Version = "4.2.2";
 
         public static readonly Item[] Items =
         {
-            new Item("A level title bar",
-                "The icon and title at the top of Settings line up with the minimize, maximize, and close buttons, and a maximized Settings window no longer cuts off its top and left edges."),
-            new Item("Third-party notices included",
-                "The installer now puts THIRD-PARTY-NOTICES.txt beside PowerPane, with the licence of the Fluent styles this window is built on."),
+            new Item("One Copy path for folder clicks",
+                "Clicking a folder lists Quick action: Copy path only, without the built-in Copy path that did the same thing. A click you set to Copy path keeps copying."),
+            new Item("New in 4.2.1",
+                "The title of this window lines up with its caption buttons, and the installer includes THIRD-PARTY-NOTICES.txt."),
         };
     }
 }
