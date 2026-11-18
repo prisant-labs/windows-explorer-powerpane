@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [4.2.1] - 2026-11-18
+
+A small fix release: the Settings window's title lines up with its caption buttons, a maximized Settings window keeps its edges, and the installer and zip carry the third-party notices for the Settings window's styles.
 
 ### Fixed
 - The icon and title at the top of the Settings window sat lower than the minimize, maximize, and close buttons, and the title was crowded against the icon. They now line up with those buttons, with the spacing Windows 11 uses: the icon 16 px from the edge and the title 16 px after it. A maximized Settings window also no longer cuts off a few pixels at its top and left edges ([#276](https://github.com/prisant-labs/windows-explorer-powerpane/issues/276)).

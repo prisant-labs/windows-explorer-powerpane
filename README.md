@@ -22,9 +22,9 @@ PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by l
 
 <!-- Keep the three newest releases here, one line each, and replace "Next release" with its version and date when tagging. CHANGELOG.md holds every version. -->
 
+- **4.2.1** (2026-11-18): the icon and title at the top of Settings line up with the minimize, maximize, and close buttons, and a maximized Settings window no longer cuts off its edges ([#276](https://github.com/prisant-labs/windows-explorer-powerpane/issues/276)). The installer and the zip include `THIRD-PARTY-NOTICES.txt` ([#278](https://github.com/prisant-labs/windows-explorer-powerpane/issues/278)).
 - **4.2.0** (2026-11-17): choose what each click does on a folder or file in the pane, under **Settings > Keyboard and mouse**. Middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click can open a new window, open the parent folder, copy the path, or run a quick action, and left click can change too ([#269](https://github.com/prisant-labs/windows-explorer-powerpane/issues/269)). The Settings icon is sharp, the gear sits at the bottom right of the pane, and the About page says what QuickPane is ([#271](https://github.com/prisant-labs/windows-explorer-powerpane/issues/271), [#272](https://github.com/prisant-labs/windows-explorer-powerpane/issues/272), [#273](https://github.com/prisant-labs/windows-explorer-powerpane/issues/273)).
 - **4.1.1** (2026-11-17): the About page in Settings has a **Support QuickPane's author** link, and this README has an [Author](#author) section again ([#266](https://github.com/prisant-labs/windows-explorer-powerpane/issues/266)).
-- **4.1.0** (2026-11-15): the **Add to PowerPane** verb works on files and drives as well as folders, lets you choose a tab, and skips items already in it. A **+** menu on each group adds a tab, a group, a folder, or a file, and **Sort pins** keeps a tab in order by itself. Five quick actions flip Explorer's own Show options, and Select Folder dialogs get fixes. The [release notes](docs/releases/4.1.0.md) list everything.
 
 [Full changelog](CHANGELOG.md)
 

@@ -22,14 +22,14 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.2.0";
+        public const string Version = "4.2.1";
 
         public static readonly Item[] Items =
         {
-            new Item("Choose what each click does",
-                "Under Keyboard and mouse, the Clicking a folder and Clicking a file cards let middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click open a new window, open the parent folder, copy the path, or run a quick action."),
-            new Item("Small fixes",
-                "The Settings icon is sharp, the pane's gear sits at the bottom right, and this page says that PowerPane began as a fork of QuickPane."),
+            new Item("A level title bar",
+                "The icon and title at the top of Settings line up with the minimize, maximize, and close buttons, and a maximized Settings window no longer cuts off its top and left edges."),
+            new Item("Third-party notices included",
+                "The installer now puts THIRD-PARTY-NOTICES.txt beside PowerPane, with the licence of the Fluent styles this window is built on."),
         };
     }
 }
