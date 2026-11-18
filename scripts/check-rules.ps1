@@ -70,7 +70,12 @@ if ($LASTEXITCODE -eq 0 -and $tracked.Count -gt 0) {
     # No git (an exported source tree): fall back to the code files, which is what this rule read
     # before it covered documentation.
     $glyphFiles = @(Get-SourceFiles 'PowerPane' @('*.cs', '*.xaml')) + @(Get-SourceFiles 'tests' @('*.cs'))
+    $glyphScope = 'code files only, because git ls-files failed'
 }
+# Printed with the result, so a log shows which scan ran: a silent fallback would still say clean.
+$glyphFiles = @($glyphFiles)
+if (-not $glyphScope) { $glyphScope = 'tracked text files' }
+$glyphScope = "$($glyphFiles.Count) $glyphScope"
 foreach ($f in $glyphFiles) {
     $rel = Get-RelativePath $f
     $n = 0
@@ -145,7 +150,7 @@ if ($failures.Count -gt 0) {
     $failures | ForEach-Object { Write-Host "  $_" }
     exit 1
 }
-Write-Host 'check-rules: clean'
+Write-Host "check-rules: clean (glyph scan read $glyphScope)"
 # Explicit, so a caller that reads $LASTEXITCODE sees 0. A script that ends without exit leaves it
 # unset in a fresh shell, which test.ps1 would read as a failure.
 exit 0
