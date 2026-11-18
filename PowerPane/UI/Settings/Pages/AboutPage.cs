@@ -60,9 +60,11 @@ namespace PowerPane.UI.Settings.Pages
         internal const string SupportAuthorUrl = "https://plexpixel.com/donate";
         internal const string SupportAuthorTitle = "Support QuickPane's author";
         private const string SupportAuthorCardId = "support-author";
-        private const string ThirdPartyNoticeText =
+        // Names the file the installer and the zip put beside PowerPane.exe, which a user has, not
+        // the source path NOTICE.md lives at, which only a clone has (#278).
+        internal const string ThirdPartyNoticeText =
             "The Settings window's styles are adapted from Microsoft's WPF Fluent theme (dotnet/wpf, MIT). " +
-            "Full notice: PowerPane/Themes/Fluent/NOTICE.md.";
+            "The full notice is THIRD-PARTY-NOTICES.txt in PowerPane's install folder.";
 
         public override IEnumerable<SettingsSearchEntry> SearchEntries
         {

@@ -72,6 +72,9 @@ Source: "{#MyBinDir}\{#MyAppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#MyBinDir}\{#MyAppExe}.config"; DestDir: "{app}"; Flags: ignoreversion
 ; MIT requires the copyright notice to travel with every copy, the installed one included.
 Source: "..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+; The same holds for the Settings window's Fluent styles, which are MIT code with their own
+; copyright holders. The About page points here (#278).
+Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 ; PowerPane spends its life in the tray, so without a launcher here the only way back in after the app

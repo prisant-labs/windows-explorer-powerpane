@@ -100,5 +100,14 @@ namespace PowerPane.Tests
             Assert.That(entries, Has.Some.Contains("Source code"));
             Assert.That(entries, Has.Some.Contains("Support QuickPane's author"));
         }
+
+        [Test]
+        public void ThirdPartyNotice_NamesTheFileThatShipsWithTheApp()
+        {
+            // The card once named PowerPane/Themes/Fluent/NOTICE.md, a path only a source clone has.
+            // package.ps1 and Installer.iss put THIRD-PARTY-NOTICES.txt beside the exe (#278).
+            Assert.That(AboutPage.ThirdPartyNoticeText, Does.Contain("THIRD-PARTY-NOTICES.txt"));
+            Assert.That(AboutPage.ThirdPartyNoticeText, Does.Not.Contain("PowerPane/Themes/Fluent"));
+        }
     }
 }

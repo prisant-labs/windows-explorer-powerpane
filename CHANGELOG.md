@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The installer and the release zip now include `THIRD-PARTY-NOTICES.txt`, the licence and copyright notices of the Microsoft Fluent styles that the Settings window is built on. Only PowerPane's own licence shipped before. The installer puts it beside `PowerPane.exe` and `LICENSE.txt` in `%LOCALAPPDATA%\PowerPane`. The **Third-party notices** card under **Settings > About** names the file in PowerPane's install folder instead of a path that exists only in the source code ([#278](https://github.com/prisant-labs/windows-explorer-powerpane/issues/278)).
+
 ## [4.2.0] - 2026-11-17
 
 Each click on a folder or file in the pane can do its own thing: middle click, Ctrl + click, Shift + click, and Ctrl + Shift + click can open a new window, open the parent folder, copy the path, or run a quick action. Three small fixes come with it: a sharp Settings icon, the gear at the bottom right of the pane, and an About page that says what QuickPane is.
