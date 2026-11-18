@@ -10,7 +10,7 @@ A folder sidebar for Windows File Explorer. PowerPane embeds a pinned-folders pa
 
 ## Download
 
-**[Download the installer](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest/download/PowerPane-x64-setup.exe)** (always the newest version), or open the [latest release](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest) for the `.zip`, which holds only the program and its license, with no right-click verb or startup entry. [Installation](#installation) has the details.
+**[Download the installer](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest/download/PowerPane-x64-setup.exe)** (always the newest version), or open the [latest release](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest) for the `.zip`, which holds only the program, its license, and `THIRD-PARTY-NOTICES.txt`, with no right-click verb or startup entry. [Installation](#installation) has the details.
 
 [![Latest release](https://img.shields.io/github/v/release/prisant-labs/windows-explorer-powerpane?label=Latest%20release&style=for-the-badge&logo=windows&color=0078D6)](https://github.com/prisant-labs/windows-explorer-powerpane/releases/latest)
 
