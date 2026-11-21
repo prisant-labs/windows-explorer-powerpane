@@ -137,7 +137,7 @@ Type: filesandordirs; Name: "{app}\PinQueue"
 { QuickPane, the name before the rename, installed under its own AppId, folder, mutex, and exit signal,
   so PowerPane cannot stop it or replace it. Both running would attach two panes to one Explorer window,
   so setup stops until QuickPane is uninstalled. The uninstall key covers both installers that used the
-  old AppId; the Run value covers a copy installed by the zip's Install.ps1, which writes no uninstall key. }
+  old AppId; the Run value covers a copy installed by QuickPane's Install.ps1, which writes no uninstall key. }
 function QuickPaneInstalled: Boolean;
 var
   Key: String;

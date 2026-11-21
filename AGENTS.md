@@ -15,7 +15,7 @@ PowerPane is a Windows tray app in C# 7.3, .NET Framework 4.8, and WPF, built fo
 | Test only | `pwsh -File scripts/test.ps1 -NoBuild` |
 | Rules check only | `pwsh -File scripts/check-rules.ps1` |
 
-A change is not done until the build succeeds with no errors and every test passes. `scripts/test.ps1` runs `scripts/check-rules.ps1` first, which fails on the rules below that a compiler cannot see: a `.cs` file missing from the csproj, a direct `SetWinEventHook` call, a raw private-use icon character, and `SettingsStore`'s default constructor in a test.
+A change is not done until the build succeeds with no errors and every test passes. `scripts/test.ps1` runs `scripts/check-rules.ps1` first, which fails on the rules below that a compiler cannot see: a `.cs` file missing from the csproj, a direct `SetWinEventHook` call, a raw private-use icon character, `SettingsStore`'s default constructor in a test, and manual install scripts that kill the app or install different files from the installer.
 
 ## Hard rules
 
@@ -61,7 +61,7 @@ A change is not done until the build succeeds with no errors and every test pass
 | `PowerPane/Models/Models.cs` | The settings and group data model. |
 | `tests/PowerPane.Tests/` | Unit tests. |
 | `scripts/` | Build, test, and packaging scripts, and `dev-run.ps1` for people trying a build on their own desktop. |
-| `packaging/` | `Installer.iss`, the Inno Setup script that `scripts/package.ps1` compiles, and `Install.ps1` and `Uninstall.ps1`, which install a build by hand without the installer. The three must register the same "Add to PowerPane" keys, which `scripts/check-rules.ps1` checks. |
+| `packaging/` | `Installer.iss`, the Inno Setup script that `scripts/package.ps1` compiles, and `Install.ps1` and `Uninstall.ps1`, which install a build by hand without the installer. The three must register the same "Add to PowerPane" keys and install the same files, the scripts must close the app with `--exit` and never kill it, and `scripts/check-rules.ps1` checks all of this. |
 
 The "Traps in the code" table in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) lists the behaviors that have caused bugs, such as Windows 11 tabs, keyboard focus, file dialogs, profile switches, and pane lifetime. Read it before changing anything in `Explorer/`, `Interop/`, a pane section, `GroupStore`, or the Settings window.
 
