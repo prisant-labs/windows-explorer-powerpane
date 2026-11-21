@@ -232,8 +232,9 @@ namespace PowerPane.Explorer
             // while that tree is showing (see HidesForDrag).
             if (Yielding)
             {
-                if (!_paneHiddenForDrag &&
-                    HidesForDrag(w != _dragStartW || h != _dragStartH, TreeShown()))
+                // The size test runs first, so a title-bar move never walks Explorer's child windows.
+                bool sizeChanged = w != _dragStartW || h != _dragStartH;
+                if (!_paneHiddenForDrag && sizeChanged && HidesForDrag(sizeChanged, TreeShown()))
                 {
                     _paneHiddenForDrag = true;
                     NM.ShowWindow(_host.Handle, NM.SW_HIDE);

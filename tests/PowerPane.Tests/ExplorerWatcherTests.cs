@@ -7,8 +7,9 @@ namespace PowerPane.Tests
 {
     /// <summary>
     /// Covers DragYieldActive, the cap that hands a dragged window back to normal layout when the
-    /// end-of-drag event is lost, and ResizeBorder.Contains, which tells a resize from a move when a
-    /// drag starts. No window or hook is needed.
+    /// end-of-drag event is lost; DragEndLost, the sweep's earlier release once Explorer's move/size
+    /// loop has ended; ExplorerWindow.HidesForDrag, which decides whether a drag hides the pane; and
+    /// ResizeBorder.Contains, which tells a resize from a move. No window or hook is needed.
     /// </summary>
     [TestFixture]
     public class ExplorerWatcherTests
