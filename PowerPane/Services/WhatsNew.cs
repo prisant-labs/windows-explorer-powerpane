@@ -22,14 +22,14 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.2.2";
+        public const string Version = "4.2.3";
 
         public static readonly Item[] Items =
         {
-            new Item("One Copy path for folder clicks",
-                "Clicking a folder lists Quick action: Copy path only, without the built-in Copy path that did the same thing. A click you set to Copy path keeps copying."),
-            new Item("New in 4.2.1",
-                "The title of this window lines up with its caption buttons, and the installer includes THIRD-PARTY-NOTICES.txt."),
+            new Item("Explorer's tree stays visible while you resize",
+                "Dragging an Explorer window's border no longer slides Explorer's own navigation pane under PowerPane. PowerPane steps aside for the drag and comes back beside the tree."),
+            new Item("Steadier file dialogs and beside pane",
+                "Resizing an Open or Save dialog by its corner grip keeps PowerPane inside the dialog, and a beside pane stays up while you drag its window's right edge."),
         };
     }
 }
