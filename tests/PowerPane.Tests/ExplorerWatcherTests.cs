@@ -58,6 +58,42 @@ namespace PowerPane.Tests
             Assert.That(ResizeBorder.Contains(Window(100, 200, 1100, 800), At(x, y), 8), Is.EqualTo(expected));
         }
 
+        [TestCase(true, true, true, TestName = "HidesForDrag: a resize with Explorer's tree showing hides the pane")]
+        [TestCase(true, false, false, TestName = "HidesForDrag: a resize with no tree keeps the pane, so no empty strip")]
+        [TestCase(false, true, false, TestName = "HidesForDrag: a move or border click keeps the pane")]
+        [TestCase(false, false, false, TestName = "HidesForDrag: a move with no tree keeps the pane")]
+        public void HidesForDrag_NeedsBothAResizeAndATree(bool sizeChanged, bool treeShown, bool expected)
+        {
+            Assert.That(ExplorerWindow.HidesForDrag(sizeChanged, treeShown), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void DragEndLost_LoopEndedAfterGrace_IsTrue()
+        {
+            Assert.That(ExplorerWatcher.DragEndLost(1000, 1000 + ExplorerWatcher.DragEndLostGraceMs, false), Is.True);
+        }
+
+        [Test]
+        public void DragEndLost_LoopStillRunning_IsFalse()
+        {
+            // A long drag or a keyboard resize keeps the loop running; never cut it short.
+            Assert.That(ExplorerWatcher.DragEndLost(1000, 1000 + 20000, true), Is.False);
+        }
+
+        [Test]
+        public void DragEndLost_WithinGrace_IsFalse()
+        {
+            Assert.That(ExplorerWatcher.DragEndLost(1000, 1000 + ExplorerWatcher.DragEndLostGraceMs - 1, false), Is.False);
+        }
+
+        [Test]
+        public void DragEndLost_AcrossTickCountWrap_CountsElapsedTime()
+        {
+            int start = int.MaxValue - 100;
+            Assert.That(ExplorerWatcher.DragEndLost(start, unchecked(start + ExplorerWatcher.DragEndLostGraceMs + 5), false), Is.True);
+            Assert.That(ExplorerWatcher.DragEndLost(start, unchecked(start + 50), false), Is.False);
+        }
+
         [Test]
         public void DragYieldActive_ClockBeforeStart_IsFalse()
         {

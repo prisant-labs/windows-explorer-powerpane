@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Resizing an Explorer window by its border no longer slides Explorer's own navigation pane under PowerPane for the length of the drag. When the window shows Explorer's navigation pane, PowerPane steps aside as soon as the window starts changing size and comes back beside Explorer's navigation pane when you let go. With Explorer's navigation pane turned off, PowerPane stays up, so no empty strip appears. Moving a window by its title bar, or clicking its border without dragging, never hides it.
+
 ## [4.2.2] - 2026-11-18
 
 A small change to the click settings: folder clicks list one Copy path instead of two.

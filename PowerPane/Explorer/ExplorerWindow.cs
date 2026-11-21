@@ -226,9 +226,18 @@ namespace PowerPane.Explorer
             int contentH = h - top;
 
             // During a drag, leave Explorer's tabs where Explorer puts them and only keep the pane itself
-            // the right size and on top. The pane is our own window, so moving it fights nothing.
+            // the right size and on top. The pane is our own window, so moving it fights nothing. Once
+            // the drag has changed the window's size, Explorer's tab sits at the left edge, so a pane
+            // still showing would cover Explorer's tree: hide it for the rest of the drag, but only
+            // while that tree is showing (see HidesForDrag).
             if (Yielding)
             {
+                if (!_paneHiddenForDrag &&
+                    HidesForDrag(w != _dragStartW || h != _dragStartH, TreeShown()))
+                {
+                    _paneHiddenForDrag = true;
+                    NM.ShowWindow(_host.Handle, NM.SW_HIDE);
+                }
                 if (!RectMatches(_host.Handle, 0, top, width, contentH))
                     NM.SetWindowPos(_host.Handle, NM.HWND_TOP, 0, top, width, contentH, NM.SWP_NOACTIVATE | NM.SWP_DEFERERASE);
                 return;
@@ -296,21 +305,63 @@ namespace PowerPane.Explorer
         /// them until the drag ends; see ExplorerWatcher._sizing for why.</summary>
         public volatile bool Yielding;
 
-        /// <summary>A drag of this window began. The pane stays up for a move and for a resize. During a
-        /// resize Explorer's content goes back to full width from the left edge, so its left side sits
-        /// behind the pane until the drag ends. #102 hid the pane for the drag instead, so Explorer's
-        /// tree showed whole, but with Explorer's own navigation pane turned off that left an empty
-        /// strip where the pane had been, which read as the pane collapsing.</summary>
+        private bool _paneHiddenForDrag;      // UI thread only
+        private int _dragStartW, _dragStartH; // client size when the drag began
+
+        /// <summary>A drag of this window began. The pane stays up until the drag changes the window's
+        /// size; ApplyLayout then decides whether to hide it (HidesForDrag).</summary>
         public void BeginDrag()
         {
+            NM.RECT client;
+            if (NM.GetClientRect(_cabinet, out client)) { _dragStartW = client.Width; _dragStartH = client.Height; }
             Yielding = true;
         }
 
-        /// <summary>The drag ended, or it is being abandoned: reapply the split once.</summary>
+        /// <summary>The drag ended, or it is being abandoned: reapply the split once, then show the pane
+        /// if the drag hid it. Showing it after the layout pass means it reappears beside Explorer's tree
+        /// rather than over it. It is shown even when that pass returns early, such as for a window too
+        /// narrow to split, so a drag can never leave the pane hidden.</summary>
         public void EndDrag()
         {
             Yielding = false;
             ApplyLayout();
+            if (!_paneHiddenForDrag) return;
+            _paneHiddenForDrag = false;
+            if (_host != null && _ready && !_disposed) NM.ShowWindow(_host.Handle, NM.SW_SHOWNA);
+        }
+
+        /// <summary>
+        /// Whether the pane hides for the rest of a drag. During a drag Explorer's tab goes back to the
+        /// window's left edge (#99), so a pane left up covers Explorer's own navigation tree. #102 hid the
+        /// pane for every resize, which left an empty strip in a window with Explorer's navigation pane
+        /// turned off, so 4.1.0 kept it up for every resize, which covered the tree in every window that
+        /// shows one. The pane now hides only when both hold: the drag has changed the window's size,
+        /// so a title-bar move or a click on the border never makes it blink, and the window shows
+        /// Explorer's tree, so a window without one never shows an empty strip.
+        /// </summary>
+        internal static bool HidesForDrag(bool sizeChanged, bool treeShown)
+        {
+            return sizeChanged && treeShown;
+        }
+
+        /// <summary>True when the top tab shows Explorer's navigation tree. It is read live from the
+        /// window, not from the navigation-pane setting, because a window applies that setting only when
+        /// it next opens a folder, and Explorer drops the tree on its own in a very narrow window. The
+        /// first ShellTabWindowClass child is the tab on top.</summary>
+        private bool TreeShown()
+        {
+            IntPtr tab = NextContentHost(IntPtr.Zero);
+            if (tab == IntPtr.Zero) return false;
+            bool shown = false;
+            NM.EnumChildWindows(tab, (h, l) =>
+            {
+                if (NM.ClassOf(h) != "SysTreeView32") return true;
+                if (NM.ClassOf(NM.GetParent(h)) != "NamespaceTreeControl" || !NM.IsWindowVisible(h)) return true;
+                NM.RECT r;
+                if (NM.GetWindowRect(h, out r) && r.Width > 0 && r.Height > 0) { shown = true; return false; }
+                return true;
+            }, IntPtr.Zero);
+            return shown;
         }
 
         /// <summary>
