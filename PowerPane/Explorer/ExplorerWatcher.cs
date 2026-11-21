@@ -53,9 +53,10 @@ namespace PowerPane.Explorer
         // cursor, because each correction waits for Explorer's thread to finish its own layout first. So
         // the dragged window is left to Explorer until the drag ends, and the split is reapplied once on
         // release (prisant-labs/windows-explorer-powerpane#99). Leaving Explorer's layout alone puts the
-        // left side of its content behind the pane for the drag. #102 hid the pane instead, but with
-        // Explorer's own navigation pane off that showed an empty strip, so the pane now stays up.
-        // Capped, so a lost end event cannot leave a window unmanaged.
+        // left side of its content behind the pane for the drag, so the pane hides once the drag resizes
+        // a window that shows Explorer's tree (ExplorerWindow.HidesForDrag). A lost end event is caught
+        // by the sweep once Explorer's thread has left its move/size loop (DragEndLost), and the cap is
+        // the last resort, so it can neither leave a window unmanaged nor keep its pane hidden.
         private ExplorerWindow _sizing;
         private int _sizingSinceTick;
         internal const int DragYieldCapMs = 30000;
@@ -66,6 +67,21 @@ namespace PowerPane.Explorer
         {
             int elapsed = unchecked(nowTick - sinceTick);
             return elapsed >= 0 && elapsed < DragYieldCapMs;
+        }
+
+        // How long a drag must have run before the sweep trusts "no move/size loop" to mean its end
+        // event was lost, so a sweep that lands in the instant between the start event and the loop
+        // check can never cut a real drag short.
+        internal const int DragEndLostGraceMs = 1000;
+
+        /// <summary>True when the sweep should release a dragged window: the drag started at least
+        /// DragEndLostGraceMs ago and Explorer's thread is no longer in a move or size loop, so its
+        /// MOVESIZEEND was lost. Without this, a lost end event kept the pane hidden until the cap,
+        /// now that a resize hides it. Compares by subtraction for the TickCount wrap.</summary>
+        internal static bool DragEndLost(int sinceTick, int nowTick, bool moveSizeLoopActive)
+        {
+            int elapsed = unchecked(nowTick - sinceTick);
+            return elapsed >= DragEndLostGraceMs && !moveSizeLoopActive;
         }
 
         public void Start()
@@ -315,7 +331,13 @@ namespace PowerPane.Explorer
             // through and leave the remaining windows unlaid. A drag whose end event was lost is
             // released first, so that window is laid out again in this pass.
             var sizing = _sizing;
-            if (sizing != null && !DragYieldActive(_sizingSinceTick, Environment.TickCount)) ForgetSizing(sizing);
+            if (sizing != null)
+            {
+                int now = Environment.TickCount;
+                if (!DragYieldActive(_sizingSinceTick, now) ||
+                    DragEndLost(_sizingSinceTick, now, FollowerPane.MoveSizeLoopActive(sizing.Cabinet)))
+                    ForgetSizing(sizing);
+            }
 
             List<IntPtr> dead = null;
             foreach (var kv in new List<KeyValuePair<IntPtr, ExplorerWindow>>(_windows))
