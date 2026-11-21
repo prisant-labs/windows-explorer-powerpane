@@ -105,7 +105,7 @@ foreach ($f in Get-SourceFiles 'tests' @('*.cs')) {
 }
 
 # 5. The "Add to PowerPane" verb is registered by three files in packaging/ that no compiler links: Installer.iss
-#    (the installer), Install.ps1 (the zip install), and Uninstall.ps1 (the zip uninstall). A verb
+#    (the installer), Install.ps1 (the manual install), and Uninstall.ps1 (the manual uninstall). A verb
 #    added to one and not the others leaves a menu entry that installs but never uninstalls, or the
 #    reverse. Each file must name the same set of PowerPanePin class keys, and none may keep the old
 #    "Pin to PowerPane" text.
@@ -142,6 +142,139 @@ foreach ($name in @('Installer.iss', 'Install.ps1', 'Uninstall.ps1')) {
         if ($line -match 'Pin to PowerPane') {
             $failures.Add("${name}:$n still says ""Pin to PowerPane"". The verb is ""Add to PowerPane"".")
         }
+    }
+}
+
+# 6. Install.ps1 and Uninstall.ps1 install and remove PowerPane by hand, and nothing runs them in CI,
+#    so they drifted from the setup program unseen: they force-killed the app, which the watchdog
+#    answers with a relaunch, killed it before checking a build existed, and installed only the exe.
+#    The scripts are read with the PowerShell parser, so a comment that
+#    names a forbidden command does not count and a script that no longer parses fails here.
+function Read-PowerShellAst([string]$name) {
+    $tokens = $null; $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $root "packaging\$name"), [ref]$tokens, [ref]$errors)
+    foreach ($e in $errors) { $failures.Add("packaging/${name}:$($e.Extent.StartLineNumber) does not parse: $($e.Message)") }
+    return $ast
+}
+
+# A step written in the script body, not inside a function definition, whose position says when it runs.
+function Get-BodyCommands($ast, [string[]]$names) {
+    @($ast.FindAll({
+        param($node)
+        if ($node -isnot [System.Management.Automation.Language.CommandAst]) { return $false }
+        if ($names -notcontains $node.GetCommandName()) { return $false }
+        for ($p = $node.Parent; $p; $p = $p.Parent) {
+            if ($p -is [System.Management.Automation.Language.FunctionDefinitionAst]) { return $false }
+        }
+        return $true
+    }, $true) | Sort-Object { $_.Extent.StartOffset })
+}
+
+function Get-FirstOffset($commands) {
+    if ($commands.Count -eq 0) { return [int]::MaxValue }
+    return $commands[0].Extent.StartOffset
+}
+
+$manualScripts = [ordered]@{ 'Install.ps1' = (Read-PowerShellAst 'Install.ps1'); 'Uninstall.ps1' = (Read-PowerShellAst 'Uninstall.ps1') }
+foreach ($name in $manualScripts.Keys) {
+    $ast = $manualScripts[$name]
+    # A kill reads as a crash to the watchdog and skips the layout restore. Close the app with --exit.
+    $kills = $ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.CommandAst] -and
+            @('Stop-Process', 'spps', 'kill', 'taskkill', 'taskkill.exe') -contains $node.GetCommandName()
+    }, $true)
+    foreach ($k in $kills) {
+        $failures.Add("packaging/${name}:$($k.Extent.StartLineNumber) stops PowerPane with $($k.GetCommandName()). Close it with --exit, as Installer.iss does.")
+    }
+    $exitArgs = $ast.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $node.Value -eq '--exit'
+    }, $true)
+    if (@($exitArgs).Count -eq 0) {
+        $failures.Add("packaging/$name never passes --exit, so it cannot close a running PowerPane cleanly.")
+    }
+}
+
+# Install.ps1 must find every file before it closes the app, and close the app before it copies.
+$installAst = $manualScripts['Install.ps1']
+$findAt = Get-FirstOffset (Get-BodyCommands $installAst @('Find-Payload'))
+$stopAt = Get-FirstOffset (Get-BodyCommands $installAst @('Stop-PowerPane'))
+$copyAt = Get-FirstOffset (Get-BodyCommands $installAst @('Copy-Item'))
+if ($findAt -eq [int]::MaxValue -or $stopAt -eq [int]::MaxValue) {
+    $failures.Add('packaging/Install.ps1 must call Find-Payload and then Stop-PowerPane, or check-rules cannot read the order.')
+} elseif (-not ($findAt -lt $stopAt -and $stopAt -lt $copyAt)) {
+    $failures.Add('packaging/Install.ps1 must find every file (Find-Payload), then close the app (Stop-PowerPane), then copy. A missing build must leave the running copy alone.')
+}
+
+# Uninstall.ps1 must close the app before it removes anything.
+$uninstallAst = $manualScripts['Uninstall.ps1']
+$stopAt = Get-FirstOffset (Get-BodyCommands $uninstallAst @('Stop-PowerPane'))
+$removeAt = Get-FirstOffset (Get-BodyCommands $uninstallAst @('Remove-Item', 'Remove-ItemProperty'))
+if ($stopAt -eq [int]::MaxValue -or $stopAt -gt $removeAt) {
+    $failures.Add('packaging/Uninstall.ps1 must close the app (Stop-PowerPane) before it removes anything.')
+}
+$deleteVerbAt = $uninstallAst.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $node.Member.Value -eq 'DeleteSubKeyTree'
+}, $true) | ForEach-Object { $_.Extent.StartOffset } | Sort-Object | Select-Object -First 1
+if ($null -ne $deleteVerbAt -and $stopAt -gt $deleteVerbAt) {
+    $failures.Add('packaging/Uninstall.ps1 must close the app (Stop-PowerPane) before it removes the verb keys.')
+}
+
+# Install.ps1 must install the same files, under the same names, as Installer.iss's [Files] section.
+$issFiles = @()
+foreach ($line in Get-Content (Join-Path $root 'packaging\Installer.iss')) {
+    if ($line -notmatch '^\s*Source:\s*"([^"]+)"') { continue }
+    $source = $Matches[1].Replace('{#MyAppExe}', 'PowerPane.exe')
+    if ($line -match 'DestName:\s*"([^"]+)"') { $issFiles += $Matches[1] }
+    else { $issFiles += [System.IO.Path]::GetFileName($source.Replace('\', '/')) }
+}
+$issFiles = @($issFiles | Sort-Object -Unique)
+$payloadAssign = $installAst.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $node.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $node.Left.VariablePath.UserPath -eq 'payload'
+}, $true) | Select-Object -First 1
+$scriptFiles = @()
+if ($payloadAssign) {
+    $table = $payloadAssign.Right.Find({ param($node) $node -is [System.Management.Automation.Language.HashtableAst] }, $true)
+    if ($table) {
+        foreach ($pair in $table.KeyValuePairs) {
+            if ($pair.Item1 -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $scriptFiles += $pair.Item1.Value }
+        }
+    }
+}
+$scriptFiles = @($scriptFiles | Sort-Object -Unique)
+if ($issFiles.Count -eq 0) {
+    $failures.Add('packaging/Installer.iss installs no files, or check-rules cannot read its [Files] section.')
+} elseif ($scriptFiles.Count -eq 0) {
+    $failures.Add('packaging/Install.ps1 has no $payload table, or check-rules cannot read it.')
+} elseif (($scriptFiles -join ', ') -ne ($issFiles -join ', ')) {
+    $failures.Add("packaging/Install.ps1 installs [$($scriptFiles -join ', ')], but Installer.iss installs [$($issFiles -join ', ')]. The two must install the same files.")
+}
+
+# The Start menu shortcut has one name in three places: ShortcutRepair.LinkName, which the app writes
+# at every start, Installer.iss's [Icons] entry, and Uninstall.ps1, which removes it. A mismatch leaves
+# two shortcuts, or one that outlives the uninstall.
+$repairText = Get-Content (Join-Path $root 'PowerPane/Services/ShortcutRepair.cs') -Raw
+$linkMatch = [regex]::Match($repairText, 'LinkName\s*=\s*"([^"]+)"')
+$issText = Get-Content (Join-Path $root 'packaging\Installer.iss') -Raw
+$appNameMatch = [regex]::Match($issText, '#define\s+MyAppName\s+"([^"]+)"')
+if (-not $linkMatch.Success -or -not $appNameMatch.Success) {
+    $failures.Add('check-rules cannot read ShortcutRepair.LinkName or Installer.iss''s MyAppName.')
+} else {
+    $linkName = $linkMatch.Groups[1].Value
+    if ("$($appNameMatch.Groups[1].Value).lnk" -ne $linkName) {
+        $failures.Add("Installer.iss names the Start menu shortcut ""$($appNameMatch.Groups[1].Value).lnk"", but ShortcutRepair.LinkName is ""$linkName"".")
+    }
+    $linkInUninstall = $uninstallAst.FindAll({
+        param($node)
+        $node -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $node.Value -eq $linkName
+    }, $true)
+    if (@($linkInUninstall).Count -eq 0) {
+        $failures.Add("packaging/Uninstall.ps1 does not name the Start menu shortcut ""$linkName"" (ShortcutRepair.LinkName), so the uninstall leaves it behind.")
     }
 }
 
