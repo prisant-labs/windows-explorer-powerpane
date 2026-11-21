@@ -92,9 +92,9 @@ namespace PowerPane.Explorer
         }
 
         // Both a title-bar move and a border resize fire MOVESIZESTART/END here; either one makes the
-        // separate pane window trail behind by a frame or more through LOCATIONCHANGE, so both hide
-        // the pane for the length of the drag and place it once, from the final rect, when it ends
-        // (#147).
+        // separate pane window trail behind by a frame or more through LOCATIONCHANGE, so the pane hides
+        // once the drag moves an edge it follows and is placed once, from the final rect, when the drag
+        // ends (#147). A right-edge drag moves nothing it follows, so the pane stays up (#235).
         private void OnMoveSize(uint evt, IntPtr hwnd, int idObject, int idChild, uint thread)
         {
             if (idObject != NM.OBJID_WINDOW) return;
@@ -268,8 +268,9 @@ namespace PowerPane.Explorer
             if (_window == null || _handle == IntPtr.Zero) return;
             // While its window is in a move or size loop, the pane never follows (it would trail a frame
             // late) and MakeRoom below never runs (it would move a window the user has hold of). The
-            // pane hides only once the window has actually left where the loop began, because Windows
-            // enters the loop on a plain title-bar click too, and hiding then made the pane blink (#147).
+            // pane hides only once an edge it follows has left where the loop began, because Windows
+            // enters the loop on a plain title-bar click too, and hiding then made the pane blink (#147),
+            // and a right-edge drag leaves the pane where it belongs (#235).
             if (_dragging)
             {
                 if (HideForMove(_dragHavePos, _dragStart, visible)) Hide();
@@ -351,7 +352,8 @@ namespace PowerPane.Explorer
         /// <summary>The window this pane follows entered a move or size loop. The pane is a separate
         /// top-level window that only moves after a LOCATIONCHANGE notification reaches us, which lags
         /// a fast drag by one or more frames (#147). From here until EndDrag, PositionBeside hides the
-        /// pane once the window moves, rather than chasing it, so it is never shown in the wrong place.
+        /// pane once an edge it follows moves (HideForMove), rather than chasing it, so it is never
+        /// shown in the wrong place.
         /// It does not hide here: a click on the title bar enters the same loop without moving.</summary>
         public void BeginDrag()
         {
@@ -362,14 +364,15 @@ namespace PowerPane.Explorer
             _dragHavePos = _havePos;
         }
 
-        /// <summary>Pure decision behind the drag hide: during a move loop, hide once the window's
-        /// visible rect differs from the one it had when the loop began. With no known start rect,
-        /// hide at once, since there is nothing to compare against (#147).</summary>
+        /// <summary>Pure decision behind the drag hide: during a move loop, hide once the window's left,
+        /// top, or bottom edge differs from where the loop began (#147). The pane sits flush to the
+        /// window's left edge at its full height and depends on nothing else, so a drag of the right
+        /// edge alone keeps it up, still in the right place (#235). With no known start rect, hide at
+        /// once, since there is nothing to compare against.</summary>
         internal static bool HideForMove(bool haveStart, NM.RECT start, NM.RECT current)
         {
             if (!haveStart) return true;
-            return start.Left != current.Left || start.Top != current.Top
-                || start.Right != current.Right || start.Bottom != current.Bottom;
+            return start.Left != current.Left || start.Top != current.Top || start.Bottom != current.Bottom;
         }
 
         /// <summary>The drag ended. Clearing the flag lets the next PositionBeside call show the pane

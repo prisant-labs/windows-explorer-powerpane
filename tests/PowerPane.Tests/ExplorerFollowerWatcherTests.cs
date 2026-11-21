@@ -88,13 +88,25 @@ namespace PowerPane.Tests
         }
 
         [Test]
-        public void HideForMove_AnyEdgeMoved_HidesThePane()
+        public void HideForMove_AnEdgeThePaneFollowsMoved_HidesThePane()
         {
             var start = Rect(400, 200, 1200, 800);
             Assert.That(FollowerPane.HideForMove(true, start, Rect(401, 200, 1201, 800)), Is.True); // dragged
             Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 199, 1200, 799)), Is.True); // dragged up
-            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1250, 800)), Is.True); // resized right
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(350, 200, 1200, 800)), Is.True); // resized left
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 150, 1200, 800)), Is.True); // resized up
             Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1200, 850)), Is.True); // resized down
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1250, 850)), Is.True); // corner
+        }
+
+        [Test]
+        public void HideForMove_RightEdgeOnly_KeepsThePane()
+        {
+            // The pane sits flush to the window's left edge at its full height, so a right-edge drag
+            // changes nothing the pane depends on (#235).
+            var start = Rect(400, 200, 1200, 800);
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 1250, 800)), Is.False); // wider
+            Assert.That(FollowerPane.HideForMove(true, start, Rect(400, 200, 900, 800)), Is.False);  // narrower
         }
 
         [Test]
