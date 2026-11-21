@@ -225,9 +225,9 @@ namespace PowerPane.Explorer
         }
 
         // Inside mode needs nothing for a title-bar move, because the controls move with the dialog,
-        // so only a press on the border starts the inside pane's resize handling; a keyboard resize is
-        // not recognised, and just changes the width under the pane, which demotes that one dialog and
-        // nothing more. A beside pane is a separate top-level window, so it hides for any move or
+        // so a press on the border starts the inside pane's resize handling at once. A drag on the size
+        // grip or a keyboard resize starts it at its first size change instead
+        // (DialogInsidePane.UserResizeMissed, #234), and the end event below ends either. A beside pane is a separate top-level window, so it hides for any move or
         // resize of its dialog -- a title-bar drag included -- rather than trail it a frame late
         // through LOCATIONCHANGE (#147).
         private void OnMoveSize(uint evt, IntPtr hwnd, int idObject, int idChild, uint thread)

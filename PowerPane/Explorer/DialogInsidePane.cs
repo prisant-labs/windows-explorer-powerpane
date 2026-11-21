@@ -408,8 +408,12 @@ namespace PowerPane.Explorer
             if (_userSizing)
             {
                 // The dialog lays itself out while its border is dragged; EndUserResize fits the pane
-                // back in on release. The sweep ends a drag whose end event never arrived.
-                if (unchecked(Environment.TickCount - _userSizingSince) > UserSizingCapMs) EndUserResize();
+                // back in on release. The sweep ends a drag whose end event never arrived, once the
+                // dialog's thread has left its move/size loop, or at the cap.
+                int elapsed = unchecked(Environment.TickCount - _userSizingSince);
+                if (elapsed > UserSizingCapMs ||
+                    ExplorerWatcher.DragEndLost(_userSizingSince, Environment.TickCount, FollowerPane.MoveSizeLoopActive(_dlg)))
+                    EndUserResize();
                 return;
             }
 
@@ -418,6 +422,18 @@ namespace PowerPane.Explorer
 
             bool sizeChanged = wr.Width != _lastW || wr.Height != _lastH;
             _lastW = wr.Width; _lastH = wr.Height;
+
+            // A resize the border test at MOVESIZESTART did not recognise: a drag on the size grip,
+            // which sits further in than the border band, or a keyboard resize. Treated as the dialog
+            // resizing itself, it moved the controls at every step and then sent the dialog beside
+            // (#234). Its first size change inside the move/size loop starts the same handling a
+            // border drag gets. The loop test keeps the common Save dialog's own resize just after
+            // attach, which runs outside any loop, on the fit-inside path below.
+            if (UserResizeMissed(sizeChanged, sizeChanged && FollowerPane.MoveSizeLoopActive(_dlg)))
+            {
+                BeginUserResize();
+                return;
+            }
 
             int now = Environment.TickCount;
             bool settling = now - _attachTick < 2000; // lazily-built controls appear shortly after attach
@@ -695,6 +711,15 @@ namespace PowerPane.Explorer
             _userSizing = true;
             _userSizingSince = Environment.TickCount;
             NM.ShowWindow(_host.Handle, NM.SW_HIDE);
+        }
+
+        /// <summary>True when a size change is the user resizing the dialog although the border test at
+        /// the start of the drag said otherwise: the size changed while the dialog's thread runs a move
+        /// or size loop. Only Relayout's pass that sees the change calls this, before any control moves.
+        /// </summary>
+        internal static bool UserResizeMissed(bool sizeChanged, bool moveSizeLoopActive)
+        {
+            return sizeChanged && moveSizeLoopActive;
         }
 
         /// <summary>The border drag ended: fit the pane back in at the size the user chose, which is also

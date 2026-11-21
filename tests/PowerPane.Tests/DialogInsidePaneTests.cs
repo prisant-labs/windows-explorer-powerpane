@@ -33,6 +33,15 @@ namespace PowerPane.Tests
             Assert.That(DialogInsidePane.FittedWidth(1200, 1400, 228, 1192), Is.EqualTo(200));
         }
 
+        [TestCase(true, true, true, TestName = "UserResizeMissed: a size change inside the move/size loop is the user's resize (size grip, keyboard)")]
+        [TestCase(true, false, false, TestName = "UserResizeMissed: a size change outside any loop is the dialog resizing itself")]
+        [TestCase(false, true, false, TestName = "UserResizeMissed: a move with no size change is not a resize")]
+        [TestCase(false, false, false, TestName = "UserResizeMissed: nothing changed")]
+        public void UserResizeMissed_NeedsASizeChangeInsideTheLoop(bool sizeChanged, bool loopActive, bool expected)
+        {
+            Assert.That(DialogInsidePane.UserResizeMissed(sizeChanged, loopActive), Is.EqualTo(expected));
+        }
+
         [Test]
         public void FitWidth_RoomToSpare_TakesTheRequestedWidth()
         {

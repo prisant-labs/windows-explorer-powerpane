@@ -4,6 +4,7 @@
 
 ### Fixed
 - Resizing an Explorer window by its border no longer slides Explorer's own navigation pane under PowerPane for the length of the drag. When the window shows Explorer's navigation pane, PowerPane steps aside as soon as the window starts changing size and comes back beside Explorer's navigation pane when you let go. With Explorer's navigation pane turned off, PowerPane stays up, so no empty strip appears. Moving a window by its title bar, or clicking its border without dragging, never hides it.
+- Resizing an Open or Save dialog by the dotted grip in its bottom-right corner, or with the keyboard, now keeps PowerPane inside the dialog, as dragging its border already did. A drag on the grip used to move the dialog's controls at every step and then move PowerPane out beside the dialog ([#234](https://github.com/prisant-labs/windows-explorer-powerpane/issues/234)).
 
 ## [4.2.2] - 2026-11-18
 
