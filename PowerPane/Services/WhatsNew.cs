@@ -22,7 +22,7 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.2.3";
+        public const string Version = "4.2.4";
 
         public static readonly Item[] Items =
         {
@@ -30,6 +30,8 @@ namespace PowerPane.Services
                 "Dragging an Explorer window's border no longer slides Explorer's own navigation pane under PowerPane. PowerPane steps aside for the drag and comes back beside the tree."),
             new Item("Steadier file dialogs and beside pane",
                 "Resizing an Open or Save dialog by its corner grip keeps PowerPane inside the dialog, and a beside pane stays up while you drag its window's right edge."),
+            new Item("The desktop dock keeps its place",
+                "Changing a display's scale no longer leaves the desktop dock wider or narrower than the strip of screen it reserves."),
         };
     }
 }
