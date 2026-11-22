@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- The desktop dock, with auto-hide off, now stays on the strip of screen it reserves when you change that display's scale in Windows Settings. Before, the dock could grow wider than its strip and cover part of a maximized window, or shrink and leave a gap, until PowerPane restarted ([#160](https://github.com/prisant-labs/windows-explorer-powerpane/issues/160)).
+
 ## [4.2.3] - 2026-11-20
 
 A fix release, mostly for resizing: Explorer's own navigation pane stays visible while you drag an Explorer window's border, file dialogs keep PowerPane inside when resized by their corner grip, and a beside pane stays up for a right-edge drag. The manual install scripts also close PowerPane the way the installer does.
