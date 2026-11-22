@@ -1,19 +1,19 @@
 # Changelog
 
-## [Unreleased]
+## [4.2.4] - 2026-11-22
+
+A fix release, mostly for resizing: Explorer's own navigation pane stays visible while you drag an Explorer window's border, file dialogs keep PowerPane inside when resized by their corner grip, and a beside pane stays up for a right-edge drag. The desktop dock also stays on its strip after a display scale change, and the manual install scripts close PowerPane the way the installer does. 4.2.3 was built as a draft and never published, so this is the first release with its fixes, and they are listed here.
 
 ### Fixed
 - The desktop dock, with auto-hide off, now stays on the strip of screen it reserves when you change that display's scale in Windows Settings. Before, the dock could grow wider than its strip and cover part of a maximized window, or shrink and leave a gap, until PowerPane restarted ([#160](https://github.com/prisant-labs/windows-explorer-powerpane/issues/160)).
-
-## [4.2.3] - 2026-11-20
-
-A fix release, mostly for resizing: Explorer's own navigation pane stays visible while you drag an Explorer window's border, file dialogs keep PowerPane inside when resized by their corner grip, and a beside pane stays up for a right-edge drag. The manual install scripts also close PowerPane the way the installer does.
-
-### Fixed
 - Resizing an Explorer window by its border no longer slides Explorer's own navigation pane under PowerPane for the length of the drag. When the window shows Explorer's navigation pane, PowerPane steps aside as soon as the window starts changing size and comes back beside Explorer's navigation pane when you let go. With Explorer's navigation pane turned off, PowerPane stays up, so no empty strip appears. Moving a window by its title bar, or clicking its border without dragging, never hides it ([#285](https://github.com/prisant-labs/windows-explorer-powerpane/issues/285)).
 - Resizing an Open or Save dialog by the dotted grip in its bottom-right corner, or with the keyboard, now keeps PowerPane inside the dialog, as dragging its border already did. A drag on the grip used to move the dialog's controls at every step and then move PowerPane out beside the dialog ([#234](https://github.com/prisant-labs/windows-explorer-powerpane/issues/234)).
 - The manual install scripts in the source code, `packaging\Install.ps1` and `packaging\Uninstall.ps1`, now close PowerPane the way the installer does, by asking it to exit. Before, they killed it, so the watchdog could start it again partway through and Explorer windows kept PowerPane's layout. `Install.ps1` now finds every file before it closes a running copy, so a missing build no longer closes the app for nothing. It installs the same four files as the installer, including `PowerPane.exe.config`, which makes the pane follow each display's scale. `Uninstall.ps1` stops without removing anything when PowerPane does not close, and it now removes the Start menu shortcut. The installer and the release zip are unchanged ([#288](https://github.com/prisant-labs/windows-explorer-powerpane/issues/288)).
 - With PowerPane beside a window or dialog, dragging that window's right edge no longer hides PowerPane, because it stays in the right place. Moving the window, or dragging its left, top, or bottom edge, still hides PowerPane until you let go ([#235](https://github.com/prisant-labs/windows-explorer-powerpane/issues/235)).
+
+## [4.2.3] - 2026-11-20
+
+Never published as a release. Its draft passed its checks, but its changes first ship in 4.2.4, together with a later fix, and are listed there.
 
 ## [4.2.2] - 2026-11-18
 
