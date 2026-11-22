@@ -77,6 +77,7 @@ namespace PowerPane.Explorer
             App.Theme?.AttachWindow(_window);
             _window.SourceInitialized += OnSourceInitialized;
             _window.Closed += (s, e) => RemoveAppBar();
+            _window.DpiChanged += OnDpiChanged;
             _window.Show();
 
             if (_allDesktops) PinAllDesktops();
@@ -302,11 +303,49 @@ namespace PowerPane.Explorer
             abd.rc = AdjustQueriedStrip(abd.rc, width, right);
 
             // Every SETPOS makes Windows recompute the work area and re-lay-out the desktop, and this
-            // runs on every settings save, so only reserve again when the strip actually changes.
-            if (_haveReserved && SameRect(abd.rc, _reserved)) return;
-            NM.SHAppBarMessage(NM.ABM_SETPOS, ref abd);
-            _reserved = abd.rc; _haveReserved = true;
+            // runs on every settings save, so only reserve again when the strip actually changes. An
+            // unchanged strip can still need the window moved back onto it: when the dock monitor's
+            // scale changes, WPF resizes the window for the new DPI while the reservation, in physical
+            // pixels, stays the same (#160).
+            NM.RECT window;
+            bool haveWindow = NM.GetWindowRect(_handle, out window);
+            var step = NextReserveStep(_haveReserved, abd.rc, _reserved, haveWindow, window);
+            if (step == ReserveStep.Nothing) return;
+            if (step == ReserveStep.Reserve)
+            {
+                NM.SHAppBarMessage(NM.ABM_SETPOS, ref abd);
+                _reserved = abd.rc; _haveReserved = true;
+            }
             NM.MoveWindow(_handle, abd.rc.Left, abd.rc.Top, abd.rc.Right - abd.rc.Left, abd.rc.Bottom - abd.rc.Top, true);
+        }
+
+        internal enum ReserveStep { Nothing, MoveOnly, Reserve }
+
+        /// <summary>What SetReservedPosition must do with the strip the shell just returned. A new or
+        /// changed strip is reserved and the window moved onto it. An unchanged strip is not reserved
+        /// again (#145), but the window is still moved back when it no longer covers the strip, or when
+        /// its rectangle cannot be read (#160).</summary>
+        internal static ReserveStep NextReserveStep(bool haveReserved, NM.RECT queried, NM.RECT reserved, bool haveWindow, NM.RECT window)
+        {
+            if (!haveReserved || !SameRect(queried, reserved)) return ReserveStep.Reserve;
+            if (haveWindow && SameRect(window, reserved)) return ReserveStep.Nothing;
+            return ReserveStep.MoveOnly;
+        }
+
+        /// <summary>The dock monitor's scale changed. WPF resizes the window to its suggested rectangle
+        /// as part of handling WM_DPICHANGED, so the dock is put back on its edge once that has run,
+        /// not from inside it (#160).</summary>
+        private void OnDpiChanged(object sender, DpiChangedEventArgs e)
+        {
+            try
+            {
+                _window.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try { if (_autoHide) SetAutoHide(_expanded); else SetReservedPosition(); }
+                    catch (Exception ex) { Log.Error("appbar dpichange", ex); }
+                }), DispatcherPriority.Background);
+            }
+            catch (Exception ex) { Log.Error("appbar dpichange", ex); }
         }
 
         /// <summary>The strip a dock asks the shell for: the monitor's full height, flush with its

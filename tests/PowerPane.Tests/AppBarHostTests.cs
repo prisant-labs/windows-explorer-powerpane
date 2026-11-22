@@ -261,6 +261,46 @@ namespace PowerPane.Tests
             Assert.That(AppBarHost.IsEdgeShared(primary, all, true), Is.False);
         }
 
+        // ---- #160: an unchanged reservation still puts the window back on it ----
+
+        [Test]
+        public void NextReserveStep_FirstReservation_Reserves()
+        {
+            var strip = Rect(0, 0, 220, 1440);
+            Assert.That(AppBarHost.NextReserveStep(false, strip, default(NM.RECT), true, strip), Is.EqualTo(AppBarHost.ReserveStep.Reserve));
+        }
+
+        [Test]
+        public void NextReserveStep_ChangedStrip_Reserves()
+        {
+            Assert.That(AppBarHost.NextReserveStep(true, Rect(0, 0, 300, 1440), Rect(0, 0, 220, 1440), true, Rect(0, 0, 220, 1440)),
+                Is.EqualTo(AppBarHost.ReserveStep.Reserve));
+        }
+
+        [Test]
+        public void NextReserveStep_SameStripWindowOnIt_DoesNothing()
+        {
+            // The #145 guard: a settings save that asks for the same strip must not SETPOS again.
+            var strip = Rect(0, 0, 220, 1440);
+            Assert.That(AppBarHost.NextReserveStep(true, strip, strip, true, strip), Is.EqualTo(AppBarHost.ReserveStep.Nothing));
+        }
+
+        [Test]
+        public void NextReserveStep_SameStripWindowRescaled_MovesOnly()
+        {
+            // The scale went from 100 % to 150 %: WPF kept the window's DIP width, so it is now 330
+            // physical pixels wide over a 220 px reservation.
+            var strip = Rect(0, 0, 220, 1440);
+            Assert.That(AppBarHost.NextReserveStep(true, strip, strip, true, Rect(0, 0, 330, 1440)), Is.EqualTo(AppBarHost.ReserveStep.MoveOnly));
+        }
+
+        [Test]
+        public void NextReserveStep_SameStripWindowUnreadable_MovesOnly()
+        {
+            var strip = Rect(0, 0, 220, 1440);
+            Assert.That(AppBarHost.NextReserveStep(true, strip, strip, false, default(NM.RECT)), Is.EqualTo(AppBarHost.ReserveStep.MoveOnly));
+        }
+
         [Test]
         public void SameRect_ComparesEveryEdge()
         {
