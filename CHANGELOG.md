@@ -6,7 +6,7 @@
 - The auto-hide desktop dock can be shorter than its display: Settings > Pane > Desktop dock > Height offers 80 %, 60 % and 40 % of the display's height, centred, never shorter than 320 px. The default stays full height. The choice is greyed out unless auto-hide is on, because a dock that reserves its strip of screen takes that width from maximized windows over the display's whole height anyway ([#177](https://github.com/prisant-labs/windows-explorer-powerpane/issues/177)).
 
 ### Fixed
-- A pinned folder that goes missing, such as a folder on a network share that dropped, now dims as soon as PowerPane notices, and comes back to normal when the folder returns. Before, the row kept its old look until something else made PowerPane read the groups again ([#136](https://github.com/prisant-labs/windows-explorer-powerpane/issues/136)).
+- A pinned folder that goes missing, such as a folder on a network share that dropped, now dims the next time the pane is drawn, such as when another Explorer window opens, and comes back to normal the same way when the folder returns. Before, the row kept its old look until something made PowerPane read the groups again, such as a pin being added ([#136](https://github.com/prisant-labs/windows-explorer-powerpane/issues/136)).
 - Network and removable drives under This PC, SSH drives, the Linux row, and folders listed under a pinned folder on a network share now show their real icons once the drive answers. Before, they could keep a plain folder icon for as long as PowerPane ran ([#139](https://github.com/prisant-labs/windows-explorer-powerpane/issues/139)).
 
 ## [4.2.4] - 2026-11-22

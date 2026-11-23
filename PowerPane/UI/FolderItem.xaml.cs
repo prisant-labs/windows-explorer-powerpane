@@ -121,8 +121,10 @@ namespace PowerPane.UI
 
         static IconHelper()
         {
-            // Static to static, so this subscription never keeps a pane alive.
-            PathStatus.Changed += OnPathStatusChanged;
+            // Static to static, so this subscription never keeps a pane alive. Probed, not Changed:
+            // a first probe that only confirms a path answers rebuilds no section, so Changed would
+            // never fire for most of the paths waiting here (#139 review).
+            PathStatus.Probed += OnPathProbed;
         }
 
         // A queued real-icon extraction. GatePath is null when the caller already knows the target
@@ -148,9 +150,10 @@ namespace PowerPane.UI
             return GateStep.Wait;
         }
 
-        // A probe result changed: hand every waiting extraction back to the drain, which extracts it,
-        // drops it, or parks it again if its own probe is still out.
-        private static void OnPathStatusChanged()
+        // A path's first probe landed: hand every waiting extraction back to the drain, which extracts
+        // it, drops it, or parks it again if its own probe is still out. The icon goes straight to the
+        // rows still waiting on it, with no section rebuild.
+        private static void OnPathProbed()
         {
             lock (Gate)
             {
@@ -266,11 +269,11 @@ namespace PowerPane.UI
                     if (step == GateStep.Wait)
                     {
                         // No probe has answered for this slow-volume path yet. Park the job with its
-                        // rows still registered, and make sure a probe is queued; its Changed event
+                        // rows still registered, and make sure a probe is queued; its Probed event
                         // hands the job back (#139). Touch queues nothing when one is already out.
                         // No result can slip past: probes and this drain share the one general
                         // worker, so a probe either finished before State was read, or runs after
-                        // this job is parked and raises Changed then.
+                        // this job is parked and raises Probed then.
                         lock (Gate) { Waiting[job.Key] = job; }
                         PathStatus.Touch(job.GatePath);
                         continue;

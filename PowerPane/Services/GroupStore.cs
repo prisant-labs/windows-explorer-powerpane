@@ -460,29 +460,39 @@ namespace PowerPane.Services
                 // direct disk hit here: scans run on the UI thread after mutations, and probing a
                 // dead network target inline froze the input queue shared with Explorer.
                 pin.TargetPath = target;
-                RefreshLiveness(pin);
+                pin.Exists = target.Length > 0 && PathStatus.IsAlive(target);
+                pin.IsFile = target.Length > 0 && PathStatus.IsFile(target);
                 tab.Items.Add(pin);
             }
             tab.SortMode = mode;
             tab.Items = PinSorter.Order(tab.Items, mode);
         }
 
+        /// <summary>Reads a pin's cached liveness: whether the path answered, and whether it is a file.
+        /// False when the cache holds nothing for it.</summary>
+        internal delegate bool CachedLiveness(string path, out bool exists, out bool isFile);
+
         /// <summary>Sets a pin's Exists and IsFile from the background probe cache, never from the
         /// disk. A scan sets them once, but a probe can later find the target gone, such as a share
         /// that dropped, or back again. The pane calls this for each pin as it builds the rows, so the
         /// rebuild that a probe's Changed event triggers dims or restores the row at once, rather than
-        /// waiting for the next groups scan (#136).</summary>
+        /// waiting for the next groups scan (#136). A path the cache has nothing for keeps its last
+        /// known state, and no probe is queued for it, because a build that probed every evicted pin
+        /// could keep a working set larger than the cache probing forever (#136 review).</summary>
         internal static void RefreshLiveness(PinnedFolder pin)
         {
-            RefreshLiveness(pin, PathStatus.IsAlive, PathStatus.IsFile);
+            RefreshLiveness(pin, PathStatus.TryGetCached);
         }
 
-        internal static void RefreshLiveness(PinnedFolder pin, Func<string, bool> isAlive, Func<string, bool> isFile)
+        internal static void RefreshLiveness(PinnedFolder pin, CachedLiveness read)
         {
             if (pin == null) return;
             var target = pin.TargetPath ?? string.Empty;
-            pin.Exists = target.Length > 0 && isAlive(target);
-            pin.IsFile = target.Length > 0 && isFile(target);
+            if (target.Length == 0) { pin.Exists = false; pin.IsFile = false; return; }
+            bool exists, isFile;
+            if (!read(target, out exists, out isFile)) return;
+            pin.Exists = exists;
+            pin.IsFile = isFile;
         }
 
         private static string MarkerPath(string tabDir) { return Path.Combine(tabDir, PinSorter.MarkerFileName); }
