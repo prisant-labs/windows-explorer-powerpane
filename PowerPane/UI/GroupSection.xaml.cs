@@ -202,6 +202,8 @@ namespace PowerPane.UI
                 foreach (var pin in active.Items)
                 {
                     var captured = pin;
+                    // The last scan fixed Exists; a probe since then may disagree (#136).
+                    GroupStore.RefreshLiveness(captured);
                     var node = new FolderTreeNode(pin.DisplayName, pin.TargetPath, pin.Exists, _navigate, 0,
                         captured.IsFile, null, pinCtx);
                     LazyContextMenu.Attach(node.Row, () => BuildPinMenu(group, active, captured, node.Row));

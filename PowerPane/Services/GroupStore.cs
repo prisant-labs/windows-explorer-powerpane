@@ -460,12 +460,29 @@ namespace PowerPane.Services
                 // direct disk hit here: scans run on the UI thread after mutations, and probing a
                 // dead network target inline froze the input queue shared with Explorer.
                 pin.TargetPath = target;
-                pin.Exists = target.Length > 0 && PathStatus.IsAlive(target);
-                pin.IsFile = target.Length > 0 && PathStatus.IsFile(target);
+                RefreshLiveness(pin);
                 tab.Items.Add(pin);
             }
             tab.SortMode = mode;
             tab.Items = PinSorter.Order(tab.Items, mode);
+        }
+
+        /// <summary>Sets a pin's Exists and IsFile from the background probe cache, never from the
+        /// disk. A scan sets them once, but a probe can later find the target gone, such as a share
+        /// that dropped, or back again. The pane calls this for each pin as it builds the rows, so the
+        /// rebuild that a probe's Changed event triggers dims or restores the row at once, rather than
+        /// waiting for the next groups scan (#136).</summary>
+        internal static void RefreshLiveness(PinnedFolder pin)
+        {
+            RefreshLiveness(pin, PathStatus.IsAlive, PathStatus.IsFile);
+        }
+
+        internal static void RefreshLiveness(PinnedFolder pin, Func<string, bool> isAlive, Func<string, bool> isFile)
+        {
+            if (pin == null) return;
+            var target = pin.TargetPath ?? string.Empty;
+            pin.Exists = target.Length > 0 && isAlive(target);
+            pin.IsFile = target.Length > 0 && isFile(target);
         }
 
         private static string MarkerPath(string tabDir) { return Path.Combine(tabDir, PinSorter.MarkerFileName); }

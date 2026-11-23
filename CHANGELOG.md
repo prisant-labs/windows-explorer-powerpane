@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- A pinned folder that goes missing, such as a folder on a network share that dropped, now dims as soon as PowerPane notices, and comes back to normal when the folder returns. Before, the row kept its old look until something else made PowerPane read the groups again ([#136](https://github.com/prisant-labs/windows-explorer-powerpane/issues/136)).
+
 ## [4.2.4] - 2026-11-22
 
 A fix release, mostly for resizing: Explorer's own navigation pane stays visible while you drag an Explorer window's border, file dialogs keep PowerPane inside when resized by their corner grip, and a beside pane stays up for a right-edge drag. The desktop dock also stays on its strip after a display scale change, and the manual install scripts close PowerPane the way the installer does. 4.2.3 was built as a draft and never published, so this is the first release with its fixes, and they are listed here.
