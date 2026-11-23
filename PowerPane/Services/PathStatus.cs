@@ -104,11 +104,23 @@ namespace PowerPane.Services
         /// operations that would themselves hit the disk (real shell icon extraction).</summary>
         public static bool ConfirmedAlive(string path)
         {
-            if (string.IsNullOrEmpty(path)) return false;
+            return State(path) == ProbeState.Alive;
+        }
+
+        internal enum ProbeState { NotYet, Alive, Gone }
+
+        /// <summary>What the last completed probe found, read in one step under the lock. NotYet means
+        /// no probe has completed: the path is new, or its entry was evicted. Reading "alive" and
+        /// "probed" separately could see a probe land between the two reads and call a live path gone,
+        /// so the icon gate reads this instead (#139). It never queues a probe; call Touch for that.</summary>
+        internal static ProbeState State(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return ProbeState.Gone;
             lock (Gate)
             {
                 Entry e;
-                return Map.TryGetValue(path, out e) && e.Probed && e.Exists;
+                if (!Map.TryGetValue(path, out e) || !e.Probed) return ProbeState.NotYet;
+                return e.Exists ? ProbeState.Alive : ProbeState.Gone;
             }
         }
 

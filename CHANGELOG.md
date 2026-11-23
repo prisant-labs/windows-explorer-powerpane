@@ -4,6 +4,7 @@
 
 ### Fixed
 - A pinned folder that goes missing, such as a folder on a network share that dropped, now dims as soon as PowerPane notices, and comes back to normal when the folder returns. Before, the row kept its old look until something else made PowerPane read the groups again ([#136](https://github.com/prisant-labs/windows-explorer-powerpane/issues/136)).
+- Network and removable drives under This PC, SSH drives, the Linux row, and folders listed under a pinned folder on a network share now show their real icons once the drive answers. Before, they could keep a plain folder icon for as long as PowerPane ran ([#139](https://github.com/prisant-labs/windows-explorer-powerpane/issues/139)).
 
 ## [4.2.4] - 2026-11-22
 

@@ -113,15 +113,54 @@ namespace PowerPane.UI
         private static readonly Dictionary<int, ImageSource> SpecialFolderCache = new Dictionary<int, ImageSource>();
         private static bool _draining;
         private static ImageSource _genericFolder;
+        // Extractions whose slow-volume path has no completed probe yet, by key. Their rows stay
+        // registered in Requests, so when the probe lands every row still waiting gets the icon.
+        // Bounded by Requests' own cap, since every key here is also a key there.
+        private static readonly Dictionary<string, IconJob> Waiting =
+            new Dictionary<string, IconJob>(StringComparer.OrdinalIgnoreCase);
 
-        // A queued real-icon extraction. Ready is null when the caller already knows the target
-        // exists (a fixed-drive path, or an app icon); otherwise it is the alive-probe gate a slow
-        // volume keeps, unchanged from before this file was rewritten.
+        static IconHelper()
+        {
+            // Static to static, so this subscription never keeps a pane alive.
+            PathStatus.Changed += OnPathStatusChanged;
+        }
+
+        // A queued real-icon extraction. GatePath is null when the caller already knows the target
+        // exists (a fixed-drive path); otherwise it is the slow-volume path whose probe must confirm
+        // it answers before the extraction may touch it.
         private sealed class IconJob
         {
             public string Key;
             public Func<ImageSource> Extract;
-            public Func<bool> Ready;
+            public string GatePath;
+        }
+
+        internal enum GateStep { Extract, Wait, Drop }
+
+        /// <summary>What the drain does with a gated extraction, given what the path's probe found.
+        /// A path no probe has answered yet waits for one instead of keeping the placeholder for good:
+        /// rows such as This PC's network drives, SSH drives, the Linux row, and children listed under
+        /// a pin on a share are never rebuilt by a probe, so nothing would ever ask again (#139).</summary>
+        internal static GateStep StepFor(PathStatus.ProbeState state)
+        {
+            if (state == PathStatus.ProbeState.Alive) return GateStep.Extract;
+            if (state == PathStatus.ProbeState.Gone) return GateStep.Drop;
+            return GateStep.Wait;
+        }
+
+        // A probe result changed: hand every waiting extraction back to the drain, which extracts it,
+        // drops it, or parks it again if its own probe is still out.
+        private static void OnPathStatusChanged()
+        {
+            lock (Gate)
+            {
+                if (Waiting.Count == 0) return;
+                foreach (var job in Waiting.Values) Jobs.Enqueue(job);
+                Waiting.Clear();
+                if (_draining) return;
+                _draining = true;
+            }
+            WorkQueue.Post(DrainBatch);
         }
 
         /// <summary>Shows a cached icon or an instant placeholder, and queues the real shell icon for a
@@ -150,8 +189,7 @@ namespace PowerPane.UI
                 // the background; the caller already knows the target exists, so unlike a slow volume
                 // it skips the alive-probe gate below.
                 bool fast = IsFastPath(path);
-                QueueExtract(key, target, () => Extract(path, useAttributes: false),
-                    fast ? (Func<bool>)null : (Func<bool>)(() => PathStatus.ConfirmedAlive(path)));
+                QueueExtract(key, target, () => Extract(path, useAttributes: false), fast ? null : path);
             }
             catch (Exception ex)
             {
@@ -183,7 +221,7 @@ namespace PowerPane.UI
                 // never holds the general lane for the network timeout.
                 QueueExtract(key, target,
                     () => (picked != null ? ExtractAt(picked.File, picked.Index) : null) ?? Extract(path, useAttributes: false),
-                    IsFastPath(path) ? (Func<bool>)null : (Func<bool>)(() => PathStatus.ConfirmedAlive(path)));
+                    IsFastPath(path) ? null : path);
             }
             catch (Exception ex)
             {
@@ -193,14 +231,14 @@ namespace PowerPane.UI
 
         // Queues one extraction per key no matter how many rows ask for it, and starts the drain task
         // if it is not already running.
-        private static void QueueExtract(string key, Image target, Func<ImageSource> extract, Func<bool> ready)
+        private static void QueueExtract(string key, Image target, Func<ImageSource> extract, string gatePath)
         {
             bool first;
             lock (Gate)
             {
                 first = Requests.Add(key, target);
                 if (!first) return; // another row already queued this extraction; it reaches this one too
-                Jobs.Enqueue(new IconJob { Key = key, Extract = extract, Ready = ready });
+                Jobs.Enqueue(new IconJob { Key = key, Extract = extract, GatePath = gatePath });
                 if (_draining) return;
                 _draining = true;
             }
@@ -224,12 +262,23 @@ namespace PowerPane.UI
                 foreach (var job in batch)
                 {
                     ImageSource img = null;
+                    var step = job.GatePath == null ? GateStep.Extract : StepFor(PathStatus.State(job.GatePath));
+                    if (step == GateStep.Wait)
+                    {
+                        // No probe has answered for this slow-volume path yet. Park the job with its
+                        // rows still registered, and make sure a probe is queued; its Changed event
+                        // hands the job back (#139). Touch queues nothing when one is already out.
+                        // No result can slip past: probes and this drain share the one general
+                        // worker, so a probe either finished before State was read, or runs after
+                        // this job is parked and raises Changed then.
+                        lock (Gate) { Waiting[job.Key] = job; }
+                        PathStatus.Touch(job.GatePath);
+                        continue;
+                    }
                     try
                     {
-                        // Not ready yet (a slow volume whose probe has not confirmed it answers): leave
-                        // the placeholder. The rebuild that follows the probe's Changed event asks
-                        // again, so nothing here needs to raise a refresh of its own (#78).
-                        if (job.Ready == null || job.Ready()) img = job.Extract();
+                        // A gone path keeps its placeholder, as before; no disk is touched for it.
+                        if (step == GateStep.Extract) img = job.Extract();
                     }
                     catch (Exception ex) { Log.Error("icon extract '" + job.Key + "'", ex); }
 
