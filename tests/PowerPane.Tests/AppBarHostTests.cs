@@ -164,6 +164,95 @@ namespace PowerPane.Tests
             Assert.That(AppBarHost.SameRect(r, Rect(796, 0, 800, 100)), Is.True);
         }
 
+        // ---- Dock height as a share of the display (#177) ----------------------
+
+        [Test]
+        public void AutoHideRect_SixtyPercent_ExpandedIsCentred()
+        {
+            // 1000 px of work area: a 600 px dock leaves 200 px above and below.
+            var r = AppBarHost.AutoHideRect(Rect(0, 40, 1920, 1040), 220, true, false, 60, 320);
+            Assert.That(AppBarHost.SameRect(r, Rect(0, 240, 220, 840)), Is.True);
+        }
+
+        [Test]
+        public void AutoHideRect_SixtyPercent_TriggerCoversTheSameBand()
+        {
+            // The strip sits where the dock opens; the 46 px dead corners lie outside the band anyway.
+            var r = AppBarHost.AutoHideRect(Rect(0, 40, 1920, 1040), 220, false, true, 60, 320);
+            Assert.That(AppBarHost.SameRect(r, Rect(1916, 240, 1920, 840)), Is.True);
+        }
+
+        [Test]
+        public void AutoHideRect_EightyPercent_TriggerStillKeepsTheDeadCorners()
+        {
+            // 80 % of 1000 px leaves only 100 px above and below, more than the 46 px dead zone, so the
+            // band decides; at a band reaching closer than 46 px the dead zone would win.
+            var r = AppBarHost.AutoHideRect(Rect(0, 0, 1920, 1000), 220, false, false, 80, 320);
+            Assert.That(AppBarHost.SameRect(r, Rect(0, 100, 4, 900)), Is.True);
+        }
+
+        [Test]
+        public void AutoHideRect_FullHeight_IsUnchangedByTheNewParameters()
+        {
+            var r = AppBarHost.AutoHideRect(Rect(0, 0, 1920, 1040), 220, false, false, 0, 320);
+            Assert.That(AppBarHost.SameRect(r, Rect(0, 46, 4, 994)), Is.True);
+        }
+
+        [Test]
+        public void DockBand_ShortDisplay_KeepsTheMinimum()
+        {
+            // 40 % of 600 px is 240 px, under the 320 px minimum, so the dock is 320 px, centred.
+            int top, bottom;
+            AppBarHost.DockBand(0, 600, 40, 320, out top, out bottom);
+            Assert.That(new[] { top, bottom }, Is.EqualTo(new[] { 140, 460 }));
+        }
+
+        [Test]
+        public void DockBand_MinimumTallerThanTheArea_UsesTheWholeArea()
+        {
+            int top, bottom;
+            AppBarHost.DockBand(100, 400, 40, 320, out top, out bottom);
+            Assert.That(new[] { top, bottom }, Is.EqualTo(new[] { 100, 400 }));
+        }
+
+        [TestCase(0)]
+        [TestCase(100)]
+        [TestCase(-5)]
+        [TestCase(150)]
+        public void DockBand_OutOfRangePercent_UsesTheWholeArea(int percent)
+        {
+            int top, bottom;
+            AppBarHost.DockBand(40, 1040, percent, 320, out top, out bottom);
+            Assert.That(new[] { top, bottom }, Is.EqualTo(new[] { 40, 1040 }));
+        }
+
+        [TestCase(80, 80)]
+        [TestCase(60, 60)]
+        [TestCase(40, 40)]
+        [TestCase(0, 0)]
+        [TestCase(100, 0)]
+        [TestCase(55, 0)]
+        [TestCase(-1, 0)]
+        public void NormalizeDockHeightPercent_OnlyOfferedHeightsSurvive(int input, int expected)
+        {
+            Assert.That(PowerPane.Models.AppSettings.NormalizeDockHeightPercent(input), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void Normalize_HandEditedDockHeight_BecomesFullHeight()
+        {
+            var s = PowerPane.Models.AppSettings.CreateDefault();
+            s.DesktopDockHeightPercent = 55;
+            s.Normalize();
+            Assert.That(s.DesktopDockHeightPercent, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void CreateDefault_DockIsFullHeight()
+        {
+            Assert.That(PowerPane.Models.AppSettings.CreateDefault().DesktopDockHeightPercent, Is.EqualTo(0));
+        }
+
         [TestCase("right", true)]
         [TestCase("RIGHT", true)]
         [TestCase(" right ", true)]

@@ -316,6 +316,13 @@ namespace PowerPane.Models
         [DataMember(Name = "desktopDockEdge", Order = 44, EmitDefaultValue = false)]
         public string DesktopDockEdge { get; set; }
 
+        // How tall the auto-hide dock is, as a percentage of its display's work area: 80, 60 or 40,
+        // centred vertically (#177). 0 means full height, the default, and stays out of the file.
+        // Reserved mode ignores it: Windows takes a reserved strip's full width from every maximized
+        // window over the whole display height, so a shorter reserved dock would only leave a gap.
+        [DataMember(Name = "desktopDockHeightPercent", Order = 56, EmitDefaultValue = false)]
+        public int DesktopDockHeightPercent { get; set; }
+
         // Profiles: independent workspaces. The active one's folder/recents/width are mirrored into the
         // top-level fields above. Groups, sections, and dock settings stay global across profiles.
         [DataMember(Name = "profiles", Order = 8, EmitDefaultValue = false)]
@@ -423,6 +430,16 @@ namespace PowerPane.Models
             return path;
         }
 
+        /// <summary>The dock heights Settings offers, tallest first (#177). Full height is 0.</summary>
+        internal static readonly int[] DockHeightPercents = { 80, 60, 40 };
+
+        /// <summary>An offered dock height stays; anything else, such as a hand-edited 55 or 100,
+        /// means full height, stored as 0 so it stays out of the file (#177).</summary>
+        internal static int NormalizeDockHeightPercent(int percent)
+        {
+            return Array.IndexOf(DockHeightPercents, percent) >= 0 ? percent : 0;
+        }
+
         /// <summary>Make sure all three sections exist exactly once, preserving stored order/visibility.</summary>
         public void Normalize()
         {
@@ -477,6 +494,7 @@ namespace PowerPane.Models
             if (string.IsNullOrWhiteSpace(DesktopDockDisplay)) DesktopDockDisplay = null;
             // Only "right" is a real choice; left is the default, stored as null so it stays out of the file (#177).
             DesktopDockEdge = string.Equals((DesktopDockEdge ?? "").Trim(), "right", StringComparison.OrdinalIgnoreCase) ? "right" : null;
+            DesktopDockHeightPercent = NormalizeDockHeightPercent(DesktopDockHeightPercent);
 
             // Profiles: migrate a pre-profiles settings file into one profile built from the top fields.
             if (Profiles == null) Profiles = new List<Profile>();

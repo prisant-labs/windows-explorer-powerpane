@@ -626,6 +626,33 @@ namespace PowerPane.UI.Settings
             sync();
         }
 
+        /// <summary>Like <see cref="LinkEnabled"/>, for a row that only means something while every
+        /// one of several toggles is on, such as the dock's Height, which needs both the dock and
+        /// auto-hide (#177). Two LinkEnabled calls on one row would each overwrite the other's answer.</summary>
+        public void LinkEnabledAll(FrameworkElement[] parentToggles, params UIElement[] rows)
+        {
+            if (parentToggles == null || rows == null) return;
+            var buttons = new List<ToggleButton>();
+            foreach (var t in parentToggles)
+            {
+                var b = t?.Tag as ToggleButton ?? t as ToggleButton;
+                if (b != null) buttons.Add(b);
+            }
+            if (buttons.Count == 0) return;
+            Action sync = () =>
+            {
+                bool on = buttons.TrueForAll(b => b.IsChecked == true);
+                foreach (var row in rows)
+                    if (row != null) row.IsEnabled = on;
+            };
+            foreach (var b in buttons)
+            {
+                b.Checked += (s, e) => sync();
+                b.Unchecked += (s, e) => sync();
+            }
+            sync();
+        }
+
         // ---- number box -------------------------------------------------
 
         /// <summary>A text box with stacked up/down chevrons, clamped to [<paramref name="min"/>,
