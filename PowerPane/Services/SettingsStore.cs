@@ -326,9 +326,37 @@ namespace PowerPane.Services
         {
             if (Current.Profiles == null || Current.Profiles.Count <= 1) return; // always keep one
             if (index < 0 || index >= Current.Profiles.Count) return;
+            Current.SyncTopToActive();          // keep the active profile's live values before indexes move
             Current.Profiles.RemoveAt(index);
-            if (Current.ActiveProfileIndex >= Current.Profiles.Count) Current.ActiveProfileIndex = Current.Profiles.Count - 1;
+            Current.ActiveProfileIndex = ActiveIndexAfterRemove(Current.ActiveProfileIndex, index, Current.Profiles.Count);
             Current.LoadActiveToTop();
+            Save();
+            ProfilesChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>The active profile's index once the profile at <paramref name="removed"/> is gone.
+        /// Removing a profile listed before the active one shifts the active one down a place, so the
+        /// index follows it. Keeping the old index used to switch the user to the next profile without
+        /// a word, and when the profile the user was on was hidden from the row, it also lost its chip,
+        /// leaving the pane no way back to it (#6). Removing the active profile itself makes the one after it active, or the
+        /// last one when it was last.</summary>
+        internal static int ActiveIndexAfterRemove(int active, int removed, int countAfter)
+        {
+            if (countAfter <= 0) return 0;
+            if (removed < active) active--;
+            if (active >= countAfter) active = countAfter - 1;
+            if (active < 0) active = 0;
+            return active;
+        }
+
+        /// <summary>Shows or hides a profile's chip in the pane's profile row (#6). The active profile
+        /// keeps its chip either way, so this only changes what the row shows once another profile is
+        /// active.</summary>
+        public void SetProfileHiddenFromRow(int index, bool hidden)
+        {
+            if (Current.Profiles == null || index < 0 || index >= Current.Profiles.Count) return;
+            if (Current.Profiles[index].HiddenFromRow == hidden) return;
+            Current.Profiles[index].HiddenFromRow = hidden;
             Save();
             ProfilesChanged?.Invoke(this, EventArgs.Empty);
         }

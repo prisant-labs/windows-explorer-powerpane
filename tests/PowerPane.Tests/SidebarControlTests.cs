@@ -175,7 +175,7 @@ namespace PowerPane.Tests
             "ClickActions" // read by FolderTreeNode at click time, so a change applies to the next click with no rebuild (#269)
         };
 
-        private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath" };
+        private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath", "HiddenFromRow" };
         private static readonly string[] ProfileNotRendered = { "RecentsMaxCount", "SidebarWidthPx" };
 
         private static readonly string[] SshProfileKeyFields = { "Name", "DriveLetter" };

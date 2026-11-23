@@ -169,6 +169,7 @@ Each profile is an independent workspace with its own groups folder, recents cou
 
 - Switch profiles from the tray icon's right-click menu or from the profile tab row under the title
 - The profile tab row can auto-hide, sliding out when the cursor is over the header
+- A profile can stay out of the profile tab row: turn off "Show in the profile row" on its page under Groups & profiles. The row still shows the active profile, and the tray menu still lists every profile. The row appears only when it would show two or more profiles
 - Manage profiles on the Settings window's Groups & profiles page, with cards for add, rename, and remove
 - Move a group to another profile with a destination picker and a "Copy instead of move" checkbox, so one group can live in more than one profile
 
@@ -276,6 +277,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 ### Profiles
 
 - Switch from the tray menu or the profile tab row under the title
+- Leave a profile out of the profile tab row with its "Show in the profile row" switch
 - Add, rename, remove, and move groups between profiles in the Settings window
 
 ### Settings
@@ -346,6 +348,8 @@ Two other features reach the network only when you use them:
   "profileTabsAutoHide": false
 }
 ```
+
+A profile left out of the profile tab row carries `"hiddenFromRow": true`. A profile without the key is shown.
 
 The file names only the click gestures you changed, under `clickActions`. A gesture that is missing uses its default, so a file without the key behaves as before:
 

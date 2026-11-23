@@ -139,6 +139,13 @@ namespace PowerPane.Models
 
         [DataMember(Name = "sidebarWidthPx", Order = 3)]
         public int SidebarWidthPx { get; set; } = 220;
+
+        /// <summary>Keeps this profile's chip out of the pane's profile row, except while it is the
+        /// active profile (#6). The tray menu and Settings still list it. Named so that false means
+        /// shown: the serializer skips field initializers, so a settings file written before this
+        /// field existed reads as false and keeps every chip, and older versions ignore the field.</summary>
+        [DataMember(Name = "hiddenFromRow", Order = 4, EmitDefaultValue = false)]
+        public bool HiddenFromRow { get; set; }
     }
 
     /// <summary>One saved SSH/SFTP connection, mounted as a real drive via SSHFS-Win. Field layout
