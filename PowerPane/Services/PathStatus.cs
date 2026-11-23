@@ -15,9 +15,19 @@ namespace PowerPane.Services
     /// </summary>
     internal static class PathStatus
     {
-        /// <summary>Raised on the UI thread, coalesced to at most one call per ~300 ms, after any
-        /// probe result changed (or a slow icon finished extracting). Sections rebuild on it.</summary>
+        /// <summary>Raised on the UI thread, coalesced to at most one call per ~300 ms, after a probe
+        /// result changed something a row shows: a path the cache had reported alive was gone, or the
+        /// other way round, or a file turned out to be a folder. Also after the first probe of a path a
+        /// <see cref="ConfirmedAlive"/> reader asked about, since that reader waits for it. Sections
+        /// rebuild on it, so a first probe that only confirms what the cache already said must not
+        /// raise it: an expanded pin on a share would otherwise re-enumerate its children once per
+        /// child probe (#139 review).</summary>
         public static event Action Changed;
+
+        /// <summary>Raised on the UI thread, coalesced with <see cref="Changed"/>, after any path's
+        /// first probe completed, whatever it found. For a waiter on one path's answer, such as a
+        /// parked icon extraction (#139), rather than for rebuilding a section.</summary>
+        public static event Action Probed;
 
         /// <summary>How long a check made while the user waits, such as before a picker opens, may take.
         /// A local folder answers in microseconds; a share that does not answer would otherwise hold
@@ -72,6 +82,7 @@ namespace PowerPane.Services
             public bool IsFile;
             public bool Probed;
             public bool InFlight;
+            public bool NotifyOnProbe; // a ConfirmedAlive reader waits on the first probe
             public int Tick;      // completion time of the last probe
         }
 
@@ -105,15 +116,82 @@ namespace PowerPane.Services
         public static bool ConfirmedAlive(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+            // Find or create the entry, queueing a probe when it is new or stale, so the wait below
+            // is never recorded on nothing: a missing entry used to return here without a probe or a
+            // waiter, and a saved expansion stayed collapsed (#139 second review).
+            var e = Lookup(path);
+            lock (Gate)
+            {
+                // The caller decides something on this answer and waits for the rebuild that follows
+                // the probe, such as restoring an expanded subtree, so that probe must raise Changed
+                // even when it only confirms the optimistic answer. A probe that landed since Lookup
+                // has already answered.
+                if (!e.Probed) { e.NotifyOnProbe = true; return false; }
+                return e.Exists;
+            }
+        }
+
+        internal enum ProbeState { NotYet, Alive, Gone }
+
+        /// <summary>What the last completed probe found, read in one step under the lock. NotYet means
+        /// no probe has completed: the path is new, or its entry was evicted. Reading "alive" and
+        /// "probed" separately could see a probe land between the two reads and call a live path gone,
+        /// so the icon gate reads this instead (#139). It never queues a probe; call Touch for that.</summary>
+        internal static ProbeState State(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return ProbeState.Gone;
             lock (Gate)
             {
                 Entry e;
-                return Map.TryGetValue(path, out e) && e.Probed && e.Exists;
+                if (!Map.TryGetValue(path, out e) || !e.Probed) return ProbeState.NotYet;
+                return e.Exists ? ProbeState.Alive : ProbeState.Gone;
             }
         }
 
         /// <summary>Ask for a (re-)probe without reading anything.</summary>
         public static void Touch(string path) { Lookup(path); }
+
+        /// <summary>The cached answer for a path, for code that draws rows. A present but stale entry
+        /// queues a re-probe, as any other read would. A missing entry, never probed or evicted,
+        /// returns false, and the caller keeps what its row shows: the new entry is seeded with that,
+        /// <paramref name="shownExists"/> and <paramref name="shownIsFile"/>, rather than the
+        /// optimistic answer, and probed. The probe is then compared with what is on screen, so it
+        /// raises Changed only when the row must change. A broken pin whose entry was evicted thus
+        /// still comes back when its share does (#136 second review), and a working set larger than
+        /// the cache settles instead of rebuilding forever, since a probe that agrees with the row
+        /// starts no rebuild (#136 review).</summary>
+        internal static bool TryGetCached(string path, bool shownExists, bool shownIsFile, out bool exists, out bool isFile)
+        {
+            exists = false; isFile = false;
+            if (string.IsNullOrEmpty(path)) return false;
+            bool probe = false;
+            bool known = true;
+            lock (Gate)
+            {
+                Entry e;
+                if (!Map.TryGetValue(path, out e))
+                {
+                    e = new Entry { Exists = shownExists, IsFile = shownIsFile, InFlight = true };
+                    Map.Set(path, e);
+                    known = false;
+                    probe = true;
+                }
+                exists = e.Exists;
+                // An unprobed entry holds its starting guess: the extension guess, or the seed above.
+                isFile = e.IsFile;
+                if (!e.InFlight && (!e.Probed || Environment.TickCount - e.Tick > TtlMs))
+                {
+                    probe = true;
+                    e.InFlight = true;
+                }
+            }
+            if (probe)
+            {
+                var p = path;
+                WorkQueue.Post(() => Probe(p));
+            }
+            return known;
+        }
 
         // Returns the entry (never probes on the calling thread) and queues a probe when the entry
         // is new or stale. Null for empty paths.
@@ -155,27 +233,45 @@ namespace PowerPane.Services
             }
             catch { exists = false; }
 
-            bool changed = false;
+            bool changed = false, first = false;
             lock (Gate)
             {
                 Entry e;
                 if (Map.TryGetValue(path, out e))
                 {
-                    changed = !e.Probed || e.Exists != exists || (exists && e.IsFile != isFile);
+                    first = !e.Probed;
+                    changed = ProbeChangesRows(e.Exists, e.IsFile, exists, isFile, first, e.NotifyOnProbe);
                     e.Exists = exists;
                     if (exists) e.IsFile = isFile;
                     e.Probed = true;
                     e.InFlight = false;
+                    e.NotifyOnProbe = false;
                     e.Tick = Environment.TickCount;
                 }
             }
-            if (changed) QueueRaise();
+            if (changed || first) QueueRaise(changed, first);
         }
 
-        private static void QueueRaise()
+        /// <summary>Whether a probe result must rebuild the sections: what rows show changed, or this
+        /// is the first probe and a ConfirmedAlive reader is waiting on it. A never-probed entry holds
+        /// the optimistic answer the rows were drawn with (alive, file by extension), so comparing
+        /// against it covers the first probe too (#139 review).</summary>
+        internal static bool ProbeChangesRows(bool wasExists, bool wasIsFile, bool exists, bool isFile,
+            bool firstProbe, bool readerWaiting)
+        {
+            if (wasExists != exists) return true;
+            if (exists && wasIsFile != isFile) return true;
+            return firstProbe && readerWaiting;
+        }
+
+        private static bool _pendingChanged, _pendingProbed;
+
+        private static void QueueRaise(bool changed, bool probed)
         {
             lock (Gate)
             {
+                _pendingChanged |= changed;
+                _pendingProbed |= probed;
                 if (_raiseQueued) return;
                 _raiseQueued = true;
             }
@@ -187,9 +283,17 @@ namespace PowerPane.Services
                 t.Tick += (s, e) =>
                 {
                     t.Stop();
-                    lock (Gate) { _raiseQueued = false; }
+                    bool raiseChanged, raiseProbed;
+                    lock (Gate)
+                    {
+                        _raiseQueued = false;
+                        raiseChanged = _pendingChanged; raiseProbed = _pendingProbed;
+                        _pendingChanged = false; _pendingProbed = false;
+                    }
                     var h = Changed;
-                    if (h != null) h();
+                    if (raiseChanged && h != null) h();
+                    var p = Probed;
+                    if (raiseProbed && p != null) p();
                 };
                 t.Start();
             });

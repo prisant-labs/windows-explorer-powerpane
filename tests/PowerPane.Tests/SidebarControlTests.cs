@@ -166,7 +166,7 @@ namespace PowerPane.Tests
         private static readonly string[] AppSettingsNotRendered =
         {
             "KeyboardNavHotkey", "RecentsMaxCount", "SidebarWidthPx",
-            "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops", "DesktopDockDisplay", "DesktopDockEdge",
+            "DesktopDock", "DesktopDockAutoHide", "DesktopDockAllDesktops", "DesktopDockDisplay", "DesktopDockEdge", "DesktopDockHeightPercent",
             "ActiveProfile", // derived from Profiles + ActiveProfileIndex, both already in the key
             "PaneColor", // live through SidebarBackground's DynamicResource binding, no rebuild (#134)
             "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion", // read by UpdateNotifier; the pane shows none of them (#176)

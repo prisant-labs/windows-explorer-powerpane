@@ -41,6 +41,7 @@ namespace PowerPane.UI.Settings.Pages
                 yield return new SettingsSearchEntry(Id, "desktopDock", "Desktop dock", "A screen-edge dock independent of the window pane.", "dock", "auto-hide", "virtual desktop");
                 yield return new SettingsSearchEntry(Id, "desktopDockDisplay", "Display", "Which display the desktop dock sits on.", "monitor", "screen", "multi-monitor", "multiple monitors");
                 yield return new SettingsSearchEntry(Id, "desktopDockEdge", "Edge", "Which screen edge the desktop dock sits on, left or right.", "left", "right", "side", "dock");
+                yield return new SettingsSearchEntry(Id, "desktopDockHeight", "Height", "How tall the auto-hide desktop dock is, as a share of the display.", "dock height", "tall", "short", "percent", "size");
                 yield return new SettingsSearchEntry(Id, "profileTabs", "Profile tabs", "The row of profile tabs under the title.", "profile tabs", "tab row");
             }
         }
@@ -87,8 +88,8 @@ namespace PowerPane.UI.Settings.Pages
             var dockToggle = cards.Toggle(s.DesktopDock, on => { s.DesktopDock = on; ctx.Settings.Save(); });
             var dockExpander = cards.Expander("desktopDock", "\uE90C", "Desktop dock",
                 "Pin a small dock to a screen edge", dockToggle, accessibleName: "Show desktop dock");
-            var autoHideRow = cards.ChildRow("Auto-hide (slide out on hover)",
-                cards.Toggle(s.DesktopDockAutoHide, on => { s.DesktopDockAutoHide = on; ctx.Settings.Save(); }),
+            var autoHideToggle = cards.Toggle(s.DesktopDockAutoHide, on => { s.DesktopDockAutoHide = on; ctx.Settings.Save(); });
+            var autoHideRow = cards.ChildRow("Auto-hide (slide out on hover)", autoHideToggle,
                 "Auto-hide the desktop dock");
             var allDesktopsRow = cards.ChildRow("Show on all virtual desktops",
                 cards.Toggle(s.DesktopDockAllDesktops, on => { s.DesktopDockAllDesktops = on; ctx.Settings.Save(); }),
@@ -115,13 +116,32 @@ namespace PowerPane.UI.Settings.Pages
                 minWidth: 120);
             var edgeRow = cards.ChildRow("Edge", edgeCombo, "Which screen edge the desktop dock sits on");
             cards.Register("desktopDockEdge", edgeCombo);
+            // How tall the auto-hide dock is (#177). Only auto-hide can use it: a reserved strip takes
+            // its full width from maximized windows over the whole display height whatever its own
+            // height, so the row is greyed out unless auto-hide is on.
+            var heightOptions = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("0", "Full height") };
+            foreach (var p in AppSettings.DockHeightPercents)
+                heightOptions.Add(new KeyValuePair<string, string>(p.ToString(), p + " %"));
+            var heightCombo = cards.Combo(heightOptions,
+                AppSettings.NormalizeDockHeightPercent(s.DesktopDockHeightPercent).ToString(),
+                v =>
+                {
+                    int p;
+                    s.DesktopDockHeightPercent = int.TryParse(v, out p) ? AppSettings.NormalizeDockHeightPercent(p) : 0;
+                    ctx.Settings.Save();
+                },
+                minWidth: 120);
+            var heightRow = cards.ChildRow("Height (auto-hide only)", heightCombo, "How tall the desktop dock is when auto-hide is on");
+            cards.Register("desktopDockHeight", heightCombo);
             dockExpander.AddChild(autoHideRow);
             dockExpander.AddChild(allDesktopsRow);
             dockExpander.AddChild(displayRow);
             dockExpander.AddChild(edgeRow);
+            dockExpander.AddChild(heightRow);
             // Auto-hide, all-desktops, and which display all do nothing while the dock itself is off
             // (#150); grey them out the way the header toggle's own on/off state already implies.
             cards.LinkEnabled(dockToggle, autoHideRow, allDesktopsRow, displayRow, edgeRow);
+            cards.LinkEnabledAll(new[] { dockToggle, autoHideToggle }, heightRow);
             panel.Children.Add(dockExpander.Root);
 
             // ---- Profile tabs (old: ProfileTabsBlock, lines 470-487) ----

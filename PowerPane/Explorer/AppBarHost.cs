@@ -6,6 +6,7 @@ using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using PowerPane.Interop;
+using PowerPane.Models;
 using PowerPane.Services;
 using PowerPane.UI;
 using NM = PowerPane.Interop.NativeMethods;
@@ -235,28 +236,65 @@ namespace PowerPane.Explorer
             bool right = EdgeIsRight();
             ApplyEdgeToSidebar(right);
             _lastEdgeRight = right;
-            var r = AutoHideRect(wa, WidthPx(), expanded, right);
+            int percent = App.Settings != null ? AppSettings.NormalizeDockHeightPercent(App.Settings.Current.DesktopDockHeightPercent) : 0;
+            var r = AutoHideRect(wa, WidthPx(), expanded, right, percent, MinHeightPx());
             NM.SetWindowPos(_handle, NM.HWND_TOP, r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top,
                 NM.SWP_NOACTIVATE | NM.SWP_SHOWWINDOW);
         }
 
-        /// <summary>The auto-hide window's rectangle: <paramref name="widthPx"/> wide and the full work
-        /// area tall when expanded, a 4 px trigger strip when collapsed, flush with the work area's left
-        /// or right edge. The collapsed strip leaves 46 px dead at the top and bottom on either edge, so
-        /// the maximized-window buttons (top-right: close; top-left: the window menu) and the
-        /// taskbar/Start or clock corner stay reachable without the pane sliding out by accident.</summary>
-        internal static NM.RECT AutoHideRect(NM.RECT wa, int widthPx, bool expanded, bool right)
+        // The shortest a partial-height dock may be, in DIPs, so 40 % of a small or rotated display
+        // still holds a few rows (#177). Converted to pixels at the dock's own scale.
+        private const double MinHeightDip = 320;
+
+        private int MinHeightPx()
+        {
+            double scale = 1.0;
+            try { if (_window != null) scale = VisualTreeHelper.GetDpi(_window).DpiScaleY; } catch { }
+            if (scale <= 0) scale = 1.0;
+            return (int)Math.Round(MinHeightDip * scale);
+        }
+
+        /// <summary>The auto-hide window's rectangle: <paramref name="widthPx"/> wide when expanded, a
+        /// 4 px trigger strip when collapsed, flush with the work area's left or right edge. Its height
+        /// is <paramref name="heightPercent"/> of the work area, centred, never under
+        /// <paramref name="minHeightPx"/>; 0 means the full work area (#177). The collapsed strip
+        /// covers the same band as the expanded dock, so the pointer finds it where the dock opens,
+        /// and keeps 46 px dead at the work area's top and bottom, so the maximized-window buttons
+        /// (top-right: close; top-left: the window menu) and the taskbar/Start or clock corner stay
+        /// reachable without the pane sliding out by accident.</summary>
+        internal static NM.RECT AutoHideRect(NM.RECT wa, int widthPx, bool expanded, bool right,
+            int heightPercent = 0, int minHeightPx = 0)
         {
             int width = expanded ? widthPx : 4;
-            int top = wa.Top;
-            int bottom = wa.Bottom;
+            int top, bottom;
+            DockBand(wa.Top, wa.Bottom, heightPercent, minHeightPx, out top, out bottom);
             if (!expanded)
             {
                 const int dead = 46;
-                if (bottom - top > 2 * dead + 10) { top += dead; bottom -= dead; }
+                if (wa.Bottom - wa.Top > 2 * dead + 10)
+                {
+                    top = Math.Max(top, wa.Top + dead);
+                    bottom = Math.Min(bottom, wa.Bottom - dead);
+                }
             }
             int left = right ? wa.Right - width : wa.Left;
             return new NM.RECT { Left = left, Top = top, Right = left + width, Bottom = bottom };
+        }
+
+        /// <summary>The vertical band a dock of <paramref name="heightPercent"/> occupies between
+        /// <paramref name="areaTop"/> and <paramref name="areaBottom"/>: centred, at least
+        /// <paramref name="minHeightPx"/> tall, never taller than the area. A percentage outside
+        /// 1 to 99 means the whole area (#177).</summary>
+        internal static void DockBand(int areaTop, int areaBottom, int heightPercent, int minHeightPx, out int top, out int bottom)
+        {
+            int total = areaBottom - areaTop;
+            top = areaTop; bottom = areaBottom;
+            if (heightPercent <= 0 || heightPercent >= 100 || total <= 0) return;
+            int height = (int)Math.Round(total * heightPercent / 100.0);
+            if (height < minHeightPx) height = minHeightPx;
+            if (height >= total) return;
+            top = areaTop + (total - height) / 2;
+            bottom = top + height;
         }
 
         private void SetReservedPosition()
