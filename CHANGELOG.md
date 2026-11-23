@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [4.3.0] - 2026-11-22
+
+The auto-hide desktop dock can now be shorter than its display, and two fixes make the pane follow slow and missing folders more closely: a pinned folder that goes missing dims sooner, and rows on network drives get their real icons.
 
 ### Added
 - The auto-hide desktop dock can be shorter than its display: Settings > Pane > Desktop dock > Height offers 80 %, 60 % and 40 % of the display's height, centred, never shorter than 320 px. The default stays full height. The choice is greyed out unless auto-hide is on, because a dock that reserves its strip of screen takes that width from maximized windows over the display's whole height anyway ([#177](https://github.com/prisant-labs/windows-explorer-powerpane/issues/177)).
