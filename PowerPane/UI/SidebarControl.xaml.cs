@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Windows;
@@ -304,7 +305,8 @@ namespace PowerPane.UI
             if (s.Profiles != null)
             {
                 foreach (var p in s.Profiles)
-                    sb.Append(p.Name).Append('\u0001').Append(p.GroupsPath).Append('\u0002');
+                    sb.Append(p.Name).Append('\u0001').Append(p.GroupsPath)
+                      .Append('\u0001').Append(p.HiddenFromRow).Append('\u0002');
             }
             sb.Append('\u0003').Append(s.ActiveProfileIndex)
               .Append('\u0001').Append(s.ShowProfileTabs)
@@ -464,7 +466,7 @@ namespace PowerPane.UI
             var profiles = st.Profiles;
             if (profiles == null) return;
 
-            for (int i = 0; i < profiles.Count; i++)
+            foreach (int i in ProfileChipIndexes(profiles, st.ActiveProfileIndex))
             {
                 int idx = i;
                 bool active = i == st.ActiveProfileIndex;
@@ -495,7 +497,8 @@ namespace PowerPane.UI
             if (ProfileTabsHost == null) return;
             if (App.Settings == null) { ProfileTabsHost.Visibility = Visibility.Collapsed; return; }
             var st = App.Settings.Current;
-            bool show = ShouldShowProfileTabs(st.ShowProfileTabs, _paneCollapsed, st.Profiles != null ? st.Profiles.Count : 0);
+            int chips = st.Profiles != null ? ProfileChipIndexes(st.Profiles, st.ActiveProfileIndex).Count : 0;
+            bool show = ShouldShowProfileTabs(st.ShowProfileTabs, _paneCollapsed, chips);
             if (!show) { ProfileTabsHost.Visibility = Visibility.Collapsed; return; }
             // Auto-hide collapses the row until the cursor is over the header.
             ProfileTabsHost.Visibility = (st.ProfileTabsAutoHide && !_tabsHover)
@@ -506,9 +509,28 @@ namespace PowerPane.UI
         /// profile to switch to. Every install starts with one profile, and the row used to show it as a
         /// lone "Profile 1" chip that did nothing (prisant-labs/windows-explorer-powerpane#5). Adding a profile saves the
         /// settings, which rebuilds the pane, so the row appears without a restart.</summary>
-        internal static bool ShouldShowProfileTabs(bool rowEnabled, bool paneCollapsed, int profileCount)
+        /// <remarks><paramref name="chipCount"/> is the number of chips the row would draw, from
+        /// <see cref="ProfileChipIndexes"/>, not the number of profiles: with every other profile
+        /// hidden from the row, a lone chip would switch nothing, as in #5 (#6).</remarks>
+        internal static bool ShouldShowProfileTabs(bool rowEnabled, bool paneCollapsed, int chipCount)
         {
-            return rowEnabled && !paneCollapsed && profileCount > 1;
+            return rowEnabled && !paneCollapsed && chipCount > 1;
+        }
+
+        /// <summary>The profiles that get a chip in the row, in their saved order: every profile not
+        /// hidden from the row, plus the active profile whether hidden or not, so the row never hides
+        /// where you are (#6).</summary>
+        internal static List<int> ProfileChipIndexes(IList<Profile> profiles, int activeIndex)
+        {
+            var chips = new List<int>();
+            if (profiles == null) return chips;
+            for (int i = 0; i < profiles.Count; i++)
+            {
+                var p = profiles[i];
+                if (p == null) continue;
+                if (!p.HiddenFromRow || i == activeIndex) chips.Add(i);
+            }
+            return chips;
         }
 
         private FrameworkElement BuildSection(string type)

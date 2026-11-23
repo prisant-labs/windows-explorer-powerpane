@@ -111,7 +111,8 @@ namespace PowerPane.UI.Settings.Pages
             string count = groupCount.HasValue
                 ? groupCount.Value + (groupCount.Value == 1 ? " group" : " groups")
                 : "Loading groups…";
-            string desc = count + (active ? " · Active profile" : "");
+            string desc = count + (active ? " · Active profile" : "")
+                + (p.HiddenFromRow ? " · Hidden from the profile row" : "");
 
             return ctx.Cards.ClickableCard("profile-" + index, GlyphProfile, p.Name, desc,
                 () => ctx.OpenSubPage(p.Name, c => BuildProfile(c, index)),
@@ -132,6 +133,13 @@ namespace PowerPane.UI.Settings.Pages
 
             var panel = new StackPanel();
             panel.Children.Add(BuildProfileHeaderCard(ctx, index, p));
+            // Off keeps the profile's chip out of the pane's row unless it is active (#6). The
+            // setting is saved per profile, so the switch reads that profile's own value.
+            string rowName = "Show " + p.Name + " in the profile row";
+            panel.Children.Add(ctx.Cards.Card("row-" + index, GlyphProfile, "Show in the profile row",
+                "Off leaves this profile out of the pane's profile row, except while it is active. The tray menu still lists it.",
+                ctx.Cards.Toggle(!p.HiddenFromRow, on => ctx.Settings.SetProfileHiddenFromRow(index, !on), rowName),
+                rowName));
 
             panel.Children.Add(ctx.Cards.Subheader("Groups"));
             var expander = ctx.Cards.Expander("groups-" + index, GlyphProfile, "Groups", "The pinned-folder groups this profile shows.");

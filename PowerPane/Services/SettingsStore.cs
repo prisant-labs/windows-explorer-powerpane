@@ -333,6 +333,18 @@ namespace PowerPane.Services
             ProfilesChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        /// <summary>Shows or hides a profile's chip in the pane's profile row (#6). The active profile
+        /// keeps its chip either way, so this only changes what the row shows once another profile is
+        /// active.</summary>
+        public void SetProfileHiddenFromRow(int index, bool hidden)
+        {
+            if (Current.Profiles == null || index < 0 || index >= Current.Profiles.Count) return;
+            if (Current.Profiles[index].HiddenFromRow == hidden) return;
+            Current.Profiles[index].HiddenFromRow = hidden;
+            Save();
+            ProfilesChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         public void RenameProfile(int index, string name)
         {
             if (Current.Profiles == null || index < 0 || index >= Current.Profiles.Count) return;
