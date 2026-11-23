@@ -21,11 +21,11 @@ namespace PowerPane.Tests
 
         private static GroupStore.CachedLiveness Cached(bool exists, bool isFile)
         {
-            return (string p, out bool e, out bool f) => { e = exists; f = isFile; return true; };
+            return (string p, bool se, bool sf, out bool e, out bool f) => { e = exists; f = isFile; return true; };
         }
 
         private static readonly GroupStore.CachedLiveness NotCached =
-            (string p, out bool e, out bool f) => { e = true; f = true; return false; };
+            (string p, bool se, bool sf, out bool e, out bool f) => { e = true; f = true; return false; };
 
         [Test]
         public void RefreshLiveness_ProbeFoundTargetGone_PinGoesBroken()
@@ -57,7 +57,7 @@ namespace PowerPane.Tests
         {
             var asked = new List<string>();
             var pin = Pin(@"C:\Demo\Projects", exists: true);
-            GroupStore.RefreshLiveness(pin, (string p, out bool e, out bool f) => { asked.Add(p); e = true; f = false; return true; });
+            GroupStore.RefreshLiveness(pin, (string p, bool se, bool sf, out bool e, out bool f) => { asked.Add(p); e = true; f = false; return true; });
             Assert.That(asked, Is.EqualTo(new[] { @"C:\Demo\Projects" }));
         }
 
@@ -72,13 +72,34 @@ namespace PowerPane.Tests
             Assert.That(pin.Exists, Is.EqualTo(lastKnown));
         }
 
+        [Test]
+        public void RefreshLiveness_EvictedFromTheCache_PassesWhatTheRowShows()
+        {
+            // The cache starts a missing entry from what the row shows, so a broken pin evicted from
+            // the cache is compared with "broken" when its probe lands, and its recovery rebuilds the
+            // pane (#136 second review).
+            bool? seenExists = null, seenIsFile = null;
+            var pin = Pin(@"\\demo-server\share\Reports", exists: false, isFile: false);
+            GroupStore.RefreshLiveness(pin, (string p, bool se, bool sf, out bool e, out bool f) =>
+            { seenExists = se; seenIsFile = sf; e = f = false; return false; });
+            Assert.That(seenExists, Is.False);
+            Assert.That(seenIsFile, Is.False);
+        }
+
+        [Test]
+        public void ProbeChangesRows_SeededBrokenPinRecovers_Rebuilds()
+        {
+            // The seeded entry says gone, as the row does; the probe finds the share back.
+            Assert.That(PathStatus.ProbeChangesRows(false, false, true, false, firstProbe: true, readerWaiting: false), Is.True);
+        }
+
         [TestCase("")]
         [TestCase(null)]
         public void RefreshLiveness_NoTarget_StaysBrokenWithoutAsking(string target)
         {
             // A shortcut whose target could not be resolved is broken; nothing is asked about it.
             var pin = Pin(target, exists: true, isFile: true);
-            GroupStore.RefreshLiveness(pin, (string p, out bool e, out bool f) => { Assert.Fail("asked about an empty target"); e = f = true; return true; });
+            GroupStore.RefreshLiveness(pin, (string p, bool se, bool sf, out bool e, out bool f) => { Assert.Fail("asked about an empty target"); e = f = true; return true; });
             Assert.That(pin.Exists, Is.False);
             Assert.That(pin.IsFile, Is.False);
         }

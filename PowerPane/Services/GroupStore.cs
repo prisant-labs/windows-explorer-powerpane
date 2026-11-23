@@ -469,16 +469,19 @@ namespace PowerPane.Services
         }
 
         /// <summary>Reads a pin's cached liveness: whether the path answered, and whether it is a file.
-        /// False when the cache holds nothing for it.</summary>
-        internal delegate bool CachedLiveness(string path, out bool exists, out bool isFile);
+        /// False when the cache holds nothing for it; shownExists and shownIsFile are what the row shows
+        /// now, which the cache starts a new entry from.</summary>
+        internal delegate bool CachedLiveness(string path, bool shownExists, bool shownIsFile, out bool exists, out bool isFile);
 
         /// <summary>Sets a pin's Exists and IsFile from the background probe cache, never from the
         /// disk. A scan sets them once, but a probe can later find the target gone, such as a share
         /// that dropped, or back again. The pane calls this for each pin as it builds the rows, so the
         /// rebuild that a probe's Changed event triggers dims or restores the row at once, rather than
         /// waiting for the next groups scan (#136). A path the cache has nothing for keeps its last
-        /// known state, and no probe is queued for it, because a build that probed every evicted pin
-        /// could keep a working set larger than the cache probing forever (#136 review).</summary>
+        /// known state, and the cache starts its new entry from that state before probing it, so the
+        /// probe rebuilds the pane only when the row must change. A pin evicted while broken still
+        /// comes back when its share does, and a working set larger than the cache settles (#136
+        /// reviews).</summary>
         internal static void RefreshLiveness(PinnedFolder pin)
         {
             RefreshLiveness(pin, PathStatus.TryGetCached);
@@ -490,7 +493,7 @@ namespace PowerPane.Services
             var target = pin.TargetPath ?? string.Empty;
             if (target.Length == 0) { pin.Exists = false; pin.IsFile = false; return; }
             bool exists, isFile;
-            if (!read(target, out exists, out isFile)) return;
+            if (!read(target, pin.Exists, pin.IsFile, out exists, out isFile)) return;
             pin.Exists = exists;
             pin.IsFile = isFile;
         }

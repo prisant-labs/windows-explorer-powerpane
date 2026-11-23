@@ -116,13 +116,16 @@ namespace PowerPane.Services
         public static bool ConfirmedAlive(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+            // Find or create the entry, queueing a probe when it is new or stale, so the wait below
+            // is never recorded on nothing: a missing entry used to return here without a probe or a
+            // waiter, and a saved expansion stayed collapsed (#139 second review).
+            var e = Lookup(path);
             lock (Gate)
             {
-                Entry e;
-                if (!Map.TryGetValue(path, out e)) return false;
                 // The caller decides something on this answer and waits for the rebuild that follows
                 // the probe, such as restoring an expanded subtree, so that probe must raise Changed
-                // even when it only confirms the optimistic answer.
+                // even when it only confirms the optimistic answer. A probe that landed since Lookup
+                // has already answered.
                 if (!e.Probed) { e.NotifyOnProbe = true; return false; }
                 return e.Exists;
             }
@@ -148,22 +151,34 @@ namespace PowerPane.Services
         /// <summary>Ask for a (re-)probe without reading anything.</summary>
         public static void Touch(string path) { Lookup(path); }
 
-        /// <summary>The cached answer for a path, for code that draws rows. False when the cache has
-        /// no entry, never probed or evicted, and then nothing is queued: drawing must not start
-        /// probes, because a build that probes every pin can keep evicting and re-probing a working
-        /// set larger than the cache and never settle (#136 review). A present but stale entry does
-        /// queue a re-probe, as any other read would.</summary>
-        internal static bool TryGetCached(string path, out bool exists, out bool isFile)
+        /// <summary>The cached answer for a path, for code that draws rows. A present but stale entry
+        /// queues a re-probe, as any other read would. A missing entry, never probed or evicted,
+        /// returns false, and the caller keeps what its row shows: the new entry is seeded with that,
+        /// <paramref name="shownExists"/> and <paramref name="shownIsFile"/>, rather than the
+        /// optimistic answer, and probed. The probe is then compared with what is on screen, so it
+        /// raises Changed only when the row must change. A broken pin whose entry was evicted thus
+        /// still comes back when its share does (#136 second review), and a working set larger than
+        /// the cache settles instead of rebuilding forever, since a probe that agrees with the row
+        /// starts no rebuild (#136 review).</summary>
+        internal static bool TryGetCached(string path, bool shownExists, bool shownIsFile, out bool exists, out bool isFile)
         {
             exists = false; isFile = false;
             if (string.IsNullOrEmpty(path)) return false;
             bool probe = false;
+            bool known = true;
             lock (Gate)
             {
                 Entry e;
-                if (!Map.TryGetValue(path, out e)) return false;
+                if (!Map.TryGetValue(path, out e))
+                {
+                    e = new Entry { Exists = shownExists, IsFile = shownIsFile, InFlight = true };
+                    Map.Set(path, e);
+                    known = false;
+                    probe = true;
+                }
                 exists = e.Exists;
-                isFile = e.Probed ? e.IsFile : GuessIsFile(path);
+                // An unprobed entry holds its starting guess: the extension guess, or the seed above.
+                isFile = e.IsFile;
                 if (!e.InFlight && (!e.Probed || Environment.TickCount - e.Tick > TtlMs))
                 {
                     probe = true;
@@ -175,7 +190,7 @@ namespace PowerPane.Services
                 var p = path;
                 WorkQueue.Post(() => Probe(p));
             }
-            return true;
+            return known;
         }
 
         // Returns the entry (never probes on the calling thread) and queues a probe when the entry
