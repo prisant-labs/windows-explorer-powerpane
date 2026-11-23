@@ -22,16 +22,16 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.2.4";
+        public const string Version = "4.3.0";
 
         public static readonly Item[] Items =
         {
-            new Item("Explorer's tree stays visible while you resize",
-                "Dragging an Explorer window's border no longer slides Explorer's own navigation pane under PowerPane. PowerPane steps aside for the drag and comes back beside the tree."),
-            new Item("Steadier file dialogs and beside pane",
-                "Resizing an Open or Save dialog by its corner grip keeps PowerPane inside the dialog, and a beside pane stays up while you drag its window's right edge."),
-            new Item("The desktop dock keeps its place",
-                "Changing a display's scale no longer leaves the desktop dock wider or narrower than the strip of screen it reserves."),
+            new Item("A shorter desktop dock",
+                "With auto-hide on, Settings > Pane > Desktop dock > Height makes the dock 80, 60 or 40 % of the display's height, centred."),
+            new Item("Missing folders dim sooner",
+                "A pinned folder that goes missing, such as one on a share that dropped, dims the next time the pane is drawn, and comes back when the folder does."),
+            new Item("Real icons on network drives",
+                "Network and removable drives, SSH drives, the Linux row, and folders on a share show their real icons once the drive answers."),
         };
     }
 }
