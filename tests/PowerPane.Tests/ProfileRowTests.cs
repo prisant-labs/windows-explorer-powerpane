@@ -124,6 +124,52 @@ namespace PowerPane.Tests
             Assert.That(Read(json).HiddenFromRow, Is.True);
         }
 
+        // ---- removing a profile keeps the user where they were -------------------
+
+        [TestCase(1, 0, 2, 0)] // removing an earlier profile: the active one moves down with it
+        [TestCase(1, 2, 2, 1)] // removing a later profile: no change
+        [TestCase(1, 1, 2, 1)] // removing the active profile: the next one takes its place
+        [TestCase(2, 2, 2, 1)] // removing the active, last profile: the new last one
+        [TestCase(0, 0, 1, 0)]
+        [TestCase(5, 0, 2, 1)] // an index already out of range is clamped
+        public void ActiveIndexAfterRemove_FollowsTheActiveProfile(int active, int removed, int countAfter, int expected)
+        {
+            Assert.That(SettingsStore.ActiveIndexAfterRemove(active, removed, countAfter), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void Store_RemoveEarlierProfile_KeepsTheActiveProfileAndItsChip()
+        {
+            using (var temp = new TempDir())
+            {
+                var settings = AppSettings.CreateDefault();
+                settings.Profiles = new List<Profile>
+                {
+                    new Profile { Name = "A", GroupsPath = Path.Combine(temp.Path, "A") },
+                    new Profile { Name = "B", GroupsPath = Path.Combine(temp.Path, "B"), HiddenFromRow = true },
+                    new Profile { Name = "C", GroupsPath = Path.Combine(temp.Path, "C") }
+                };
+                settings.ActiveProfileIndex = 1;
+                settings.GroupsPath = Path.Combine(temp.Path, "B");
+                using (var fs = File.Create(Path.Combine(temp.Path, "settings.json")))
+                    new DataContractJsonSerializer(typeof(AppSettings)).WriteObject(fs, settings);
+
+                var store = new SettingsStore(temp.Path);
+                store.Load();
+                store.Current.RecentsMaxCount = 27; // a live edit to B not yet copied into its profile
+                store.RemoveProfile(0);
+                store.Flush();
+
+                var reloaded = new SettingsStore(temp.Path);
+                reloaded.Load();
+                var s = reloaded.Current;
+                Assert.That(s.Profiles[s.ActiveProfileIndex].Name, Is.EqualTo("B"));
+                Assert.That(s.GroupsPath, Is.EqualTo(Path.Combine(temp.Path, "B")));
+                Assert.That(s.Profiles[s.ActiveProfileIndex].RecentsMaxCount, Is.EqualTo(27));
+                Assert.That(SidebarControl.ProfileChipIndexes(s.Profiles, s.ActiveProfileIndex), Is.EqualTo(new[] { 0, 1 }));
+            }
+        }
+
         [Test]
         public void Store_SetProfileHiddenFromRow_SavesAndReloads()
         {

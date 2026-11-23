@@ -5,6 +5,9 @@
 ### Added
 - A profile can stay out of the pane's profile row: turn off Show in the profile row on its page under Settings > Groups & profiles. The row still shows the active profile, hidden or not, and the tray menu still lists every profile. The row now appears only when it would show two or more profiles. Settings files without the new `hiddenFromRow` key show every profile, as before ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
 
+### Fixed
+- Removing a profile listed above the one you are using no longer switches you to a different profile. The profile you were on stays active, with its own groups and settings ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
+
 ## [4.3.0] - 2026-11-22
 
 The auto-hide desktop dock can now be shorter than its display, and two fixes make the pane follow slow and missing folders more closely: a pinned folder that goes missing dims sooner, and rows on network drives get their real icons.
