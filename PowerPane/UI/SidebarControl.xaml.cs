@@ -252,7 +252,7 @@ namespace PowerPane.UI
         /// is the root of an HwndSource, not a Window, and WPF tells only Windows that Application
         /// resources changed, so without this the background, title, chevron, separator and gear in
         /// SidebarControl.xaml kept the old theme after a live light/dark switch while the rebuilt rows
-        /// took the new one: light text on a light pane, or dark on dark. Changing the pane's own
+        /// took the new one: light text on a light pane, or dark on dark (#302). Changing the pane's own
         /// Resources makes WPF re-resolve every DynamicResource below it.</summary>
         private void RefreshThemeResources()
         {

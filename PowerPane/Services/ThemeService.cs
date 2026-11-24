@@ -157,7 +157,7 @@ namespace PowerPane.Services
         /// the new one in its place. A real dictionary swap, not a mutation of the live one (see
         /// ApplyPaneColor's notes). WPF tells only the Windows it knows about that Application
         /// resources changed, so an HwndSource-hosted pane, which is not a Window, never hears of this
-        /// swap; it copies <see cref="CurrentDictionary"/> into its own resources instead.</summary>
+        /// swap; it copies <see cref="CurrentDictionary"/> into its own resources instead (#302).</summary>
         private void SwapDictionary(ResourceDictionary dict)
         {
             var app = Application.Current;
@@ -176,7 +176,7 @@ namespace PowerPane.Services
         /// place of <paramref name="previous"/>, and returns what the caller should pass as previous next
         /// time. Changing an element's own resources makes WPF re-resolve every DynamicResource in that
         /// element's subtree whose key either dictionary holds, which is the refresh an HwndSource-hosted
-        /// pane does not get from an Application resource swap (after a live dark switch the pane
+        /// pane does not get from an Application resource swap (#302: after a live dark switch the pane
         /// kept its light background and fixed text while its rebuilt rows took the dark theme's light
         /// text, so the rows turned unreadable). Removing and adding in one place keeps the lookup order
         /// the same, so the pane's own copy always matches the Application's.</summary>

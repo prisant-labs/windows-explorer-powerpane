@@ -6,7 +6,7 @@
 - A profile can stay out of the pane's profile row: turn off Show in the profile row on its page under Settings > Groups & profiles. The row still shows the active profile, hidden or not, and the tray menu still lists every profile. The row now appears only when it would show two or more profiles. Settings files without the new `hiddenFromRow` key show every profile, as before ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
 
 ### Fixed
-- Switching Windows between light and dark mode while PowerPane runs no longer leaves the pane unreadable. An open pane used to keep its old background while its folder names took the new theme's text colour, so they all but disappeared until the Explorer window was closed. An open Settings window had the same problem, with a blank navigation column. Both now follow the switch in either direction.
+- Switching Windows between light and dark mode while PowerPane runs no longer leaves the pane unreadable. An open pane used to keep its old background while its folder names took the new theme's text colour, so they all but disappeared until the Explorer window was closed. An open Settings window had the same problem, with a blank navigation column. Both now follow the switch in either direction ([#302](https://github.com/prisant-labs/windows-explorer-powerpane/issues/302)).
 - Removing a profile listed above the one you are using no longer switches you to a different profile. The profile you were on stays active, with its own groups and settings ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
 
 ## [4.3.0] - 2026-11-22
