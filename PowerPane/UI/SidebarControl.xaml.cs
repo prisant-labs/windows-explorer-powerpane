@@ -108,7 +108,7 @@ namespace PowerPane.UI
         {
             if (_wired || _detached) return;
             _wired = true;
-            if (App.Theme != null) App.Theme.ThemeChanged += OnDataChanged;
+            if (App.Theme != null) App.Theme.ThemeChanged += OnThemeChanged;
             if (App.Theme != null) App.Theme.PaneColorChanged += OnPaneColorChanged;
             if (App.Settings != null) App.Settings.Changed += OnSettingsChanged;
             SshfsService.MountStatusChanged += OnSshMountChanged;
@@ -119,7 +119,7 @@ namespace PowerPane.UI
         {
             if (!_wired) return;
             _wired = false;
-            if (App.Theme != null) App.Theme.ThemeChanged -= OnDataChanged;
+            if (App.Theme != null) App.Theme.ThemeChanged -= OnThemeChanged;
             if (App.Theme != null) App.Theme.PaneColorChanged -= OnPaneColorChanged;
             if (App.Settings != null) App.Settings.Changed -= OnSettingsChanged;
             SshfsService.MountStatusChanged -= OnSshMountChanged;
@@ -229,7 +229,37 @@ namespace PowerPane.UI
         private void OnPaneColorChanged()
         {
             if (_detached || MainBorder == null) return;
+            // The pane's own copy of the theme (RefreshThemeResources) is looked up before the
+            // Application's, so it must take the new pane color too, or it would keep showing the old one.
+            RefreshThemeResources();
             MainBorder.SetResourceReference(Border.BackgroundProperty, "SidebarBackground");
+        }
+
+        /// <summary>A light/dark, accent or contrast switch: refresh every theme colour the pane's own
+        /// XAML holds, then rebuild the sections, whose rows read the colours as they are created.</summary>
+        private void OnThemeChanged()
+        {
+            if (_detached) return;
+            RefreshThemeResources();
+            OnDataChanged();
+        }
+
+        // The theme dictionary this pane last copied into its own Resources, so the next switch can
+        // replace it rather than stack another one on top.
+        private ResourceDictionary _hostedTheme;
+
+        /// <summary>Copies the theme ThemeService just installed into this pane's own Resources. The pane
+        /// is the root of an HwndSource, not a Window, and WPF tells only Windows that Application
+        /// resources changed, so without this the background, title, chevron, separator and gear in
+        /// SidebarControl.xaml kept the old theme after a live light/dark switch while the rebuilt rows
+        /// took the new one: light text on a light pane, or dark on dark. Changing the pane's own
+        /// Resources makes WPF re-resolve every DynamicResource below it.</summary>
+        private void RefreshThemeResources()
+        {
+            var theme = App.Theme;
+            if (theme == null) return;
+            try { _hostedTheme = ThemeService.SwapInto(Resources, _hostedTheme, theme.CurrentDictionary); }
+            catch (Exception ex) { Log.Error("refresh the pane's theme resources", ex); }
         }
 
         // What BuildSections built the pane from last time, so OnSettingsChanged can tell a change

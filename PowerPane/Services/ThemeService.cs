@@ -154,9 +154,10 @@ namespace PowerPane.Services
         }
 
         /// <summary>Removes whichever dictionary Apply()/ApplyPaneColor() last installed and adds
-        /// the new one in its place. A real dictionary swap, not a mutation of the live one: WPF
-        /// pushes the DynamicResource update through to an HwndSource-hosted pane for this, but not
-        /// for an in-place edit (see ApplyPaneColor's notes).</summary>
+        /// the new one in its place. A real dictionary swap, not a mutation of the live one (see
+        /// ApplyPaneColor's notes). WPF tells only the Windows it knows about that Application
+        /// resources changed, so an HwndSource-hosted pane, which is not a Window, never hears of this
+        /// swap; it copies <see cref="CurrentDictionary"/> into its own resources instead.</summary>
         private void SwapDictionary(ResourceDictionary dict)
         {
             var app = Application.Current;
@@ -165,6 +166,27 @@ namespace PowerPane.Services
             if (_current != null) merged.Remove(_current);
             merged.Add(dict);
             _current = dict;
+        }
+
+        /// <summary>The theme dictionary Apply() or ApplyPaneColor() installed last, or null before the
+        /// first Apply().</summary>
+        public ResourceDictionary CurrentDictionary { get { return _current; } }
+
+        /// <summary>Puts <paramref name="fresh"/> into <paramref name="target"/>'s merged dictionaries in
+        /// place of <paramref name="previous"/>, and returns what the caller should pass as previous next
+        /// time. Changing an element's own resources makes WPF re-resolve every DynamicResource in that
+        /// element's subtree whose key either dictionary holds, which is the refresh an HwndSource-hosted
+        /// pane does not get from an Application resource swap (after a live dark switch the pane
+        /// kept its light background and fixed text while its rebuilt rows took the dark theme's light
+        /// text, so the rows turned unreadable). Removing and adding in one place keeps the lookup order
+        /// the same, so the pane's own copy always matches the Application's.</summary>
+        internal static ResourceDictionary SwapInto(ResourceDictionary target, ResourceDictionary previous, ResourceDictionary fresh)
+        {
+            if (target == null || ReferenceEquals(previous, fresh)) return previous;
+            var merged = target.MergedDictionaries;
+            if (previous != null) merged.Remove(previous);
+            if (fresh != null) merged.Add(fresh);
+            return fresh;
         }
 
         /// <summary>Windows hosted as HwndSource roots fall back to Application resources, so brushes
