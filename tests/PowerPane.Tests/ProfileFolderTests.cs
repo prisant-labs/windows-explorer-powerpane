@@ -21,7 +21,7 @@ namespace PowerPane.Tests
             return Root + folder + @"\Groups";
         }
 
-        private static readonly Func<string, bool> NothingOnDisk = path => false;
+        private static readonly Func<string, bool?> NothingOnDisk = path => false;
 
         [Test]
         public void Choose_FreeName_KeepsIt()
@@ -65,7 +65,7 @@ namespace PowerPane.Tests
         {
             // A removed profile leaves its folder behind, and reusing it would bring its groups back.
             string leftBehind = Environment.ExpandEnvironmentVariables(Root + "Work");
-            Func<string, bool> exists = path => string.Equals(path, leftBehind, StringComparison.OrdinalIgnoreCase);
+            Func<string, bool?> exists = path => string.Equals(path, leftBehind, StringComparison.OrdinalIgnoreCase);
             Assert.That(SettingsStore.ChooseProfileFolder("Work", new string[0], exists), Is.EqualTo("Work 2"));
         }
 
@@ -88,6 +88,46 @@ namespace PowerPane.Tests
         public void Choose_NullChecks_AreSafe()
         {
             Assert.That(SettingsStore.ChooseProfileFolder("Work", null, null), Is.EqualTo("Work"));
+        }
+
+        [Test]
+        public void Choose_DotSegmentSpelling_CountsAsTaken()
+        {
+            Assert.That(SettingsStore.ChooseProfileFolder("Work", new[] { Root + @".\Work\Groups" }, NothingOnDisk),
+                Is.EqualTo("Work 2"));
+        }
+
+        [Test]
+        public void Choose_DiskDoesNotAnswer_NeverTakesTheCandidate()
+        {
+            // A slow share may hold a removed profile's folder, so "unknown" must not mean "free".
+            string folder = SettingsStore.ChooseProfileFolder("Work", new string[0], path => null);
+            Assert.That(folder, Does.Match(@"^Work [0-9a-f]{8}$"));
+        }
+
+        [Test]
+        public void Choose_DiskStopsAnsweringPartWay_NeverTakesTheUnknownCandidate()
+        {
+            int calls = 0;
+            Func<string, bool?> exists = path => ++calls == 1 ? (bool?)true : null;
+            Assert.That(SettingsStore.ChooseProfileFolder("Work", new string[0], exists),
+                Does.Match(@"^Work [0-9a-f]{8}$"));
+        }
+
+        [TestCase("Work", "Work")]
+        [TestCase("  Work  ", "Work")]
+        [TestCase("Work?", "Work")]
+        [TestCase("Work. .", "Work")]
+        [TestCase("%TEAM%", "TEAM")]
+        [TestCase("CON", "_CON")]
+        [TestCase("nul.txt", "_nul.txt")]
+        [TestCase("Com1 .notes", "_Com1 .notes")]
+        [TestCase("Console", "Console")]
+        [TestCase("???", "Profile3")]
+        [TestCase(null, "Profile3")]
+        public void FolderBase_CleansTheName(string name, string expected)
+        {
+            Assert.That(SettingsStore.ProfileFolderBase(name, 3), Is.EqualTo(expected));
         }
 
         // ---- through the store ----------------------------------------------------
