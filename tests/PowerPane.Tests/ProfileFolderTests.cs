@@ -145,11 +145,22 @@ namespace PowerPane.Tests
             Assert.That((folder + " " + Guid.NewGuid().ToString("N").Substring(0, 8)).Length, Is.LessThan(255));
         }
 
+        [Test]
+        public void FolderBase_LongNameEndingInAnEmoji_NeverSplitsIt()
+        {
+            string folder = SettingsStore.ProfileFolderBase(new string('a', SettingsStore.MaxFolderBaseLength - 1) + "\uD83D\uDE00", 3);
+            Assert.That(char.IsHighSurrogate(folder[folder.Length - 1]), Is.False);
+            Assert.That(folder, Is.EqualTo(new string('a', SettingsStore.MaxFolderBaseLength - 1)));
+        }
+
         [TestCase(@"C:\Demo\Profiles\.\Work\Groups", @"C:\Demo\Profiles\Work\Groups")]
         [TestCase(@"C:\Demo\Profiles\Other\..\Work\", @"C:\Demo\Profiles\Work")]
         [TestCase(@"C:/Demo//Profiles/Work", @"C:\Demo\Profiles\Work")]
         [TestCase(@"C:\..\..\Demo", @"C:\Demo")]
         [TestCase(@"\\Server\Share\.\Work", @"\\Server\Share\Work")]
+        [TestCase(@"\\Server\Share\..\Roaming\Work", @"\\Server\Share\Roaming\Work")]
+        [TestCase(@"C:\Demo\Profiles\Work.\Groups", @"C:\Demo\Profiles\Work\Groups")]
+        [TestCase(@"C:\Demo\Profiles\Work . \Groups", @"C:\Demo\Profiles\Work\Groups")]
         public void FullForCompare_ResolvesDotsWithoutTheDisk(string path, string expected)
         {
             Assert.That(SettingsStore.FullForCompare(path), Is.EqualTo(expected));

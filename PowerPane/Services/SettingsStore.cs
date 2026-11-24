@@ -400,7 +400,14 @@ namespace PowerPane.Services
             foreach (var c in Path.GetInvalidFileNameChars()) safe = safe.Replace(c.ToString(), string.Empty);
             safe = safe.Replace("%", string.Empty).TrimEnd('.', ' ');
             // A folder name holds at most 255 characters, and a clash adds " 2" or a random suffix.
-            if (safe.Length > MaxFolderBaseLength) safe = safe.Substring(0, MaxFolderBaseLength).TrimEnd('.', ' ');
+            if (safe.Length > MaxFolderBaseLength)
+            {
+                // Never cut between the two halves of a character such as an emoji: a lone half is
+                // not valid text, and the settings file would no longer load.
+                int cut = MaxFolderBaseLength;
+                if (char.IsHighSurrogate(safe[cut - 1])) cut--;
+                safe = safe.Substring(0, cut).TrimEnd('.', ' ');
+            }
             if (string.IsNullOrWhiteSpace(safe)) return "Profile" + fallbackNumber;
             int dot = safe.IndexOf('.');
             string stem = (dot < 0 ? safe : safe.Substring(0, dot)).TrimEnd(' ');
@@ -453,11 +460,15 @@ namespace PowerPane.Services
             string prefix = string.Empty;
             if (expanded.StartsWith(@"\\")) { prefix = @"\\"; expanded = expanded.Substring(2); }
             var parts = new System.Collections.Generic.List<string>();
-            foreach (var part in expanded.Split('\\'))
+            // Never climb above the drive, or above the server and share of a network path.
+            int floor = prefix.Length > 0 ? 2 : 1;
+            foreach (var raw in expanded.Split('\\'))
             {
-                if (part.Length == 0 || part == ".") continue;
-                // Never climb above the drive or the server name.
-                if (part == "..") { if (parts.Count > 1) parts.RemoveAt(parts.Count - 1); continue; }
+                if (raw.Length == 0 || raw == ".") continue;
+                if (raw == "..") { if (parts.Count > floor) parts.RemoveAt(parts.Count - 1); continue; }
+                // Windows drops trailing dots and spaces from each name, so "Work." is the folder "Work".
+                string part = parts.Count == 0 ? raw : raw.TrimEnd('.', ' ');
+                if (part.Length == 0) continue;
                 parts.Add(part);
             }
             return prefix + string.Join(@"\", parts);
