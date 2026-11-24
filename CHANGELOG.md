@@ -6,6 +6,7 @@
 - A profile can stay out of the pane's profile row: turn off Show in the profile row on its page under Settings > Groups & profiles. The row still shows the active profile, hidden or not, and the tray menu still lists every profile. The row now appears only when it would show two or more profiles. Settings files without the new `hiddenFromRow` key show every profile, as before ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
 
 ### Fixed
+- A new profile always gets a groups folder of its own. Before, a profile with the same name as another, a name differing only in letter case, the name of a removed profile, or a renamed profile's old name moved into that folder, so both profiles showed the same groups. The profile keeps the name you typed, and its folder gets a number, such as `Work 2`. Profiles that already share a folder are not changed ([#303](https://github.com/prisant-labs/windows-explorer-powerpane/issues/303)).
 - Removing a profile listed above the one you are using no longer switches you to a different profile. The profile you were on stays active, with its own groups and settings ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
 
 ## [4.3.0] - 2026-11-22
