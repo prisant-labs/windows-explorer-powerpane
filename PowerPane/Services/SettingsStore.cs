@@ -351,19 +351,41 @@ namespace PowerPane.Services
             {
                 int left = budgetMs - (int)clock.ElapsedMilliseconds;
                 if (left <= 0) return null;
-                bool timedOut;
-                bool exists = PathStatus.FolderExistsWithin(path, left, out timedOut,
-                    p => Directory.Exists(p) || File.Exists(p));
-                if (timedOut) return null;
-                return exists;
+                try
+                {
+                    var task = System.Threading.Tasks.Task.Run(() => ProbePath(path));
+                    return task.Wait(left) ? task.Result : null;
+                }
+                catch (Exception) { return null; }
             };
         }
+
+        /// <summary>Whether anything, a folder or a file, is at <paramref name="path"/>: true when
+        /// it is there, false only when Windows says the path or its parent is missing, and null for
+        /// any other answer. <see cref="Directory.Exists"/> returns false for "access denied" or a
+        /// dropped share too, and taking that as "free" would hand a removed profile's folder to the
+        /// new one once access came back (#303).</summary>
+        internal static bool? ProbePath(string path)
+        {
+            try
+            {
+                File.GetAttributes(path);
+                return true;
+            }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
+            catch (Exception) { return null; }
+        }
+
+        internal const int MaxFolderBaseLength = 200;
 
         private static readonly string[] ReservedNames =
         {
             "CON", "PRN", "AUX", "NUL",
             "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+            // Windows also reserves these with superscript digits.
+            "COM¹", "COM²", "COM³", "LPT¹", "LPT²", "LPT³"
         };
 
         /// <summary>The folder name a profile called <paramref name="name"/> would like, before any
@@ -377,6 +399,8 @@ namespace PowerPane.Services
             string safe = (name ?? string.Empty).Trim();
             foreach (var c in Path.GetInvalidFileNameChars()) safe = safe.Replace(c.ToString(), string.Empty);
             safe = safe.Replace("%", string.Empty).TrimEnd('.', ' ');
+            // A folder name holds at most 255 characters, and a clash adds " 2" or a random suffix.
+            if (safe.Length > MaxFolderBaseLength) safe = safe.Substring(0, MaxFolderBaseLength).TrimEnd('.', ' ');
             if (string.IsNullOrWhiteSpace(safe)) return "Profile" + fallbackNumber;
             int dot = safe.IndexOf('.');
             string stem = (dot < 0 ? safe : safe.Substring(0, dot)).TrimEnd(' ');
@@ -418,15 +442,25 @@ namespace PowerPane.Services
             return safe + " " + Guid.NewGuid().ToString("N").Substring(0, 8);
         }
 
-        /// <summary>A path expanded and made full, so "Profiles\.\Work", "profiles/work/" and the
-        /// expanded spelling all compare equal. GetFullPath works on the string alone and does not
-        /// touch the disk.</summary>
-        private static string FullForCompare(string path)
+        /// <summary>A path expanded, with "." and ".." segments resolved, so "Profiles\.\Work",
+        /// "profiles/work/" and the expanded spelling all compare equal. This works on the text
+        /// alone. <see cref="Path.GetFullPath(string)"/> was not used because on .NET Framework it can
+        /// reach a share to expand a short name, and this runs on the UI thread outside the probe's
+        /// time budget.</summary>
+        internal static string FullForCompare(string path)
         {
             string expanded = Environment.ExpandEnvironmentVariables(path.Trim()).Replace('/', '\\');
-            try { expanded = Path.GetFullPath(expanded); }
-            catch (Exception) { }
-            return expanded.TrimEnd('\\');
+            string prefix = string.Empty;
+            if (expanded.StartsWith(@"\\")) { prefix = @"\\"; expanded = expanded.Substring(2); }
+            var parts = new System.Collections.Generic.List<string>();
+            foreach (var part in expanded.Split('\\'))
+            {
+                if (part.Length == 0 || part == ".") continue;
+                // Never climb above the drive or the server name.
+                if (part == "..") { if (parts.Count > 1) parts.RemoveAt(parts.Count - 1); continue; }
+                parts.Add(part);
+            }
+            return prefix + string.Join(@"\", parts);
         }
 
         public void RemoveProfile(int index)

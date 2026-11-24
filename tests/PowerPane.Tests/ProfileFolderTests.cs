@@ -130,6 +130,48 @@ namespace PowerPane.Tests
             Assert.That(SettingsStore.ProfileFolderBase(name, 3), Is.EqualTo(expected));
         }
 
+        [Test]
+        public void FolderBase_SuperscriptDeviceNames_AreEscaped()
+        {
+            Assert.That(SettingsStore.ProfileFolderBase("COM\u00B9.notes", 3), Is.EqualTo("_COM\u00B9.notes"));
+            Assert.That(SettingsStore.ProfileFolderBase("lpt\u00B3", 3), Is.EqualTo("_lpt\u00B3"));
+        }
+
+        [Test]
+        public void FolderBase_LongName_LeavesRoomForASuffix()
+        {
+            string folder = SettingsStore.ProfileFolderBase(new string('a', 254), 3);
+            Assert.That(folder.Length, Is.EqualTo(SettingsStore.MaxFolderBaseLength));
+            Assert.That((folder + " " + Guid.NewGuid().ToString("N").Substring(0, 8)).Length, Is.LessThan(255));
+        }
+
+        [TestCase(@"C:\Demo\Profiles\.\Work\Groups", @"C:\Demo\Profiles\Work\Groups")]
+        [TestCase(@"C:\Demo\Profiles\Other\..\Work\", @"C:\Demo\Profiles\Work")]
+        [TestCase(@"C:/Demo//Profiles/Work", @"C:\Demo\Profiles\Work")]
+        [TestCase(@"C:\..\..\Demo", @"C:\Demo")]
+        [TestCase(@"\\Server\Share\.\Work", @"\\Server\Share\Work")]
+        public void FullForCompare_ResolvesDotsWithoutTheDisk(string path, string expected)
+        {
+            Assert.That(SettingsStore.FullForCompare(path), Is.EqualTo(expected));
+        }
+
+        [Test]
+        public void Probe_TellsThereMissingAndFileApart()
+        {
+            using (var temp = new TempDir())
+            {
+                string folder = Path.Combine(temp.Path, "Work");
+                Directory.CreateDirectory(folder);
+                string file = Path.Combine(temp.Path, "Home");
+                File.WriteAllText(file, "");
+                Assert.That(SettingsStore.ProbePath(folder), Is.True);
+                Assert.That(SettingsStore.ProbePath(file), Is.True); // a file in the way counts as taken
+                Assert.That(SettingsStore.ProbePath(Path.Combine(temp.Path, "Absent")), Is.False);
+                Assert.That(SettingsStore.ProbePath(Path.Combine(temp.Path, "Absent", "Deeper")), Is.False);
+                Assert.That(SettingsStore.ProbePath(temp.Path + @"\Bad|Name"), Is.Null); // an error that is not "missing"
+            }
+        }
+
         // ---- through the store ----------------------------------------------------
 
         private static SettingsStore StoreWith(TempDir temp, params Profile[] profiles)
