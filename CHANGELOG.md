@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [4.4.0] - 2026-11-25
+
+A profile can now stay out of the pane's profile row, and three fixes keep things readable and separate: open panes and Settings follow a live light or dark switch, every new profile gets its own groups folder, and removing a profile keeps you on the one you were using.
 
 ### Added
 - A profile can stay out of the pane's profile row: turn off Show in the profile row on its page under Settings > Groups & profiles. The row still shows the active profile, hidden or not, and the tray menu still lists every profile. The row now appears only when it would show two or more profiles. Settings files without the new `hiddenFromRow` key show every profile, as before ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).

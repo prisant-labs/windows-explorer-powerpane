@@ -22,16 +22,16 @@ namespace PowerPane.Services
         }
 
         /// <summary>The version these lines describe, spelled as its release tag spells it after the "v".</summary>
-        public const string Version = "4.3.0";
+        public const string Version = "4.4.0";
 
         public static readonly Item[] Items =
         {
-            new Item("A shorter desktop dock",
-                "With auto-hide on, Settings > Pane > Desktop dock > Height makes the dock 80, 60 or 40 % of the display's height, centred."),
-            new Item("Missing folders dim sooner",
-                "A pinned folder that goes missing, such as one on a share that dropped, dims the next time the pane is drawn, and comes back when the folder does."),
-            new Item("Real icons on network drives",
-                "Network and removable drives, SSH drives, the Linux row, and folders on a share show their real icons once the drive answers."),
+            new Item("Keep a profile out of the profile row",
+                "Turn off Show in the profile row on a profile's page under Settings > Groups & profiles. The tray menu still lists every profile."),
+            new Item("Panes follow a light or dark switch",
+                "Switching Windows between light and dark mode no longer leaves an open pane or Settings window unreadable."),
+            new Item("Profiles stay separate",
+                "A new profile always gets its own groups folder, and removing a profile no longer switches you to a different one."),
         };
     }
 }
