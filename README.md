@@ -22,9 +22,9 @@ PowerPane began as a fork of [QuickPane](https://github.com/lso2/QuickPane) by l
 
 <!-- Keep the three newest releases here, one line each, and replace "Next release" with its version and date when tagging. CHANGELOG.md holds every version. -->
 
+- **4.4.0** (2026-11-25): a profile can stay out of the pane's profile row with its **Show in the profile row** switch under **Settings > Groups & profiles** ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)). Switching Windows between light and dark mode no longer leaves an open pane or Settings window unreadable ([#302](https://github.com/prisant-labs/windows-explorer-powerpane/issues/302)). A new profile always gets its own groups folder, even when its name matches another profile ([#303](https://github.com/prisant-labs/windows-explorer-powerpane/issues/303)), and removing a profile no longer switches you to a different one.
 - **4.3.0** (2026-11-22): with auto-hide on, the desktop dock can be 80, 60 or 40 % of its display's height ([#177](https://github.com/prisant-labs/windows-explorer-powerpane/issues/177)). A pinned folder that goes missing dims the next time the pane is drawn ([#136](https://github.com/prisant-labs/windows-explorer-powerpane/issues/136)), and network drives, SSH drives, the Linux row, and folders on a share show their real icons once the drive answers ([#139](https://github.com/prisant-labs/windows-explorer-powerpane/issues/139)).
 - **4.2.4** (2026-11-22): dragging an Explorer window's border no longer slides Explorer's own navigation pane under PowerPane, which now steps aside for the drag ([#285](https://github.com/prisant-labs/windows-explorer-powerpane/issues/285)). Resizing an Open or Save dialog by its corner grip keeps PowerPane inside the dialog ([#234](https://github.com/prisant-labs/windows-explorer-powerpane/issues/234)), and a beside pane stays up while you drag its window's right edge ([#235](https://github.com/prisant-labs/windows-explorer-powerpane/issues/235)). The desktop dock stays on its strip of screen after a display scale change ([#160](https://github.com/prisant-labs/windows-explorer-powerpane/issues/160)).
-- **4.2.2** (2026-11-18): **Clicking a folder** lists **Quick action: Copy path** only, without the built-in **Copy path** that did the same thing; a click set to **Copy path** keeps copying ([#282](https://github.com/prisant-labs/windows-explorer-powerpane/issues/282)).
 
 [Full changelog](CHANGELOG.md)
 
@@ -169,8 +169,9 @@ Each profile is an independent workspace with its own groups folder, recents cou
 
 - Switch profiles from the tray icon's right-click menu or from the profile tab row under the title
 - The profile tab row can auto-hide, sliding out when the cursor is over the header
-- A profile can stay out of the profile tab row: turn off "Show in the profile row" on its page under Groups & profiles. The row still shows the active profile, and the tray menu still lists every profile. The row appears only when it would show two or more profiles
-- Manage profiles on the Settings window's Groups & profiles page, with cards for add, rename, and remove
+- A profile can stay out of the profile tab row: turn off "Show in the profile row" on its page under Groups & profiles. The row still shows the active profile, and the tray menu still lists every profile. A hidden profile leaves the row once you switch to another one. The row appears only when it would show two or more profiles
+- Manage profiles on the Settings window's Groups & profiles page, with cards for add, rename, and remove. Removing the profile you are using makes the next one in the list active, and removing any other profile keeps you where you are
+- A new profile's groups live in `%APPDATA%\PowerPane\Profiles\<name>\Groups`. When that folder is already taken, by another profile or by a folder left on disk, the new profile gets a numbered folder such as `Profiles\Work 2`, while the profile itself keeps the name you typed. Removing or renaming a profile never deletes or moves its folder, so its groups stay on disk. Each profile's folder is its `groupsPath` in `settings.json`, so two profiles that show the same groups share one folder; give one of them a new `groupsPath` to separate them
 - Move a group to another profile with a destination picker and a "Copy instead of move" checkbox, so one group can live in more than one profile
 
 ### Remembered layout
