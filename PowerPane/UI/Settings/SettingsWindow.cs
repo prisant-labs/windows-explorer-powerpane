@@ -357,6 +357,13 @@ namespace PowerPane.UI.Settings
             int hr = -1;
             if (!highContrast)
             {
+                // Mica takes its light or dark tint from this flag. ThemeService.AttachWindow sets it
+                // too, but its ThemeChanged handler runs after this window's own, so on a live switch
+                // Mica was re-applied with the old flag and stayed light under the dark theme's white
+                // text, leaving the navigation column blank (#302). Setting it here first fixes the order.
+                int dark = _theme != null && _theme.IsDark ? 1 : 0;
+                if (NM.DwmSetWindowAttribute(hwnd, NM.DWMWA_USE_IMMERSIVE_DARK_MODE, ref dark, sizeof(int)) != 0)
+                    NM.DwmSetWindowAttribute(hwnd, NM.DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref dark, sizeof(int));
                 int backdrop = NM.DWMSBT_MAINWINDOW;
                 hr = NM.DwmSetWindowAttribute(hwnd, NM.DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int));
             }
