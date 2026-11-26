@@ -306,13 +306,15 @@ namespace PowerPane.Services
             if (Current.Profiles == null) Current.Profiles = new System.Collections.Generic.List<Profile>();
             if (string.IsNullOrWhiteSpace(name)) name = "Profile " + (Current.Profiles.Count + 1);
             // Each new profile gets its own groups folder so it starts independent.
-            string safe = name.Trim();
-            foreach (var c in Path.GetInvalidFileNameChars()) safe = safe.Replace(c.ToString(), string.Empty);
-            if (string.IsNullOrWhiteSpace(safe)) safe = "Profile" + (Current.Profiles.Count + 1);
+            string safe = ProfileFolderBase(name, Current.Profiles.Count + 1);
+            var used = new System.Collections.Generic.List<string>();
+            foreach (var other in Current.Profiles) if (other != null) used.Add(other.GroupsPath);
+            used.Add(Current.GroupsPath); // the active profile's live value, which may not be synced yet
+            string folder = ChooseProfileFolder(safe, used, ProfileFolderExists ?? ProfileFolderProbe());
             var p = new Profile
             {
                 Name = name.Trim(),
-                GroupsPath = @"%APPDATA%\PowerPane\Profiles\" + safe + @"\Groups",
+                GroupsPath = ProfileGroupsPath(folder),
                 RecentsMaxCount = 15,
                 SidebarWidthPx = 220
             };
@@ -320,6 +322,156 @@ namespace PowerPane.Services
             Save();
             ProfilesChanged?.Invoke(this, EventArgs.Empty);
             return p;
+        }
+
+        private const string ProfilesRoot = @"%APPDATA%\PowerPane\Profiles\";
+
+        private static string ProfileGroupsPath(string folder)
+        {
+            return ProfilesRoot + folder + @"\Groups";
+        }
+
+        /// <summary>Test seam for the on-disk half of <see cref="ChooseProfileFolder"/>: given an
+        /// expanded profile folder, says whether something is already there, or null when the disk did
+        /// not answer in time. Null uses the real probe, so tests set it to keep away from the user's
+        /// own AppData folder.</summary>
+        internal Func<string, bool?> ProfileFolderExists { get; set; }
+
+        /// <summary>The real probe. AppData can be redirected to a share and this runs on the UI
+        /// thread, which in inside mode shares Explorer's input queue (#163), so every probe for one
+        /// new profile shares a single 500 ms budget. Once the budget is spent the probe answers
+        /// "unknown", never "free": a folder a removed profile left behind on a slow share must not be
+        /// handed to the new profile (#303). A file with the folder's name counts as taken, because
+        /// the groups folder could not be made inside it.</summary>
+        private static Func<string, bool?> ProfileFolderProbe()
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            const int budgetMs = 500;
+            return path =>
+            {
+                int left = budgetMs - (int)clock.ElapsedMilliseconds;
+                if (left <= 0) return null;
+                try
+                {
+                    var task = System.Threading.Tasks.Task.Run(() => ProbePath(path));
+                    return task.Wait(left) ? task.Result : null;
+                }
+                catch (Exception) { return null; }
+            };
+        }
+
+        /// <summary>Whether anything, a folder or a file, is at <paramref name="path"/>: true when
+        /// it is there, false only when Windows says the path or its parent is missing, and null for
+        /// any other answer. <see cref="Directory.Exists"/> returns false for "access denied" or a
+        /// dropped share too, and taking that as "free" would hand a removed profile's folder to the
+        /// new one once access came back (#303).</summary>
+        internal static bool? ProbePath(string path)
+        {
+            try
+            {
+                File.GetAttributes(path);
+                return true;
+            }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
+            catch (Exception) { return null; }
+        }
+
+        internal const int MaxFolderBaseLength = 200;
+
+        private static readonly string[] ReservedNames =
+        {
+            "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+            // Windows also reserves these with superscript digits.
+            "COM¹", "COM²", "COM³", "LPT¹", "LPT²", "LPT³"
+        };
+
+        /// <summary>The folder name a profile called <paramref name="name"/> would like, before any
+        /// clash is resolved. Characters a folder name cannot hold are dropped, and so is "%", because
+        /// the stored path is expanded at every launch and a name such as "%TEAM%" would point at a
+        /// different folder whenever that variable changed. Trailing dots and spaces go too, because
+        /// Windows drops them. A device name such as CON or NUL.txt gets a leading underscore, because
+        /// Windows refuses a folder by that name.</summary>
+        internal static string ProfileFolderBase(string name, int fallbackNumber)
+        {
+            string safe = (name ?? string.Empty).Trim();
+            foreach (var c in Path.GetInvalidFileNameChars()) safe = safe.Replace(c.ToString(), string.Empty);
+            safe = safe.Replace("%", string.Empty).TrimEnd('.', ' ');
+            // A folder name holds at most 255 characters, and a clash adds " 2" or a random suffix.
+            if (safe.Length > MaxFolderBaseLength)
+            {
+                // Never cut between the two halves of a character such as an emoji: a lone half is
+                // not valid text, and the settings file would no longer load.
+                int cut = MaxFolderBaseLength;
+                if (char.IsHighSurrogate(safe[cut - 1])) cut--;
+                safe = safe.Substring(0, cut).TrimEnd('.', ' ');
+            }
+            if (string.IsNullOrWhiteSpace(safe)) return "Profile" + fallbackNumber;
+            int dot = safe.IndexOf('.');
+            string stem = (dot < 0 ? safe : safe.Substring(0, dot)).TrimEnd(' ');
+            foreach (var r in ReservedNames)
+                if (string.Equals(stem, r, StringComparison.OrdinalIgnoreCase)) return "_" + safe;
+            return safe;
+        }
+
+        /// <summary>Picks the folder name under the Profiles folder for a new profile: <paramref name="safe"/>
+        /// itself, or "safe 2", "safe 3" and so on when that folder is taken. A folder is taken when
+        /// any profile's groups folder is it or sits in it, compared as full paths without regard to
+        /// case as Windows does, or when something already exists there on disk, such as the folder a
+        /// removed profile left behind. Before this check two profiles could share one groups folder,
+        /// so an edit in one showed in the other (#303). <paramref name="exists"/> receives the
+        /// expanded profile folder. When it cannot tell (null), the name gets a random suffix instead,
+        /// so not knowing never means reusing someone else's folder.</summary>
+        internal static string ChooseProfileFolder(string safe, System.Collections.Generic.IEnumerable<string> usedGroupsPaths,
+            Func<string, bool?> exists)
+        {
+            var used = new System.Collections.Generic.List<string>();
+            if (usedGroupsPaths != null)
+                foreach (var u in usedGroupsPaths)
+                    if (!string.IsNullOrWhiteSpace(u)) used.Add(FullForCompare(u));
+
+            for (int n = 1; n < 1000; n++)
+            {
+                string folder = n == 1 ? safe : safe + " " + n;
+                string root = FullForCompare(ProfilesRoot + folder);
+                bool taken = false;
+                foreach (var u in used)
+                    if (string.Equals(u, root, StringComparison.OrdinalIgnoreCase)
+                        || u.StartsWith(root + @"\", StringComparison.OrdinalIgnoreCase)) { taken = true; break; }
+                if (taken) continue;
+                bool? there = exists == null ? false : exists(root);
+                if (there == null) break;
+                if (there.Value) continue;
+                return folder;
+            }
+            return safe + " " + Guid.NewGuid().ToString("N").Substring(0, 8);
+        }
+
+        /// <summary>A path expanded, with "." and ".." segments resolved, so "Profiles\.\Work",
+        /// "profiles/work/" and the expanded spelling all compare equal. This works on the text
+        /// alone. <see cref="Path.GetFullPath(string)"/> was not used because on .NET Framework it can
+        /// reach a share to expand a short name, and this runs on the UI thread outside the probe's
+        /// time budget.</summary>
+        internal static string FullForCompare(string path)
+        {
+            string expanded = Environment.ExpandEnvironmentVariables(path.Trim()).Replace('/', '\\');
+            string prefix = string.Empty;
+            if (expanded.StartsWith(@"\\")) { prefix = @"\\"; expanded = expanded.Substring(2); }
+            var parts = new System.Collections.Generic.List<string>();
+            // Never climb above the drive, or above the server and share of a network path.
+            int floor = prefix.Length > 0 ? 2 : 1;
+            foreach (var raw in expanded.Split('\\'))
+            {
+                if (raw.Length == 0 || raw == ".") continue;
+                if (raw == "..") { if (parts.Count > floor) parts.RemoveAt(parts.Count - 1); continue; }
+                // Windows drops trailing dots and spaces from each name, so "Work." is the folder "Work".
+                string part = parts.Count == 0 ? raw : raw.TrimEnd('.', ' ');
+                if (part.Length == 0) continue;
+                parts.Add(part);
+            }
+            return prefix + string.Join(@"\", parts);
         }
 
         public void RemoveProfile(int index)

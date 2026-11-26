@@ -7,6 +7,7 @@
 
 ### Fixed
 - Switching Windows between light and dark mode while PowerPane runs no longer leaves the pane unreadable. An open pane used to keep its old background while its folder names took the new theme's text colour, so they all but disappeared until the Explorer window was closed. An open Settings window had the same problem, with a blank navigation column. Both now follow the switch in either direction ([#302](https://github.com/prisant-labs/windows-explorer-powerpane/issues/302)).
+- A new profile always gets a groups folder of its own. Before, a profile with the same name as another, a name differing only in letter case, the name of a removed profile, or a renamed profile's old name moved into that folder, so both profiles showed the same groups. The profile keeps the name you typed, and its folder gets a number, such as `Work 2`. Profiles that already share a folder are not changed ([#303](https://github.com/prisant-labs/windows-explorer-powerpane/issues/303)).
 - Removing a profile listed above the one you are using no longer switches you to a different profile. The profile you were on stays active, with its own groups and settings ([#6](https://github.com/prisant-labs/windows-explorer-powerpane/issues/6)).
 
 ## [4.3.0] - 2026-11-22
