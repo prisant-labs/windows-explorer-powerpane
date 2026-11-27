@@ -172,11 +172,12 @@ namespace PowerPane.Tests
             "UpdateCheckOff", "LastUpdateCheckUtc", "UpdateNoticeVersion", // read by UpdateNotifier; the pane shows none of them (#176)
             "QuickSwitcher", "QuickSwitcherHotkey", // read by App.ApplyHotkeys; the switcher is its own window (#226)
             "RecentHiddenFolders", "RecentClearedTicks", // RecentFoldersService rescans on its own and raises RecentsChanged; no pane rebuild (#224)
-            "ClickActions" // read by FolderTreeNode at click time, so a change applies to the next click with no rebuild (#269)
+            "ClickActions", // read by FolderTreeNode at click time, so a change applies to the next click with no rebuild (#269)
+            "PinHotkeys", "PinHotkeyModifiers" // read by App.ApplyHotkeys and the pin menu when it opens (#299)
         };
 
         private static readonly string[] ProfileKeyFields = { "Name", "GroupsPath", "HiddenFromRow" };
-        private static readonly string[] ProfileNotRendered = { "RecentsMaxCount", "SidebarWidthPx" };
+        private static readonly string[] ProfileNotRendered = { "RecentsMaxCount", "SidebarWidthPx", "PinHotkeys" };
 
         private static readonly string[] SshProfileKeyFields = { "Name", "DriveLetter" };
         private static readonly string[] SshProfileNotRendered =

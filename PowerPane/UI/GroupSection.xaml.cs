@@ -883,9 +883,94 @@ namespace PowerPane.UI
 
                 ShellLink.Create(pin.LinkPath, typed);
                 Log.Info("pin \"" + pin.DisplayName + "\" now points at " + typed + ".");
+                MovePinShortcut(pin.TargetPath, typed);
                 if (App.Groups != null) App.Groups.Reload();
             }
             catch (Exception ex) { Log.Error("edit the path of '" + (pin == null ? "" : pin.DisplayName) + "'", ex); }
+        }
+
+        /// <summary>"Assign shortcut" for a folder pin (#299): None and the numbers 1 to 9, with the
+        /// number this folder holds checked. A number another folder holds names it, and choosing it
+        /// moves the number here. Null while pin shortcuts are off, so the menu does not grow for
+        /// people who never turned them on. The key belongs to the folder, so two pins of one folder
+        /// show the same number.</summary>
+        private static MenuItem BuildPinShortcutSubmenu(PinnedFolder pin)
+        {
+            var settings = App.Settings;
+            var s = settings == null ? null : settings.Current;
+            if (s == null || !s.PinHotkeys || pin == null || string.IsNullOrWhiteSpace(pin.TargetPath)) return null;
+            var profile = s.ActiveProfile;
+            if (profile == null) return null;
+
+            var entries = profile.PinHotkeys;
+            int mine = PinHotkeyModel.SlotOf(entries, pin.TargetPath);
+            var sub = new MenuItem { Header = "Assign shortcut" };
+            var none = new MenuItem { Header = "None", IsCheckable = true, IsChecked = mine == 0 };
+            MarkCurrent(none, mine == 0);
+            none.Click += (x, e) => SetPinShortcut(profile, pin.TargetPath, 0);
+            sub.Items.Add(none);
+            for (int slot = PinHotkeyModel.FirstSlot; slot <= PinHotkeyModel.LastSlot; slot++)
+            {
+                int n = slot;
+                string header = PinHotkeyModel.SlotLabel(s.PinHotkeyModifiers, n);
+                var holder = PinHotkeyModel.TargetOf(entries, n);
+                if (holder != null && n != mine) header += "  (" + PinHotkeyLabel(holder) + ")";
+                var item = new MenuItem { Header = header, IsCheckable = true, IsChecked = n == mine };
+                MarkCurrent(item, n == mine);
+                item.Click += (x, e) => SetPinShortcut(profile, pin.TargetPath, n);
+                sub.Items.Add(item);
+            }
+            return sub;
+        }
+
+        // The pane's menu template draws no check, so the current number gets the glyph SortChoice
+        // uses; IsChecked stays set for UI Automation.
+        private static void MarkCurrent(MenuItem item, bool current)
+        {
+            if (current)
+                item.Icon = new TextBlock { Text = "\uE73E", FontFamily = UiHelpers.IconFont(), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        }
+
+        // The name a person knows a folder by: the first pin pointing at it, or its folder name.
+        internal static string PinHotkeyLabel(string target)
+        {
+            if (App.Groups != null)
+                foreach (var g in App.Groups.Groups)
+                    foreach (var t in g.Tabs)
+                        foreach (var p in t.Items)
+                            if (!p.IsFile && PinPickerModel.PathKey(p.TargetPath) == PinPickerModel.PathKey(target)) return p.DisplayName;
+            try
+            {
+                var leaf = System.IO.Path.GetFileName((target ?? string.Empty).TrimEnd('\\', '/'));
+                return string.IsNullOrEmpty(leaf) ? target : leaf;
+            }
+            catch (ArgumentException) { return target; }
+        }
+
+        private static void SetPinShortcut(Profile profile, string target, int slot)
+        {
+            var settings = App.Settings;
+            if (settings == null || profile == null) return;
+            // The menu was built for one profile; a switch since then must not write into another.
+            if (!ReferenceEquals(settings.Current.ActiveProfile, profile)) return;
+            profile.PinHotkeys = slot == 0
+                ? PinHotkeyModel.Unassign(profile.PinHotkeys, PinHotkeyModel.SlotOf(profile.PinHotkeys, target))
+                : PinHotkeyModel.Assign(profile.PinHotkeys, slot, target);
+            settings.Save();   // re-registers the keys through App.ApplyHotkeys
+        }
+
+        // A pin shortcut belongs to a folder, so when Edit path points a pin at another folder the
+        // key follows it (#299). Only another pin still pointing at the old folder keeps it there.
+        private static void MovePinShortcut(string oldTarget, string newTarget)
+        {
+            var settings = App.Settings;
+            var profile = settings == null ? null : settings.Current.ActiveProfile;
+            if (profile == null || PinHotkeyModel.SlotOf(profile.PinHotkeys, oldTarget) == 0) return;
+            int others = PinHotkeyModel.FolderPinTargets(App.Groups == null ? null : App.Groups.Groups)
+                .Count(t => PinPickerModel.PathKey(t) == PinPickerModel.PathKey(oldTarget));
+            if (others > 1) return;   // this pin was one of several on that folder, and the others keep the key
+            profile.PinHotkeys = PinHotkeyModel.MigrateTarget(profile.PinHotkeys, oldTarget, newTarget);
+            settings.Save();
         }
 
         private ContextMenu BuildPinMenu(PinnedGroup group, PinnedTab tab, PinnedFolder pin, FrameworkElement owner)
@@ -910,6 +995,8 @@ namespace PowerPane.UI
                 menu.Items.Add(Item("Open in new window", () => ExplorerNavigator.OpenNewWindow(pin.TargetPath)));
                 var quickActions = BuildQuickActionsSubmenu(pin.TargetPath);
                 if (quickActions != null) menu.Items.Add(quickActions);
+                var shortcut = BuildPinShortcutSubmenu(pin);
+                if (shortcut != null) menu.Items.Add(shortcut);
             }
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("Rename", () => { var v = AnchoredPrompt.Ask(owner, new PromptOptions { Title = "Rename pin", Initial = pin.DisplayName }); if (v != null) App.Groups.PostEdit(store => store.RenamePin(pin, v)); }));

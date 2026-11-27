@@ -58,9 +58,8 @@ namespace PowerPane.UI
             {
                 if (_open != null) { _open.CloseAndReturn(); return; }
 
-                IntPtr fg = NM.GetForegroundWindow();
-                var kind = Classify(fg);
-                if (kind == TargetKind.Other && IsOurs(fg)) fg = IntPtr.Zero;   // never "return" focus to our own pane or Settings
+                IntPtr fg;
+                var kind = TargetInFront(out fg);
                 var w = new QuickSwitcher(fg, kind, Gather(kind));
                 _open = w;
                 w.Show();
@@ -68,6 +67,40 @@ namespace PowerPane.UI
                 w._box.Focus();
             }
             catch (Exception ex) { Log.Error("quick switcher open", ex); _open = null; }
+        }
+
+        /// <summary>The window in front and what kind it is. Our own pane or Settings counts as no
+        /// window, so nothing ever "returns" focus to it or navigates it.</summary>
+        internal static TargetKind TargetInFront(out IntPtr hwnd)
+        {
+            hwnd = NM.GetForegroundWindow();
+            var kind = Classify(hwnd);
+            if (kind == TargetKind.Other && IsOurs(hwnd)) hwnd = IntPtr.Zero;
+            return kind;
+        }
+
+        /// <summary>Sends a window to a folder: an Explorer window navigates in place, a file dialog
+        /// navigates and keeps its File name text, and with neither a new Explorer window opens, as
+        /// the desktop dock does. Shared by the switcher and the pin shortcuts (#299), so the two
+        /// cannot drift. The navigation runs on the navigation lane.</summary>
+        internal static void SendFolder(TargetKind kind, IntPtr target, string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            switch (kind)
+            {
+                case TargetKind.Explorer:
+                    App.Recents?.RecordNavigation(path);
+                    ExplorerNavigator.NavigateAsync(target, path);
+                    break;
+                case TargetKind.FileDialog:
+                    var dlg = target;
+                    WorkQueue.PostNavigation(() => DialogNavigator.Navigate(dlg, path));
+                    break;
+                default:
+                    App.Recents?.RecordNavigation(path);
+                    WorkQueue.PostNavigation(() => ExplorerNavigator.OpenNewWindow(path));
+                    break;
+            }
         }
 
         internal static TargetKind Classify(IntPtr hwnd)
@@ -377,26 +410,11 @@ namespace PowerPane.UI
                     return;
                 }
 
-                switch (_targetKind)
-                {
-                    case TargetKind.Explorer:
-                        App.Recents?.RecordNavigation(path);
-                        var cabinet = _target;
-                        CloseAndReturn();
-                        ExplorerNavigator.NavigateAsync(cabinet, path);
-                        break;
-                    case TargetKind.FileDialog:
-                        var dlg = _target;
-                        CloseAndReturn();
-                        WorkQueue.PostNavigation(() => DialogNavigator.Navigate(dlg, path));
-                        break;
-                    default:
-                        // No Explorer window or dialog was in front, so open one, as the desktop dock does.
-                        App.Recents?.RecordNavigation(path);
-                        CloseQuietly();
-                        WorkQueue.PostNavigation(() => ExplorerNavigator.OpenNewWindow(path));
-                        break;
-                }
+                var kind = _targetKind;
+                var target = _target;
+                // Focus goes back to the window that will navigate; with none in front, a new one opens.
+                if (kind == TargetKind.Other) CloseQuietly(); else CloseAndReturn();
+                SendFolder(kind, target, path);
             }
             catch (Exception ex) { Log.Error("quick switcher choose", ex); CloseQuietly(); }
         }
