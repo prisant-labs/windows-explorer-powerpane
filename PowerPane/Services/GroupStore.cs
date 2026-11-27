@@ -23,6 +23,10 @@ namespace PowerPane.Services
         public IReadOnlyList<PinnedGroup> Groups { get { return _groups; } }
 
         private static readonly Regex Prefix = new Regex(@"^(\d+)_(.*)$", RegexOptions.Compiled);
+        // A pin's prefix may carry the pinned-to-top flag, as in 003!_Apollo (#301). Groups and tabs
+        // keep the plain pattern. A build without the flag reads 003!_Apollo as a pin with no prefix
+        // named "003!_Apollo", which still works, so nothing is lost on a downgrade.
+        private static readonly Regex PinPrefix = new Regex(@"^(\d+)(!?)_(.*)$", RegexOptions.Compiled);
 
         private readonly SettingsStore _settings;
         private readonly Dictionary<string, int> _activeTabs = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -443,9 +447,9 @@ namespace PowerPane.Services
                     continue;
                 }
                 if (!fi.Extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase)) continue;
-                int o; string disp;
-                Split(Path.GetFileNameWithoutExtension(fi.Name), out o, out disp);
-                pins.Add(new PinnedFolder { DisplayName = disp, LinkPath = fi.FullName, Order = o, AddedUtc = fi.CreationTimeUtc });
+                int o; bool top; string disp;
+                SplitPin(Path.GetFileNameWithoutExtension(fi.Name), out o, out top, out disp);
+                pins.Add(new PinnedFolder { DisplayName = disp, LinkPath = fi.FullName, Order = o, PinnedToTop = top, AddedUtc = fi.CreationTimeUtc });
             }
             return pins;
         }
@@ -922,23 +926,26 @@ namespace PowerPane.Services
         // Put a new shortcut, already inside dir under a temp name, at a position in the order the
         // tab shows on screen, and write that order into the file names. A tab that was sorted
         // loses its marker, because a pin placed at a line is a manual order (#241).
+        // Every pin keeps its pinned-to-top flag, and the new pin is pinned only when it lands inside
+        // the band of pinned pins (#301).
         private static void InsertPinAt(string dir, string newLink, string newName, int index)
         {
             PinSortMode mode;
             var existing = ReadPinFiles(dir, out mode)
                 .Where(p => !string.Equals(p.LinkPath, newLink, StringComparison.OrdinalIgnoreCase));
             var order = PinSorter.Order(existing, mode)
-                .Select(p => Tuple.Create(p.LinkPath, p.DisplayName)).ToList();
+                .Select(p => Tuple.Create(p.LinkPath, p.DisplayName, p.PinnedToTop)).ToList();
             if (index < 0) index = 0;
             if (index > order.Count) index = order.Count;
-            order.Insert(index, Tuple.Create(newLink, newName));
+            bool top = PinSorter.TopAfterDrop(order.Count(p => p.Item3), false, index);
+            order.Insert(index, Tuple.Create(newLink, newName, top));
 
             var plan = new List<Tuple<string, string, string>>();
             for (int i = 0; i < order.Count; i++)
             {
                 plan.Add(Tuple.Create(order[i].Item1,
                     Path.Combine(dir, "~ord~" + Guid.NewGuid().ToString("N") + ".lnk"),
-                    Path.Combine(dir, (i + 1).ToString("000") + "_" + order[i].Item2 + ".lnk")));
+                    Path.Combine(dir, PinStem(i + 1, order[i].Item3, order[i].Item2) + ".lnk")));
             }
             TwoPhaseRename(plan, isDir: false);
             if (mode != PinSortMode.Manual) DeleteMarker(dir);
@@ -986,9 +993,25 @@ namespace PowerPane.Services
                 newName = Sanitize(newName);
                 if (string.IsNullOrWhiteSpace(newName)) return;
                 var dir = Path.GetDirectoryName(folder.LinkPath);
-                var dest = Path.Combine(dir, folder.Order.ToString("000") + "_" + newName + ".lnk");
+                var dest = Path.Combine(dir, PinStem(folder.Order, folder.PinnedToTop, newName) + ".lnk");
                 if (!string.Equals(dest, folder.LinkPath, StringComparison.OrdinalIgnoreCase))
                     File.Move(folder.LinkPath, dest);
+            });
+        }
+
+        /// <summary>Pin a pin to the top of its tab, or unpin it (#301). Only the flag in the file name
+        /// changes. The stored order number stays, so in a Manual tab an unpinned pin goes back to the
+        /// place it had, and a sorted tab keeps its sort marker.</summary>
+        public void SetPinTop(PinnedFolder folder, bool top)
+        {
+            if (folder == null || folder.PinnedToTop == top || Stale(folder.LinkPath)) return;
+            Try(() =>
+            {
+                if (!File.Exists(folder.LinkPath)) return;
+                var dir = Path.GetDirectoryName(folder.LinkPath);
+                int order = folder.Order == int.MaxValue ? NextPinOrder(dir) : folder.Order;
+                var dest = UniqueLink(dir, order, top, folder.DisplayName);
+                File.Move(folder.LinkPath, dest);
             });
         }
 
@@ -1022,6 +1045,9 @@ namespace PowerPane.Services
             int idx = ordered.FindIndex(p => string.Equals(p.LinkPath, folder.LinkPath, StringComparison.OrdinalIgnoreCase));
             int dest = idx + delta;
             if (idx < 0 || dest < 0 || dest >= ordered.Count) return;
+            // Move up and Move down never carry a pin across the edge of the pinned-to-top band, so
+            // a keyboard user cannot pin or unpin one by accident (#301).
+            if (ordered[idx].PinnedToTop != ordered[dest].PinnedToTop) return;
             ordered.RemoveAt(idx); ordered.Insert(dest, folder);
             ReorderPins(tab, ordered);
         }
@@ -1039,7 +1065,7 @@ namespace PowerPane.Services
                     var p = ordered[i];
                     plan.Add(Tuple.Create(p.LinkPath,
                         Path.Combine(dir, "~ord~" + Guid.NewGuid().ToString("N") + ".lnk"),
-                        Path.Combine(dir, (i + 1).ToString("000") + "_" + p.DisplayName + ".lnk")));
+                        Path.Combine(dir, PinStem(i + 1, p.PinnedToTop, p.DisplayName) + ".lnk")));
                 }
                 TwoPhaseRename(plan, isDir: false);
                 // A manual order replaces any sort mode. Only after the rename succeeded, so a
@@ -1353,7 +1379,8 @@ namespace PowerPane.Services
             int max = 0;
             foreach (var lnk in Directory.GetFiles(tabDir, "*.lnk"))
             {
-                int o; string n; Split(Path.GetFileNameWithoutExtension(lnk), out o, out n);
+                // A pinned pin's number counts too, or a new pin could reuse it (#301).
+                int o; bool top; string n; SplitPin(Path.GetFileNameWithoutExtension(lnk), out o, out top, out n);
                 if (o != int.MaxValue && o > max) max = o;
             }
             return max + 1;
@@ -1371,8 +1398,13 @@ namespace PowerPane.Services
 
         private static string UniqueLink(string folder, int order, string leaf)
         {
+            return UniqueLink(folder, order, false, leaf);
+        }
+
+        private static string UniqueLink(string folder, int order, bool top, string leaf)
+        {
             leaf = Sanitize(leaf);
-            var baseName = order.ToString("000") + "_" + leaf;
+            var baseName = PinStem(order, top, leaf);
             var path = Path.Combine(folder, baseName + ".lnk");
             int n = 1;
             while (File.Exists(path)) path = Path.Combine(folder, baseName + " (" + (++n) + ").lnk");
@@ -1396,6 +1428,28 @@ namespace PowerPane.Services
             var m = Prefix.Match(raw);
             if (m.Success && int.TryParse(m.Groups[1].Value, out order)) { name = m.Groups[2].Value; return; }
             order = int.MaxValue; name = raw;
+        }
+
+        /// <summary>Splits a pin's file name, without its extension, into its stored order, its
+        /// pinned-to-top flag and its display name (#301). A name with no prefix has the largest
+        /// order and no flag, as Split gives it.</summary>
+        internal static void SplitPin(string raw, out int order, out bool top, out string name)
+        {
+            var m = PinPrefix.Match(raw ?? string.Empty);
+            if (m.Success && int.TryParse(m.Groups[1].Value, out order))
+            {
+                top = m.Groups[2].Value.Length > 0;
+                name = m.Groups[3].Value;
+                return;
+            }
+            order = int.MaxValue; top = false; name = raw;
+        }
+
+        /// <summary>A pin's file name without its extension: 003_Apollo, or 003!_Apollo when it is
+        /// pinned to top (#301). Every writer of a pin's name goes through this, so none drops the flag.</summary>
+        internal static string PinStem(int order, bool top, string name)
+        {
+            return order.ToString("000") + (top ? "!" : string.Empty) + "_" + name;
         }
 
         /// <summary>What the store would write for a typed name, so the prompt compares names the way the store does.</summary>

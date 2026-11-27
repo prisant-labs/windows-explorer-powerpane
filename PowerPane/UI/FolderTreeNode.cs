@@ -60,9 +60,12 @@ namespace PowerPane.UI
         /// directory anything can be copied into.</param>
         /// <param name="onClick">Run instead of opening the path, for a row that stands for something
         /// the pane does rather than somewhere it goes, such as a program to start.</param>
+        /// <param name="pinnedToTop">Shows a pin glyph at the row's right edge, for a pin kept above
+        /// the tab's other pins (#301).</param>
         public FolderTreeNode(string display, string path, bool exists, Action<string> navigate, int level,
             bool isFile = false, ImageSource overrideIcon = null, PinDropContext pinContext = null,
-            Func<int, List<FrameworkElement>> childProvider = null, Action onClick = null)
+            Func<int, List<FrameworkElement>> childProvider = null, Action onClick = null,
+            bool pinnedToTop = false)
         {
             _path = path;
             _level = level;
@@ -121,6 +124,28 @@ namespace PowerPane.UI
             content.Children.Add(chevHit);
             content.Children.Add(icon);
             content.Children.Add(label);
+            FrameworkElement rowContent = content;
+            if (pinnedToTop)
+            {
+                // A pinned-to-top pin shows the pin glyph at the right edge, as Explorer's own
+                // navigation pane marks a pinned Quick access folder. The dock keeps the glyph in view
+                // and clips a long name before it, instead of pushing the glyph off the row.
+                var glyph = new TextBlock
+                {
+                    Text = "\uE718", // Segoe MDL2 Pin, the glyph the quick switcher uses
+                    FontFamily = UiHelpers.IconFont(),
+                    FontSize = 11,
+                    Foreground = UiHelpers.AppBrush("TextSecondary"),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 0, 0, 0)
+                };
+                System.Windows.Automation.AutomationProperties.SetName(glyph, "Pinned to top");
+                var dock = new DockPanel { LastChildFill = true };
+                DockPanel.SetDock(glyph, Dock.Right);
+                dock.Children.Add(glyph);
+                dock.Children.Add(content);
+                rowContent = dock;
+            }
 
             _row = new Border
             {
@@ -128,7 +153,7 @@ namespace PowerPane.UI
                 CornerRadius = new CornerRadius(3),
                 Padding = new Thickness(6, 4, 8, 4),
                 Cursor = Cursors.Hand,
-                Child = content,
+                Child = rowContent,
                 ToolTip = exists ? path : path + "  (target not found)",
                 Opacity = exists ? 1 : 0.5
             };
