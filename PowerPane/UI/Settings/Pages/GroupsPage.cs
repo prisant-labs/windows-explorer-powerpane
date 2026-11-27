@@ -186,6 +186,7 @@ namespace PowerPane.UI.Settings.Pages
         {
             var host = new StackPanel();
             var renameSlot = new StackPanel();
+            var duplicateSlot = new StackPanel();
             var removeSlot = new StackPanel();
 
             bool active = index == ctx.Settings.Current.ActiveProfileIndex;
@@ -208,17 +209,31 @@ namespace PowerPane.UI.Settings.Pages
             var rename = ctx.Cards.IconButton("\uE70F", "Rename profile " + p.Name, () =>
             {
                 removeSlot.Children.Clear();
+                duplicateSlot.Children.Clear();
                 renameSlot.Children.Clear();
                 renameSlot.Children.Add(BuildRenameRow(ctx, index, p, renameSlot));
             });
             rename.Margin = new Thickness(8, 0, 0, 0);
             actions.Children.Add(rename);
 
+            // Duplicate copies the profile's groups into a new profile at the end of the list (#300).
+            var duplicate = ctx.Cards.IconButton("\uE8C8", "Duplicate profile " + p.Name, () =>
+            {
+                if (_duplicateRunning) return;   // one copy at a time, even from a reopened row
+                removeSlot.Children.Clear();
+                renameSlot.Children.Clear();
+                duplicateSlot.Children.Clear();
+                duplicateSlot.Children.Add(BuildDuplicateRow(ctx, index, p, duplicateSlot));
+            });
+            duplicate.Margin = new Thickness(8, 0, 0, 0);
+            actions.Children.Add(duplicate);
+
             if ((ctx.Settings.Current.Profiles ?? new List<Profile>()).Count > 1)
             {
                 var remove = ctx.Cards.IconButton("\uE74D", "Remove profile " + p.Name, () =>
                 {
                     renameSlot.Children.Clear();
+                    duplicateSlot.Children.Clear();
                     removeSlot.Children.Clear();
                     removeSlot.Children.Add(ctx.Cards.ConfirmRow(
                         "Remove profile \"" + p.Name + "\"? Its groups folder is left on disk.", "Remove",
@@ -232,7 +247,93 @@ namespace PowerPane.UI.Settings.Pages
             host.Children.Add(ctx.Cards.Card("profile-header-" + index, GlyphProfile, p.Name,
                 "Shown in the pane when active.", actions));
             host.Children.Add(renameSlot);
+            host.Children.Add(duplicateSlot);
             host.Children.Add(removeSlot);
+            return host;
+        }
+
+        /// <summary>The inline row that names a duplicate of a profile (#300), built like the Rename
+        /// row. The copy runs on the worker; the buttons stay disabled until it ends, and the page then
+        /// opens the new profile. The active profile does not change.</summary>
+        // True while a duplicate copies, across every rebuild of the page, so a second Duplicate
+        // cannot start a second copy of the same name (#300 review).
+        private static bool _duplicateRunning;
+
+        private FrameworkElement BuildDuplicateRow(SettingsPageContext ctx, int index, Profile p, StackPanel slot)
+        {
+            var names = (ctx.Settings.Current.Profiles ?? new List<Profile>()).Select(x => x == null ? null : x.Name);
+            var box = new TextBox { Text = SettingsStore.CopyName(p.Name, names), Width = 200, Margin = new Thickness(0, 0, 8, 0) };
+            AutomationProperties_SetName(box, "Name for the copy of profile " + p.Name);
+            var go = new Button { Content = "Duplicate", Margin = new Thickness(0, 0, 8, 0) };
+            AutomationProperties_SetName(go, "Duplicate");
+            var cancel = new Button { Content = "Cancel" };
+            var status = new TextBlock { Margin = new Thickness(16, 0, 0, 8), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+            status.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            Action<string> say = text =>
+            {
+                status.Text = text ?? string.Empty;
+                status.Visibility = string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+                AutomationProperties_SetName(status, status.Text);
+            };
+            bool running = false;
+
+            Action commit = () =>
+            {
+                if (running || _duplicateRunning) return;
+                var v = box.Text;
+                if (string.IsNullOrWhiteSpace(v)) { slot.Children.Clear(); return; }
+                if (SettingsStore.ProfileNameTaken(v, ctx.Settings.Current.Profiles))
+                {
+                    say("A profile is already called \"" + v.Trim() + "\". Choose another name.");
+                    return;
+                }
+                var request = ctx.Settings.BeginProfileCopy(index, v);
+                if (request == null) { slot.Children.Clear(); return; }
+                running = true;
+                _duplicateRunning = true;
+                go.IsEnabled = false; cancel.IsEnabled = false; box.IsEnabled = false;
+                say("Copying…");
+                WorkQueue.Post(() =>
+                {
+                    string groupsPath = SettingsStore.CopyProfileGroups(request);
+                    WorkQueue.PostUI(() =>
+                    {
+                        _duplicateRunning = false;
+                        var added = groupsPath == null ? null : ctx.Settings.AddProfileCopy(request, groupsPath);
+                        if (!ctx.IsCurrent) return;
+                        if (added == null)
+                        {
+                            running = false;
+                            go.IsEnabled = true; cancel.IsEnabled = true; box.IsEnabled = true;
+                            say("The profile could not be copied. Nothing was added.");
+                            return;
+                        }
+                        int newIndex = ctx.Settings.Current.Profiles.IndexOf(added);
+                        ctx.OpenSubPage(added.Name, c => BuildProfile(c, newIndex));
+                    });
+                });
+            };
+            go.Click += (s, e) => commit();
+            cancel.Click += (s, e) => slot.Children.Clear();
+            box.KeyDown += (s, e) =>
+            {
+                if (e.Key == System.Windows.Input.Key.Enter) commit();
+                else if (e.Key == System.Windows.Input.Key.Escape)
+                {
+                    // Handled, so the Settings window does not close on the same key.
+                    e.Handled = true;
+                    if (!running) slot.Children.Clear();
+                }
+            };
+
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 8, 0, 8) };
+            row.Children.Add(box);
+            row.Children.Add(go);
+            row.Children.Add(cancel);
+            var host = new StackPanel();
+            host.Children.Add(row);
+            host.Children.Add(status);
+            box.Loaded += (s, e) => { box.Focus(); box.SelectAll(); };
             return host;
         }
 
