@@ -231,6 +231,26 @@ namespace PowerPane.Tests
         }
 
         [Test]
+        public void AddProfileCopy_CopiesThePinShortcutsIntoAListOfItsOwn()
+        {
+            using (var temp = new TempDir())
+            {
+                var store = TwoProfileStore(temp, active: 1);
+                var source = store.Current.Profiles[0];
+                source.PinHotkeys = new List<PinHotkeyEntry> { new PinHotkeyEntry { Slot = 1, Target = @"C:\Demo\Projects\Apollo" } };
+
+                var added = store.AddProfileCopy(store.BeginProfileCopy(0, "Work copy"), CopyPath);
+
+                Assert.That(added.PinHotkeys, Is.Not.Null);
+                Assert.That(added.PinHotkeys.Count, Is.EqualTo(1));
+                Assert.That(added.PinHotkeys[0].Slot, Is.EqualTo(1));
+                Assert.That(added.PinHotkeys[0].Target, Is.EqualTo(@"C:\Demo\Projects\Apollo"));
+                Assert.That(added.PinHotkeys, Is.Not.SameAs(source.PinHotkeys));
+                Assert.That(added.PinHotkeys[0], Is.Not.SameAs(source.PinHotkeys[0]));
+            }
+        }
+
+        [Test]
         public void BeginProfileCopy_OfTheActiveProfile_UsesItsLiveFolder_AndTheCopyItsLiveValues()
         {
             using (var temp = new TempDir())

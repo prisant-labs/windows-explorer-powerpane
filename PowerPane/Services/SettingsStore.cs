@@ -428,7 +428,10 @@ namespace PowerPane.Services
                 Name = request.Name,
                 GroupsPath = groupsPath,
                 RecentsMaxCount = request.Source.RecentsMaxCount,
-                SidebarWidthPx = request.Source.SidebarWidthPx
+                SidebarWidthPx = request.Source.SidebarWidthPx,
+                // The copy's pins point at the same folders, so its pin shortcuts (#299) come along.
+                // Unassign of a free number returns a new list, so the two profiles never share one.
+                PinHotkeys = PinHotkeyModel.Unassign(request.Source.PinHotkeys, 0)
             };
             Current.Profiles.Add(p);
             Save();
