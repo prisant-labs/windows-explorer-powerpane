@@ -1232,6 +1232,58 @@ namespace PowerPane.Services
             return max + 1;
         }
 
+        /// <summary>Copies a whole groups folder into a new folder, for a duplicated profile (#300).
+        /// Every group, tab, pin and sort marker keeps its name, so the copy shows the same order.
+        /// Returns false, with the reason logged, when either path is empty, when the destination
+        /// already exists, when one folder holds the other, or when the copy fails part way, in which
+        /// case the partial copy is removed. A source that does not exist yet copies as an empty
+        /// profile. Runs on the worker: it reads and writes the disk.</summary>
+        public static bool CopyGroupsRoot(string srcRoot, string dstRoot)
+        {
+            if (string.IsNullOrWhiteSpace(srcRoot) || string.IsNullOrWhiteSpace(dstRoot)) return false;
+            if (IsInsideOrSame(dstRoot, srcRoot) || IsInsideOrSame(srcRoot, dstRoot))
+            {
+                Log.Info("copy a groups folder: one folder holds the other; nothing copied");
+                return false;
+            }
+            bool created = false;
+            try
+            {
+                if (Directory.Exists(dstRoot) || File.Exists(dstRoot))
+                {
+                    Log.Info("copy a groups folder: the destination already exists; nothing copied");
+                    return false;
+                }
+                if (!Directory.Exists(srcRoot)) { Directory.CreateDirectory(dstRoot); return true; }
+                created = true;
+                CopyDir(srcRoot, dstRoot);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Error("copy a groups folder", ex);
+                if (created)
+                {
+                    try { if (Directory.Exists(dstRoot)) Directory.Delete(dstRoot, true); }
+                    catch (Exception cleanup) { Log.Error("remove a partial groups copy", cleanup); }
+                }
+                return false;
+            }
+        }
+
+        /// <summary>Whether <paramref name="candidate"/> is <paramref name="root"/> or lies inside it,
+        /// compared as full paths, ignoring case and trailing separators, and only on a separator
+        /// boundary, so C:\Demo\Groups2 is not inside C:\Demo\Groups.</summary>
+        internal static bool IsInsideOrSame(string candidate, string root)
+        {
+            if (string.IsNullOrWhiteSpace(candidate) || string.IsNullOrWhiteSpace(root)) return false;
+            string c = SettingsStore.FullForCompare(candidate);
+            string r = SettingsStore.FullForCompare(root);
+            if (c.Length == 0 || r.Length == 0) return false;
+            return string.Equals(c, r, StringComparison.OrdinalIgnoreCase)
+                || c.StartsWith(r + @"\", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static void CopyDir(string src, string dst)
         {
             Directory.CreateDirectory(dst);

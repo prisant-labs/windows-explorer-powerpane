@@ -170,7 +170,7 @@ Each profile is an independent workspace with its own groups folder, recents cou
 - Switch profiles from the tray icon's right-click menu or from the profile tab row under the title
 - The profile tab row can auto-hide, sliding out when the cursor is over the header
 - A profile can stay out of the profile tab row: turn off "Show in the profile row" on its page under Groups & profiles. The row still shows the active profile, and the tray menu still lists every profile. A hidden profile leaves the row once you switch to another one. The row appears only when it would show two or more profiles
-- Manage profiles on the Settings window's Groups & profiles page, with cards for add, rename, and remove. Removing the profile you are using makes the next one in the list active, and removing any other profile keeps you where you are
+- Manage profiles on the Settings window's Groups & profiles page, with cards for add, rename, duplicate, and remove. Duplicate makes a new profile at the end of the list with a copy of every group, tab, and pin, in a groups folder of its own, and keeps you on the profile you were using. Removing the profile you are using makes the next one in the list active, and removing any other profile keeps you where you are
 - A new profile's groups live in `%APPDATA%\PowerPane\Profiles\<name>\Groups`. When that folder is already taken, by another profile or by a folder left on disk, the new profile gets a numbered folder such as `Profiles\Work 2`, while the profile itself keeps the name you typed. Removing or renaming a profile never deletes or moves its folder, so its groups stay on disk. Each profile's folder is its `groupsPath` in `settings.json`, so two profiles that show the same groups share one folder; give one of them a new `groupsPath` to separate them
 - Move a group to another profile with a destination picker and a "Copy instead of move" checkbox, so one group can live in more than one profile
 
@@ -279,7 +279,7 @@ A placeholder is refused for a program that would read a folder name as code: `c
 
 - Switch from the tray menu or the profile tab row under the title
 - Leave a profile out of the profile tab row with its "Show in the profile row" switch
-- Add, rename, remove, and move groups between profiles in the Settings window
+- Add, rename, duplicate, remove, and move groups between profiles in the Settings window
 
 ### Settings
 

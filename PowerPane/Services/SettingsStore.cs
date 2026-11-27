@@ -324,6 +324,108 @@ namespace PowerPane.Services
             return p;
         }
 
+        /// <summary>The name a duplicate of <paramref name="name"/> is offered first: "Work copy", or
+        /// "Work copy 2", "Work copy 3" and so on while another profile has that name, ignoring case
+        /// (#300).</summary>
+        internal static string CopyName(string name, System.Collections.Generic.IEnumerable<string> existingNames)
+        {
+            string stem = (string.IsNullOrWhiteSpace(name) ? "Profile" : name.Trim()) + " copy";
+            var taken = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (existingNames != null)
+                foreach (var n in existingNames) if (n != null) taken.Add(n.Trim());
+            if (!taken.Contains(stem)) return stem;
+            for (int i = 2; i < 1000; i++)
+                if (!taken.Contains(stem + " " + i)) return stem + " " + i;
+            return stem + " " + Guid.NewGuid().ToString("N").Substring(0, 8);
+        }
+
+        /// <summary>Whether a profile already has <paramref name="name"/>, ignoring case and outer
+        /// spaces. The duplicate row refuses such a name, because two chips with one name cannot be
+        /// told apart (#300).</summary>
+        internal static bool ProfileNameTaken(string name, System.Collections.Generic.IEnumerable<Profile> profiles)
+        {
+            if (string.IsNullOrWhiteSpace(name) || profiles == null) return false;
+            string n = name.Trim();
+            foreach (var p in profiles)
+                if (p != null && string.Equals((p.Name ?? string.Empty).Trim(), n, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        /// <summary>What a duplicate of a profile needs from the UI thread, captured before the copy
+        /// runs on the worker (#300): the source, the folder its groups are in now, the name, and every
+        /// groups folder a profile already uses.</summary>
+        internal sealed class ProfileCopyRequest
+        {
+            public Profile Source;
+            public string Name;
+            public string SourceRoot;
+            public string FolderBase;
+            public System.Collections.Generic.List<string> UsedGroupsPaths;
+            public Func<string, bool?> FolderExists;
+        }
+
+        /// <summary>Starts a duplicate of the profile at <paramref name="index"/>, on the UI thread.
+        /// Null when the index is out of range. For the active profile the live groups folder is used,
+        /// since it may not be synced into the profile yet.</summary>
+        internal ProfileCopyRequest BeginProfileCopy(int index, string name)
+        {
+            if (Current.Profiles == null || index < 0 || index >= Current.Profiles.Count || string.IsNullOrWhiteSpace(name)) return null;
+            var source = Current.Profiles[index];
+            string groups = index == Current.ActiveProfileIndex ? Current.GroupsPath : source.GroupsPath;
+            var used = new System.Collections.Generic.List<string>();
+            foreach (var other in Current.Profiles) if (other != null) used.Add(other.GroupsPath);
+            used.Add(Current.GroupsPath);
+            return new ProfileCopyRequest
+            {
+                Source = source,
+                Name = name.Trim(),
+                SourceRoot = Environment.ExpandEnvironmentVariables(groups ?? string.Empty),
+                FolderBase = ProfileFolderBase(name, Current.Profiles.Count + 1),
+                UsedGroupsPaths = used,
+                // The worker may wait on the disk, so it needs no time budget; the seam still wins.
+                FolderExists = ProfileFolderExists ?? ProbePath
+            };
+        }
+
+        /// <summary>Chooses the copy's groups folder and copies the source into it, on the worker.
+        /// Returns the stored groups path, or null when nothing was copied. The folder is chosen the
+        /// way <see cref="AddProfile"/> chooses one, so it is never a folder another profile uses or
+        /// one left on disk (#303).</summary>
+        internal static string CopyProfileGroups(ProfileCopyRequest request)
+        {
+            if (request == null) return null;
+            string folder = ChooseProfileFolder(request.FolderBase, request.UsedGroupsPaths, request.FolderExists);
+            string groupsPath = ProfileGroupsPath(folder);
+            return GroupStore.CopyGroupsRoot(request.SourceRoot, Environment.ExpandEnvironmentVariables(groupsPath))
+                ? groupsPath : null;
+        }
+
+        /// <summary>Adds the duplicate once its groups are copied, on the UI thread (#300). It goes at
+        /// the end of the list, so no index moves and the active profile stays as it is. It takes the
+        /// source's Recents count and pane width, the active profile's live values when the source is
+        /// active, and starts shown in the profile row. Null when the source was removed meanwhile.</summary>
+        internal Profile AddProfileCopy(ProfileCopyRequest request, string groupsPath)
+        {
+            if (request == null || string.IsNullOrEmpty(groupsPath) || Current.Profiles == null) return null;
+            Current.SyncTopToActive();
+            if (!Current.Profiles.Contains(request.Source))
+            {
+                Log.Info("duplicate a profile: the source was removed while it copied; the copy's folder is left on disk");
+                return null;
+            }
+            var p = new Profile
+            {
+                Name = request.Name,
+                GroupsPath = groupsPath,
+                RecentsMaxCount = request.Source.RecentsMaxCount,
+                SidebarWidthPx = request.Source.SidebarWidthPx
+            };
+            Current.Profiles.Add(p);
+            Save();
+            ProfilesChanged?.Invoke(this, EventArgs.Empty);
+            return p;
+        }
+
         private const string ProfilesRoot = @"%APPDATA%\PowerPane\Profiles\";
 
         private static string ProfileGroupsPath(string folder)

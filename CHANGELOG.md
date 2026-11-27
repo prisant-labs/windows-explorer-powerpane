@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- A profile can be duplicated: open it under Settings > Groups & profiles, press **Duplicate profile**, and confirm the name, which starts as "Work copy" for a profile called Work. The new profile goes at the end of the list with a copy of every group, tab and pin, the same order and sort modes, and the same Recents count and pane width. It starts shown in the profile row, and the profile you are using stays active. The copy has a groups folder of its own, so editing one profile never changes the other. A name another profile already has is refused ([#300](https://github.com/prisant-labs/windows-explorer-powerpane/issues/300)).
+
+### Changed
+- The Backup & restore page now says that a backup holds your settings but not your groups and pins, which stay in each profile's groups folder.
+
 ## [4.4.0] - 2026-11-25
 
 A profile can now stay out of the pane's profile row, and three fixes keep things readable and separate: open panes and Settings follow a live light or dark switch, every new profile gets its own groups folder, and removing a profile keeps you on the one you were using.

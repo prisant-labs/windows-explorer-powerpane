@@ -102,7 +102,7 @@ namespace PowerPane.UI.Settings.Pages
             body.Children.Add(statusHost);
 
             return ctx.Cards.Card(CardId, Glyph, "Back up or restore settings",
-                "Save every setting to one file, or replace them all from one.", body,
+                "Save every setting to one file, or replace them all from one. The file does not hold your groups and pins, which stay in each profile's groups folder.", body,
                 "Back up or restore settings");
         }
 
