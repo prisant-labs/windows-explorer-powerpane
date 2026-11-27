@@ -1258,5 +1258,304 @@ namespace PowerPane.Tests
                 Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Apollo", "Mango", "Zephyr" }));
             }
         }
+
+        // ---- pin to top (#301) ------------------------------------------------
+
+        private static bool[] Flags(PinnedTab tab) { return tab.Items.Select(p => p.PinnedToTop).ToArray(); }
+
+        [TestCase("003!_Apollo", 3, true, "Apollo")]
+        [TestCase("003_Apollo", 3, false, "Apollo")]
+        [TestCase("003_!Apollo", 3, false, "!Apollo")]
+        [TestCase("004!_!Apollo", 4, true, "!Apollo")]
+        [TestCase("005_3D_Models", 5, false, "3D_Models")]
+        [TestCase("Apollo", int.MaxValue, false, "Apollo")]
+        [TestCase("12!Apollo", int.MaxValue, false, "12!Apollo")]
+        public void SplitPin_ReadsTheOrderTheFlagAndTheName(string raw, int order, bool top, string name)
+        {
+            int o; bool t; string n;
+            GroupStore.SplitPin(raw, out o, out t, out n);
+            Assert.That(o, Is.EqualTo(order));
+            Assert.That(t, Is.EqualTo(top));
+            Assert.That(n, Is.EqualTo(name));
+        }
+
+        [TestCase(3, true, "Apollo", "003!_Apollo")]
+        [TestCase(3, false, "Apollo", "003_Apollo")]
+        [TestCase(12, true, "!Apollo", "012!_!Apollo")]
+        public void PinStem_WritesWhatSplitPinReads(int order, bool top, string name, string expected)
+        {
+            var stem = GroupStore.PinStem(order, top, name);
+            Assert.That(stem, Is.EqualTo(expected));
+            int o; bool t; string n;
+            GroupStore.SplitPin(stem, out o, out t, out n);
+            Assert.That(new object[] { o, t, n }, Is.EqualTo(new object[] { order, top, name }));
+        }
+
+        [Test]
+        public void Scan_AFlaggedFileReadsAsPinnedToTop_AndAnOldNameAsOrdinary()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Apollo.lnk");
+                Touch(MainDir(f), "002!_Borealis.lnk");
+                var tab = MainTab(f);
+
+                Assert.That(Names(tab), Is.EqualTo(new[] { "Borealis", "Apollo" }));
+                Assert.That(Flags(tab), Is.EqualTo(new[] { true, false }));
+                Assert.That(tab.Items[0].Order, Is.EqualTo(2));
+            }
+        }
+
+        [TestCase(null)]
+        [TestCase("name")]
+        [TestCase("recent")]
+        public void SetPinTop_RenamesOnlyTheFlag_KeepsTheMarker_AndShowsThePinFirst(string marker)
+        {
+            using (var f = new TwoProfiles())
+            {
+                var t = new System.DateTime(2026, 3, 1, 0, 0, 0, System.DateTimeKind.Utc);
+                Touch(MainDir(f), "001_Apollo.lnk", t.AddDays(2));
+                Touch(MainDir(f), "002_Borealis.lnk", t.AddDays(1));
+                Touch(MainDir(f), "003_Contoso.lnk", t);
+                if (marker != null) Mark(MainDir(f), marker);
+                var tab = MainTab(f);
+                var contoso = tab.Items.Single(p => p.DisplayName == "Contoso");
+
+                f.Store.SetPinTop(contoso, true);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Apollo.lnk", "002_Borealis.lnk", "003!_Contoso.lnk" }));
+                Assert.That(HasMarker(MainDir(f)), Is.EqualTo(marker != null));
+                var after = f.Store.Groups[0].Tabs[0];
+                Assert.That(after.Items[0].DisplayName, Is.EqualTo("Contoso"));
+                Assert.That(after.Items[0].PinnedToTop, Is.True);
+            }
+        }
+
+        [Test]
+        public void SetPinTop_Off_OnAManualTab_PutsThePinBackInItsStoredPlace()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Apollo.lnk");
+                Touch(MainDir(f), "002!_Borealis.lnk");
+                Touch(MainDir(f), "003_Contoso.lnk");
+                var tab = MainTab(f);   // on screen: Borealis, Apollo, Contoso
+
+                f.Store.SetPinTop(tab.Items[0], false);
+
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Apollo", "Borealis", "Contoso" }));
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Apollo.lnk", "002_Borealis.lnk", "003_Contoso.lnk" }));
+            }
+        }
+
+        [Test]
+        public void ReorderPins_KeepsEveryFlagItIsGiven_AndWritesNoOther()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001!_Apollo.lnk");
+                Touch(MainDir(f), "002_Borealis.lnk");
+                Touch(MainDir(f), "003_Contoso.lnk");
+                var tab = MainTab(f);
+                var ordered = new List<PinnedFolder> { tab.Items[0], tab.Items[2], tab.Items[1] };
+
+                f.Store.ReorderPins(tab, ordered);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001!_Apollo.lnk", "002_Contoso.lnk", "003_Borealis.lnk" }));
+            }
+        }
+
+        [Test]
+        public void ReorderPins_WithACopyCarryingANewFlag_WritesThatFlag()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001!_Apollo.lnk");
+                Touch(MainDir(f), "002_Borealis.lnk");
+                var tab = MainTab(f);   // on screen: Apollo*, Borealis
+                var ordered = PinSorter.PlaceAtLineInBands(tab.Items, tab.Items[1], 0);   // Borealis into the band
+
+                f.Store.ReorderPins(tab, ordered);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001!_Borealis.lnk", "002!_Apollo.lnk" }));
+            }
+        }
+
+        [Test]
+        public void SetPinSort_Manual_OnANameTab_FreezesThePinnedPinFirst()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Apollo.lnk");
+                Touch(MainDir(f), "002!_Zephyr.lnk");
+                Touch(MainDir(f), "003_Mango.lnk");
+                Mark(MainDir(f), "name");
+                var tab = MainTab(f);   // on screen: Zephyr*, Apollo, Mango
+
+                f.Store.SetPinSort(tab, PinSortMode.Manual);
+
+                Assert.That(HasMarker(MainDir(f)), Is.False);
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001!_Zephyr.lnk", "002_Apollo.lnk", "003_Mango.lnk" }));
+            }
+        }
+
+        [Test]
+        public void SortPinsOnce_KeepsTheBandFirstAndSortsEachPartAToZ()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Zephyr.lnk");
+                Touch(MainDir(f), "002!_Mango.lnk");
+                Touch(MainDir(f), "003_Apollo.lnk");
+                Touch(MainDir(f), "004!_Delta.lnk");
+                var tab = MainTab(f);
+
+                f.Store.SortPinsOnce(tab);
+
+                Assert.That(Names(f.Store.Groups[0].Tabs[0]), Is.EqualTo(new[] { "Delta", "Mango", "Apollo", "Zephyr" }));
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001!_Delta.lnk", "002!_Mango.lnk", "003_Apollo.lnk", "004_Zephyr.lnk" }));
+            }
+        }
+
+        [Test]
+        public void AddPinAtIndex_InsideTheBandIsPinned_BelowItIsNot_AndOtherFlagsSurvive()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001!_Apollo.lnk");
+                Touch(MainDir(f), "002_Borealis.lnk");
+                var mango = Path.Combine(f.Temp.Path, "Mango");
+                var delta = Path.Combine(f.Temp.Path, "Delta");
+                Directory.CreateDirectory(mango);
+                Directory.CreateDirectory(delta);
+
+                f.Store.AddPinAtIndex(MainTab(f), mango, 0);   // above Apollo, inside the band
+                f.Store.AddPinAtIndex(MainTab(f), delta, 2);   // the edge between the band and Borealis
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001!_Mango.lnk", "002!_Apollo.lnk", "003_Delta.lnk", "004_Borealis.lnk" }));
+            }
+        }
+
+        [Test]
+        public void MovePinToTab_ArrivesOrdinary()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Apollo.lnk");
+                Touch(SecondDir(f), "001!_Mango.lnk");
+                f.Store.ScanOnce();
+                var main = f.Store.Groups[0].Tabs[0];
+                var mango = f.Store.Groups[0].Tabs[1].Items[0];
+
+                f.Store.MovePinToTab(mango, main);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001_Apollo.lnk", "002_Mango.lnk" }));
+            }
+        }
+
+        [Test]
+        public void MovePinToTabAt_IntoTheDestinationsBand_IsPinnedThere()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001!_Apollo.lnk");
+                Touch(MainDir(f), "002_Borealis.lnk");
+                Touch(SecondDir(f), "001_Mango.lnk");
+                f.Store.ScanOnce();
+                var main = f.Store.Groups[0].Tabs[0];
+                var mango = f.Store.Groups[0].Tabs[1].Items[0];
+
+                f.Store.MovePinToTabAt(mango, main, 0);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "001!_Mango.lnk", "002!_Apollo.lnk", "003_Borealis.lnk" }));
+            }
+        }
+
+        [TestCase(null)]
+        [TestCase("name")]
+        [TestCase("recent")]
+        public void AddPins_TheVerbPath_LandsBelowTheBandWithANumberAboveEveryPinnedPin(string marker)
+        {
+            using (var f = new TwoProfiles())
+            {
+                var t = new System.DateTime(2026, 3, 1, 0, 0, 0, System.DateTimeKind.Utc);
+                Touch(MainDir(f), "001_Borealis.lnk", t);
+                Touch(MainDir(f), "007!_Zephyr.lnk", t);
+                if (marker != null) Mark(MainDir(f), marker);
+                var target = Path.Combine(f.Temp.Path, "Apollo");
+                Directory.CreateDirectory(target);
+
+                f.Store.AddPins(MainTab(f), new[] { target });
+
+                var after = f.Store.Groups[0].Tabs[0];
+                Assert.That(after.Items[0].DisplayName, Is.EqualTo("Zephyr"));
+                Assert.That(after.Items.Single(p => p.DisplayName == "Apollo").PinnedToTop, Is.False);
+                Assert.That(FileNames(MainDir(f)), Does.Contain("008_Apollo.lnk"));
+            }
+        }
+
+        [Test]
+        public void MovePin_NeverCrossesTheEdgeOfTheBand()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001!_Apollo.lnk");
+                Touch(MainDir(f), "002_Borealis.lnk");
+                var before = FileNames(MainDir(f));
+                var tab = MainTab(f);
+
+                f.Store.MovePin(tab, tab.Items[1], -1);   // Move up on the first ordinary pin
+                f.Store.MovePin(MainTab(f), MainTab(f).Items[0], +1);   // Move down on the last pinned pin
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(before));
+            }
+        }
+
+        [Test]
+        public void RenamePin_KeepsTheFlag()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "004!_Apollo.lnk");
+                var tab = MainTab(f);
+
+                f.Store.RenamePin(tab.Items[0], "Apollo Reports");
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "004!_Apollo Reports.lnk" }));
+            }
+        }
+
+        [Test]
+        public void CopyGroupFolder_KeepsTheFlags()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001_Apollo.lnk");
+                Touch(MainDir(f), "002!_Borealis.lnk");
+                var destRoot = Path.Combine(f.Temp.Path, "Copied");
+                Directory.CreateDirectory(destRoot);
+
+                GroupStore.CopyGroupFolder(f.GroupA, destRoot);
+
+                var main = Path.Combine(Directory.GetDirectories(destRoot).Single(), "01_Main");
+                Assert.That(FileNames(main), Is.EqualTo(new[] { "001_Apollo.lnk", "002!_Borealis.lnk" }));
+            }
+        }
+
+        [Test]
+        public void RemovePin_OfAPinnedPin_LeavesTheOthersAsTheyWere()
+        {
+            using (var f = new TwoProfiles())
+            {
+                Touch(MainDir(f), "001!_Apollo.lnk");
+                Touch(MainDir(f), "002!_Borealis.lnk");
+                Touch(MainDir(f), "003_Contoso.lnk");
+                var tab = MainTab(f);
+
+                f.Store.RemovePin(tab.Items[0]);
+
+                Assert.That(FileNames(MainDir(f)), Is.EqualTo(new[] { "002!_Borealis.lnk", "003_Contoso.lnk" }));
+            }
+        }
     }
 }
