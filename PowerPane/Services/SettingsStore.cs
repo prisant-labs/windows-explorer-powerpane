@@ -413,6 +413,16 @@ namespace PowerPane.Services
                 Log.Info("duplicate a profile: the source was removed while it copied; the copy's folder is left on disk");
                 return null;
             }
+            // A profile added while the copy ran may have chosen the same folder, which was still
+            // absent then. Two profiles must never share one (#303), so the copy is not added.
+            string mine = FullForCompare(groupsPath);
+            foreach (var other in Current.Profiles)
+                if (other != null && !string.IsNullOrWhiteSpace(other.GroupsPath)
+                    && string.Equals(FullForCompare(other.GroupsPath), mine, StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.Info("duplicate a profile: another profile took the copy's folder meanwhile; the copy is not added");
+                    return null;
+                }
             var p = new Profile
             {
                 Name = request.Name,

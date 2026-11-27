@@ -151,7 +151,22 @@ namespace PowerPane.Tests
                 }
 
                 Assert.That(Directory.Exists(dst), Is.False);
+                Assert.That(Directory.GetFileSystemEntries(Path.Combine(temp.Path, "Copy")), Is.Empty, "no staging folder is left");
                 Assert.That(File.Exists(locked), Is.True);
+            }
+        }
+
+        [Test]
+        public void CopyGroupsRoot_ASourceThatIsAFile_IsRefused()
+        {
+            using (var temp = new TempDir())
+            {
+                var src = Path.Combine(temp.Path, "Groups");
+                File.WriteAllText(src, "not a folder");
+                var dst = Path.Combine(temp.Path, "Copy", "Groups");
+
+                Assert.That(GroupStore.CopyGroupsRoot(src, dst), Is.False);
+                Assert.That(Directory.Exists(dst), Is.False);
             }
         }
 
@@ -248,6 +263,20 @@ namespace PowerPane.Tests
 
                 Assert.That(store.AddProfileCopy(request, CopyPath), Is.Null);
                 Assert.That(store.Current.Profiles.Select(p => p.Name), Is.EqualTo(new[] { "Home" }));
+            }
+        }
+
+        [Test]
+        public void AddProfileCopy_WhenAnotherProfileTookTheFolderMeanwhile_AddsNothing()
+        {
+            using (var temp = new TempDir())
+            {
+                var store = TwoProfileStore(temp, active: 1);
+                var request = store.BeginProfileCopy(0, "Work copy");
+                store.Current.Profiles.Add(new Profile { Name = "Work copy?", GroupsPath = CopyPath.ToLowerInvariant() });
+
+                Assert.That(store.AddProfileCopy(request, CopyPath), Is.Null);
+                Assert.That(store.Current.Profiles.Count, Is.EqualTo(3));
             }
         }
 

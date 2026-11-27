@@ -1234,10 +1234,12 @@ namespace PowerPane.Services
 
         /// <summary>Copies a whole groups folder into a new folder, for a duplicated profile (#300).
         /// Every group, tab, pin and sort marker keeps its name, so the copy shows the same order.
-        /// Returns false, with the reason logged, when either path is empty, when the destination
-        /// already exists, when one folder holds the other, or when the copy fails part way, in which
-        /// case the partial copy is removed. A source that does not exist yet copies as an empty
-        /// profile. Runs on the worker: it reads and writes the disk.</summary>
+        /// The copy is made in a new folder beside the destination and then renamed into place, so a
+        /// folder that appears at the destination meanwhile is never written into, and a failure
+        /// removes only that new folder. Returns false, with the reason logged, when either path is
+        /// empty, when the destination already exists, when one folder holds the other, when the
+        /// source exists but cannot be read as a folder, or when the copy fails. A source that does
+        /// not exist yet copies as an empty profile. Runs on the worker: it reads and writes the disk.</summary>
         public static bool CopyGroupsRoot(string srcRoot, string dstRoot)
         {
             if (string.IsNullOrWhiteSpace(srcRoot) || string.IsNullOrWhiteSpace(dstRoot)) return false;
@@ -1246,7 +1248,7 @@ namespace PowerPane.Services
                 Log.Info("copy a groups folder: one folder holds the other; nothing copied");
                 return false;
             }
-            bool created = false;
+            string staging = null;
             try
             {
                 if (Directory.Exists(dstRoot) || File.Exists(dstRoot))
@@ -1254,20 +1256,35 @@ namespace PowerPane.Services
                     Log.Info("copy a groups folder: the destination already exists; nothing copied");
                     return false;
                 }
-                if (!Directory.Exists(srcRoot)) { Directory.CreateDirectory(dstRoot); return true; }
-                created = true;
-                CopyDir(srcRoot, dstRoot);
+                bool sourceIsFolder = Directory.Exists(srcRoot);
+                if (!sourceIsFolder && SettingsStore.ProbePath(srcRoot) != false)
+                {
+                    // A file, a folder that refuses access, or a share that did not answer: copying it
+                    // as an empty profile would look like success and lose every group.
+                    Log.Info("copy a groups folder: the source cannot be read as a folder; nothing copied");
+                    return false;
+                }
+                var parent = Path.GetDirectoryName(dstRoot.TrimEnd('\\', '/'));
+                if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+                staging = dstRoot.TrimEnd('\\', '/') + ".~copy~" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                if (sourceIsFolder) CopyDir(srcRoot, staging);
+                else Directory.CreateDirectory(staging);
+                Directory.Move(staging, dstRoot);   // fails rather than merging when the destination now exists
+                staging = null;
                 return true;
             }
             catch (Exception ex)
             {
                 Log.Error("copy a groups folder", ex);
-                if (created)
+                return false;
+            }
+            finally
+            {
+                if (staging != null)
                 {
-                    try { if (Directory.Exists(dstRoot)) Directory.Delete(dstRoot, true); }
+                    try { if (Directory.Exists(staging)) Directory.Delete(staging, true); }
                     catch (Exception cleanup) { Log.Error("remove a partial groups copy", cleanup); }
                 }
-                return false;
             }
         }
 
@@ -1295,7 +1312,17 @@ namespace PowerPane.Services
                 try { File.SetCreationTimeUtc(copy, File.GetCreationTimeUtc(f)); }
                 catch (Exception ex) { Log.Error("keep creation time of a copied file", ex); }
             }
-            foreach (var d in Directory.GetDirectories(src)) CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
+            foreach (var d in Directory.GetDirectories(src))
+            {
+                // A junction or link inside a groups folder can point back up the tree, and following
+                // it would copy the folder into itself until the path gets too long (#300 review).
+                if ((File.GetAttributes(d) & FileAttributes.ReparsePoint) != 0)
+                {
+                    Log.Info("copy a groups folder: skipped a linked folder");
+                    continue;
+                }
+                CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
+            }
         }
 
         // ---- helpers ---------------------------------------------------------

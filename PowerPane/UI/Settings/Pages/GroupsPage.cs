@@ -219,6 +219,7 @@ namespace PowerPane.UI.Settings.Pages
             // Duplicate copies the profile's groups into a new profile at the end of the list (#300).
             var duplicate = ctx.Cards.IconButton("\uE8C8", "Duplicate profile " + p.Name, () =>
             {
+                if (_duplicateRunning) return;   // one copy at a time, even from a reopened row
                 removeSlot.Children.Clear();
                 renameSlot.Children.Clear();
                 duplicateSlot.Children.Clear();
@@ -254,6 +255,10 @@ namespace PowerPane.UI.Settings.Pages
         /// <summary>The inline row that names a duplicate of a profile (#300), built like the Rename
         /// row. The copy runs on the worker; the buttons stay disabled until it ends, and the page then
         /// opens the new profile. The active profile does not change.</summary>
+        // True while a duplicate copies, across every rebuild of the page, so a second Duplicate
+        // cannot start a second copy of the same name (#300 review).
+        private static bool _duplicateRunning;
+
         private FrameworkElement BuildDuplicateRow(SettingsPageContext ctx, int index, Profile p, StackPanel slot)
         {
             var names = (ctx.Settings.Current.Profiles ?? new List<Profile>()).Select(x => x == null ? null : x.Name);
@@ -274,7 +279,7 @@ namespace PowerPane.UI.Settings.Pages
 
             Action commit = () =>
             {
-                if (running) return;
+                if (running || _duplicateRunning) return;
                 var v = box.Text;
                 if (string.IsNullOrWhiteSpace(v)) { slot.Children.Clear(); return; }
                 if (SettingsStore.ProfileNameTaken(v, ctx.Settings.Current.Profiles))
@@ -285,6 +290,7 @@ namespace PowerPane.UI.Settings.Pages
                 var request = ctx.Settings.BeginProfileCopy(index, v);
                 if (request == null) { slot.Children.Clear(); return; }
                 running = true;
+                _duplicateRunning = true;
                 go.IsEnabled = false; cancel.IsEnabled = false; box.IsEnabled = false;
                 say("Copying…");
                 WorkQueue.Post(() =>
@@ -292,6 +298,7 @@ namespace PowerPane.UI.Settings.Pages
                     string groupsPath = SettingsStore.CopyProfileGroups(request);
                     WorkQueue.PostUI(() =>
                     {
+                        _duplicateRunning = false;
                         var added = groupsPath == null ? null : ctx.Settings.AddProfileCopy(request, groupsPath);
                         if (!ctx.IsCurrent) return;
                         if (added == null)
@@ -311,7 +318,12 @@ namespace PowerPane.UI.Settings.Pages
             box.KeyDown += (s, e) =>
             {
                 if (e.Key == System.Windows.Input.Key.Enter) commit();
-                else if (e.Key == System.Windows.Input.Key.Escape && !running) slot.Children.Clear();
+                else if (e.Key == System.Windows.Input.Key.Escape)
+                {
+                    // Handled, so the Settings window does not close on the same key.
+                    e.Handled = true;
+                    if (!running) slot.Children.Clear();
+                }
             };
 
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 8, 0, 8) };
