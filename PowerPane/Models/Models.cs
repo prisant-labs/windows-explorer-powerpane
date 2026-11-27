@@ -12,6 +12,7 @@ namespace PowerPane.Models
         public string TargetPath { get; set; }     // resolved shortcut target
         public string LinkPath { get; set; }        // full path of the .lnk on disk
         public int Order { get; set; }              // from the NNN_ prefix
+        public bool PinnedToTop { get; set; }       // the NNN!_ flag: shown above the tab's other pins (#301)
         public bool Exists { get; set; }            // target currently resolvable
         public bool IsFile { get; set; }            // recent item that is a file, not a folder
         public DateTime AddedUtc { get; set; }      // creation time of the .lnk, the "Recently added" key

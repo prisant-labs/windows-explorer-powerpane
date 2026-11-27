@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- A pin can stay at the top of its tab: right-click it and choose **Pin to top**. Pins pinned to top show a pin mark at the right of their row and stay above the tab's other pins in every sort order, including A to Z and newest first, and among themselves they follow the tab's order. **Unpin from top** puts the pin back; in a tab in your own order it returns to the place it had. Dragging a pin into the pinned rows pins it, and dragging it below them unpins it. Move up and Move down stay on their own side. A pin moved to another tab arrives unpinned, unless you drop it among that tab's pinned pins. The mark is a `!` after the number in the shortcut's file name, such as `003!_Apollo.lnk`, so it travels with the pin; an older version of PowerPane shows that pin under its file name ([#301](https://github.com/prisant-labs/windows-explorer-powerpane/issues/301)).
+
 ## [4.4.0] - 2026-11-25
 
 A profile can now stay out of the pane's profile row, and three fixes keep things readable and separate: open panes and Settings follow a live light or dark switch, every new profile gets its own groups folder, and removing a profile keeps you on the one you were using.

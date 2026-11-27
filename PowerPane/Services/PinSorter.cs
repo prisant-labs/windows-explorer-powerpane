@@ -48,11 +48,19 @@ namespace PowerPane.Services
         private static readonly Comparer<PinnedFolder> ByName =
             Comparer<PinnedFolder>.Create((x, y) => CompareNames(x.DisplayName, y.DisplayName));
 
-        /// <summary>Orders pins for display. Ties always fall back to the stored order and then the
-        /// shortcut path, so equal keys never reshuffle between scans.</summary>
+        /// <summary>Orders pins for display. Pins pinned to top come first, then the rest, and the
+        /// tab's own mode orders each part (#301). Ties always fall back to the stored order and then
+        /// the shortcut path, so equal keys never reshuffle between scans.</summary>
         public static List<PinnedFolder> Order(IEnumerable<PinnedFolder> pins, PinSortMode mode)
         {
             var list = (pins ?? Enumerable.Empty<PinnedFolder>()).ToList();
+            var result = OrderPart(list.Where(p => p.PinnedToTop), mode);
+            result.AddRange(OrderPart(list.Where(p => !p.PinnedToTop), mode));
+            return result;
+        }
+
+        private static List<PinnedFolder> OrderPart(IEnumerable<PinnedFolder> list, PinSortMode mode)
+        {
             switch (mode)
             {
                 case PinSortMode.Name:
@@ -84,6 +92,45 @@ namespace PowerPane.Services
             if (at == from) return null;
             result.Insert(at, moved);
             return result;
+        }
+
+        /// <summary>The order after dropping a pin at a line, where the line also decides whether the
+        /// pin is pinned to top (#301). With K pins pinned to top once the dragged pin is set aside, a
+        /// pinned pin stays pinned when it lands within the first K + 1 places, and an ordinary pin
+        /// becomes pinned when it lands within the first K. So a drop just below the last pinned pin
+        /// keeps a pinned pin pinned and leaves an ordinary pin ordinary. Only the dragged pin can
+        /// change, and when it does the list holds a copy of it carrying the new flag. Returns null
+        /// when the drop changes neither the order nor the flag.</summary>
+        public static List<PinnedFolder> PlaceAtLineInBands(IList<PinnedFolder> shown, PinnedFolder moved, int lineIndex)
+        {
+            int from = shown.IndexOf(moved);
+            if (from < 0) return null;
+            var result = shown.Where(p => !ReferenceEquals(p, moved)).ToList();
+            int at = lineIndex > from ? lineIndex - 1 : lineIndex;
+            if (at < 0) at = 0;
+            if (at > result.Count) at = result.Count;
+            bool top = TopAfterDrop(result.Count(p => p.PinnedToTop), moved.PinnedToTop, at);
+            if (at == from && top == moved.PinnedToTop) return null;
+            result.Insert(at, top == moved.PinnedToTop ? moved : WithTop(moved, top));
+            return result;
+        }
+
+        /// <summary>Whether a pin dropped at place <paramref name="at"/> is pinned to top, when
+        /// <paramref name="pinnedCount"/> pins other than it are. A pin arriving from somewhere else
+        /// is ordinary, so it becomes pinned only inside the band.</summary>
+        public static bool TopAfterDrop(int pinnedCount, bool wasPinned, int at)
+        {
+            return wasPinned ? at <= pinnedCount : at < pinnedCount;
+        }
+
+        /// <summary>A copy of a pin with its flag set, for a caller that writes the order back.</summary>
+        public static PinnedFolder WithTop(PinnedFolder p, bool top)
+        {
+            return new PinnedFolder
+            {
+                DisplayName = p.DisplayName, TargetPath = p.TargetPath, LinkPath = p.LinkPath,
+                Order = p.Order, PinnedToTop = top, Exists = p.Exists, IsFile = p.IsFile, AddedUtc = p.AddedUtc
+            };
         }
     }
 }

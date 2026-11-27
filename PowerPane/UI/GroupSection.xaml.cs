@@ -205,7 +205,7 @@ namespace PowerPane.UI
                     // The last scan fixed Exists; a probe since then may disagree (#136).
                     GroupStore.RefreshLiveness(captured);
                     var node = new FolderTreeNode(pin.DisplayName, pin.TargetPath, pin.Exists, _navigate, 0,
-                        captured.IsFile, null, pinCtx);
+                        captured.IsFile, null, pinCtx, pinnedToTop: captured.PinnedToTop);
                     LazyContextMenu.Attach(node.Row, () => BuildPinMenu(group, active, captured, node.Row));
                     WirePinDragSource(node.Row, captured);
                     items.Children.Add(node);
@@ -728,22 +728,29 @@ namespace PowerPane.UI
         {
             var hit = FindPin(linkPath);
             if (hit.Item2 == null || destTab == null) return;
-            if (!ReferenceEquals(hit.Item1, destTab))
+            // Compared by folder, not by object: a scan that lands before the pane redraws gives the
+            // same tab a new object, and a drag within the tab must not turn into a move to another
+            // tab, which would append the pin unpinned (#301 review).
+            if (!string.Equals(hit.Item1.FolderPath, destTab.FolderPath, StringComparison.OrdinalIgnoreCase))
             {
                 var folder = hit.Item2;
                 // A pin dropped at a line on a sorted tab goes in at that line, in the order shown,
-                // and the tab becomes Manual (#241). A manual tab keeps its append-at-end behavior.
-                if (destTab.SortMode != PinSortMode.Manual)
+                // and the tab becomes Manual (#241). A manual tab keeps its append-at-end behavior,
+                // except that a drop inside its pinned-to-top band goes in there and is pinned (#301).
+                if (destTab.SortMode != PinSortMode.Manual || index < destTab.Items.Count(p => p.PinnedToTop))
                     App.Groups.PostEdit(store => store.MovePinToTabAt(folder, destTab, index));
                 else
                     App.Groups.PostEdit(store => store.MovePinToTab(folder, destTab));
                 return;
             }
             // The index counts the dragged row too. A drop that leaves the order as it is posts
-            // nothing, so it never turns a sorted tab to Manual.
-            var ordered = PinSorter.PlaceAtLine(destTab.Items, hit.Item2, index);
+            // nothing, so it never turns a sorted tab to Manual. The line also decides whether the
+            // pin is pinned to top: dropped below the band it is unpinned, and dropped into the band
+            // it is pinned, as pinned tabs behave in a browser (#301).
+            var ordered = PinSorter.PlaceAtLineInBands(hit.Item1.Items, hit.Item2, index);
             if (ordered == null) return;
-            App.Groups.PostEdit(store => store.ReorderPins(destTab, ordered));
+            var sameTab = hit.Item1;
+            App.Groups.PostEdit(store => store.ReorderPins(sameTab, ordered));
         }
 
         private void MovePinToTabEnd(string linkPath, PinnedTab destTab)
@@ -918,6 +925,10 @@ namespace PowerPane.UI
             if (moveTo.Items.Count == 0) moveTo.IsEnabled = false;
             menu.Items.Add(moveTo);
 
+            // "Pin to top" keeps a pin above the tab's other pins whatever the tab's order (#301).
+            menu.Items.Add(pin.PinnedToTop
+                ? Item("Unpin from top", () => App.Groups.PostEdit(store => store.SetPinTop(pin, false)))
+                : Item("Pin to top", () => App.Groups.PostEdit(store => store.SetPinTop(pin, true))));
             menu.Items.Add(Item("Move up", () => App.Groups.PostEdit(store => store.MovePin(tab, pin, -1))));
             menu.Items.Add(Item("Move down", () => App.Groups.PostEdit(store => store.MovePin(tab, pin, +1))));
             menu.Items.Add(Item("Copy path", () => SafeClipboard(pin.TargetPath)));
