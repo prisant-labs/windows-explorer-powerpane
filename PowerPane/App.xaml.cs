@@ -254,6 +254,9 @@ namespace PowerPane
         {
             if (_hotkeys == null || Settings == null) return;
             var s = Settings.Current;
+            // The pin keys are dropped first, so a combination a pin gave up is free when the two
+            // older shortcuts register; otherwise a shortcut set to it stayed off until the next save.
+            if (_pinHotkeys != null) _pinHotkeys.Apply(false, null, null);
             _hotkeys.Apply(s.KeyboardNav, s.KeyboardNavHotkey);
             if (_switcherHotkey != null) _switcherHotkey.Apply(s.QuickSwitcher, s.QuickSwitcherHotkey);
             if (_pinHotkeys != null)
@@ -277,7 +280,9 @@ namespace PowerPane
                 IntPtr target;
                 var kind = UI.QuickSwitcher.TargetInFront(out target);
                 var s = Settings == null ? null : Settings.Current;
-                var profile = s == null ? null : s.ActiveProfile;
+                // A press already queued when the feature was switched off still arrives here.
+                if (s == null || !s.PinHotkeys) return;
+                var profile = s.ActiveProfile;
                 string path = PinHotkeyModel.Resolve(profile == null ? null : profile.PinHotkeys, slot,
                     PinHotkeyModel.FolderPinTargets(Groups == null ? null : Groups.Groups));
                 if (path == null)

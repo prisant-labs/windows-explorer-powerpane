@@ -230,9 +230,13 @@ namespace PowerPane.UI.Settings.Pages
                 // ChildRow names its control, so the button's own name goes in again there; passing the
                 // row's label would make a screen reader announce the Remove button as the folder.
                 string removeName = "Remove pin shortcut " + PinHotkeyModel.SlotLabel(s.PinHotkeyModifiers, slot);
+                string target = entry.Target;
                 var remove = ctx.Cards.IconButton("\uE74D", removeName, () =>
                 {
                     if (profile == null || !ReferenceEquals(settings.Current.ActiveProfile, profile)) return;
+                    // The number may have been given to another folder from a pin's menu since this
+                    // row was built; removing it then would take the key from the wrong folder.
+                    if (PinHotkeyModel.TargetOf(profile.PinHotkeys, slot) != target) { ctx.Rebuild(); return; }
                     profile.PinHotkeys = PinHotkeyModel.Unassign(profile.PinHotkeys, slot);
                     settings.Save();
                     ctx.Rebuild();
@@ -241,18 +245,40 @@ namespace PowerPane.UI.Settings.Pages
             }
             panel.Children.Add(list.Root);
 
-            // The keys are registered after the save that changed them, so the refusals can arrive
-            // after this page is built. Rebuild once they differ from what the page shows.
-            string seen = string.Join(",", refused);
+            // The keys are applied after every save, so the list can go stale while this page is open:
+            // a profile switch, a number assigned from a pin's menu, a new prefix, or a refusal that
+            // arrives after the page was built. Rebuild only when what the list shows changed, because
+            // a rebuild of the window takes focus from the control someone just used.
+            string seen = PinListSignature(s, refused);
             Action onApplied = null;
             onApplied = () =>
             {
                 if (!ctx.IsCurrent) { App.PinHotkeysApplied -= onApplied; return; }
-                if (string.Join(",", App.PinHotkeysRefused ?? new List<int>()) == seen) return;
+                if (PinListSignature(settings.Current, App.PinHotkeysRefused) == seen) return;
                 App.PinHotkeysApplied -= onApplied;
                 ctx.Rebuild();
             };
+            // A closed window leaves its page current, so the static event would keep the whole window
+            // alive. Unloaded fires when the window closes and when a rebuild replaces this page.
             App.PinHotkeysApplied += onApplied;
+            panel.Unloaded += (x, e) => App.PinHotkeysApplied -= onApplied;
+            panel.Loaded += (x, e) => { App.PinHotkeysApplied -= onApplied; App.PinHotkeysApplied += onApplied; };
+        }
+
+        /// <summary>What the assigned pin shortcut list shows, as one string: the active profile, the
+        /// prefix, each number and folder, and the refused numbers while the feature is on. Two equal
+        /// strings mean the list needs no rebuild (#299).</summary>
+        internal static string PinListSignature(Models.AppSettings s, IEnumerable<int> refused)
+        {
+            if (s == null) return string.Empty;
+            var profile = s.ActiveProfile;
+            var entries = profile == null || profile.PinHotkeys == null
+                ? Enumerable.Empty<Models.PinHotkeyEntry>()
+                : profile.PinHotkeys.Where(e => e != null).OrderBy(e => e.Slot);
+            var off = s.PinHotkeys && refused != null ? refused.OrderBy(n => n) : Enumerable.Empty<int>();
+            return s.ActiveProfileIndex + "|" + (profile == null ? string.Empty : profile.Name) + "|" + s.PinHotkeyModifiers +
+                "|" + string.Join(";", entries.Select(e => e.Slot + "=" + e.Target)) +
+                "|" + string.Join(",", off);
         }
 
         /// <summary>The note beside an assigned pin shortcut, or null when it works: the folder is no

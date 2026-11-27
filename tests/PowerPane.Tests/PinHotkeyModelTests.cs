@@ -186,6 +186,38 @@ namespace PowerPane.Tests
             Assert.That(KeyboardPage.PinShortcutNote(false, true), Does.Contain("Windows refused"));
         }
 
+        [Test]
+        public void KeyboardPage_PinListSignature_ChangesOnlyWithWhatTheListShows()
+        {
+            var s = AppSettings.CreateDefault();
+            s.PinHotkeys = true;
+            s.Profiles = new List<Profile>
+            {
+                new Profile { Name = "Work", PinHotkeys = Entries(1, Apollo) },
+                new Profile { Name = "Home", PinHotkeys = Entries(1, Borealis) }
+            };
+            s.ActiveProfileIndex = 0;
+            var none = new List<int>();
+            string before = KeyboardPage.PinListSignature(s, none);
+
+            s.PinHotkeys = false;
+            Assert.That(KeyboardPage.PinListSignature(s, none), Is.EqualTo(before), "the switch alone does not rebuild the list");
+            Assert.That(KeyboardPage.PinListSignature(s, new[] { 1 }), Is.EqualTo(before), "a refusal while off shows no note");
+            s.PinHotkeys = true;
+            Assert.That(KeyboardPage.PinListSignature(s, new[] { 1 }), Is.Not.EqualTo(before), "a refusal while on");
+
+            s.Profiles[0].PinHotkeys = Entries(1, Contoso);
+            Assert.That(KeyboardPage.PinListSignature(s, none), Is.Not.EqualTo(before), "the number went to another folder");
+            s.Profiles[0].PinHotkeys = Entries(1, Apollo);
+
+            s.PinHotkeyModifiers = "ctrl+shift";
+            Assert.That(KeyboardPage.PinListSignature(s, none), Is.Not.EqualTo(before), "a new prefix");
+            s.PinHotkeyModifiers = AppSettings.DefaultPinHotkeyModifiers;
+
+            s.ActiveProfileIndex = 1;
+            Assert.That(KeyboardPage.PinListSignature(s, none), Is.Not.EqualTo(before), "another profile");
+        }
+
         // ---- settings round trip ---------------------------------------------
 
         private static AppSettings RoundTrip(AppSettings s, out string json)
