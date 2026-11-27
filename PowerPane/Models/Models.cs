@@ -147,6 +147,24 @@ namespace PowerPane.Models
         /// field existed reads as false and keeps every chip, and older versions ignore the field.</summary>
         [DataMember(Name = "hiddenFromRow", Order = 4, EmitDefaultValue = false)]
         public bool HiddenFromRow { get; set; }
+
+        /// <summary>Which pinned folders this profile's pin shortcuts open (#299). Each entry holds a
+        /// number from 1 to 9 and the folder it opens. A key belongs to a folder, not to a shortcut
+        /// file, because every reorder renames the files. Null when no key is assigned, so the field
+        /// stays out of the file and older versions ignore it.</summary>
+        [DataMember(Name = "pinHotkeys", Order = 5, EmitDefaultValue = false)]
+        public List<PinHotkeyEntry> PinHotkeys { get; set; }
+    }
+
+    /// <summary>One pin shortcut: the number it uses and the folder it opens (#299).</summary>
+    [DataContract]
+    public sealed class PinHotkeyEntry
+    {
+        [DataMember(Name = "slot", Order = 0)]
+        public int Slot { get; set; }
+
+        [DataMember(Name = "target", Order = 1)]
+        public string Target { get; set; }
     }
 
     /// <summary>One saved SSH/SFTP connection, mounted as a real drive via SSHFS-Win. Field layout
@@ -225,6 +243,17 @@ namespace PowerPane.Models
         public string QuickSwitcherHotkey { get; set; } = DefaultQuickSwitcherHotkey;
 
         public const string DefaultQuickSwitcherHotkey = "ctrl+alt+Space";
+
+        // Pin shortcuts (#299): a modifier prefix plus a number from 1 to 9 sends the window in front
+        // to the pinned folder that holds that number. Off by default, like the shortcuts above,
+        // because each key is taken from every other program.
+        [DataMember(Name = "pinHotkeys", Order = 57, EmitDefaultValue = false)]
+        public bool PinHotkeys { get; set; }
+
+        [DataMember(Name = "pinHotkeyModifiers", Order = 58, EmitDefaultValue = false)]
+        public string PinHotkeyModifiers { get; set; } = DefaultPinHotkeyModifiers;
+
+        public const string DefaultPinHotkeyModifiers = "ctrl+alt";
 
         // What each click gesture does on a pane row (#269). Null, or a gesture missing from the
         // list, means that gesture's default, which is the click behaviour from before this setting:
@@ -484,6 +513,7 @@ namespace PowerPane.Models
             }
             if (string.IsNullOrWhiteSpace(KeyboardNavHotkey)) KeyboardNavHotkey = "ctrl+shift+Q";
             if (string.IsNullOrWhiteSpace(QuickSwitcherHotkey)) QuickSwitcherHotkey = DefaultQuickSwitcherHotkey;
+            PinHotkeyModifiers = PinHotkeyModel.ValidateModifiers(PinHotkeyModifiers) ?? DefaultPinHotkeyModifiers;
             var ras = (RecentAppsSource ?? "").Trim().ToLowerInvariant();
             RecentAppsSource = (ras == "open" || ras == "dialogs") ? ras : "both";
             if (RecentsMaxCount < 5) RecentsMaxCount = 5;

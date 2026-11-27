@@ -164,6 +164,10 @@ A second optional shortcut, Ctrl+Alt+Space unless you change it, opens a search 
 
 ![The quick switcher finding a pinned folder](docs/images/quick-switcher.png)
 
+### Pin shortcuts
+
+Up to nine pinned folders can each have their own key: Ctrl+Alt and a number from 1 to 9, unless you change the prefix. Pressing it sends the Explorer window or Open or Save dialog in front to that folder, keeping a dialog's file name, and with neither in front it opens a new Explorer window. Turn it on under Settings, Keyboard and mouse, Pin shortcuts, then give a folder pin its number with **Assign shortcut** in the pin's right-click menu. Each profile has its own numbers. A number stays with its folder when the pin is renamed, reordered, or moved to another tab or group, and follows the pin when Edit path points it at another folder. File pins get no number. The keys stay off until the switch is on, because each one is taken from every other program. On a keyboard where the right Alt key types extra characters, Ctrl+Alt and a number can be one of them, so choose another prefix, such as Ctrl+Shift, if you type those.
+
 ### Profiles
 
 Each profile is an independent workspace with its own groups folder, recents count, and sidebar width.

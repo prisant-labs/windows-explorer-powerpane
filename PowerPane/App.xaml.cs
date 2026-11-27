@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Windows;
@@ -218,6 +219,9 @@ namespace PowerPane
             // switcher records it before it takes focus (#226).
             _switcherHotkey = new HotkeyService(HotkeyService.QuickSwitcherId, "quick switcher");
             _switcherHotkey.Pressed += () => Dispatcher.BeginInvoke(new Action(UI.QuickSwitcher.Toggle));
+            // Pin shortcuts (#299) send the window in front to a pinned folder, as the switcher does.
+            _pinHotkeys = new PinHotkeyService();
+            _pinHotkeys.Pressed += slot => Dispatcher.BeginInvoke(new Action(() => OpenPinFromHotkey(slot)));
             ApplyHotkeys();
 
             CreateTrayIcon();
@@ -234,14 +238,56 @@ namespace PowerPane
 
         private static HotkeyService _hotkeys;
         private static HotkeyService _switcherHotkey;
+        private static PinHotkeyService _pinHotkeys;
 
-        /// <summary>Re-read the keyboard settings and register or drop each shortcut.</summary>
+        /// <summary>The pin shortcut numbers Windows refused at the last apply, because another
+        /// program holds that combination (#299). The Keyboard page shows them.</summary>
+        internal static List<int> PinHotkeysRefused { get; private set; } = new List<int>();
+
+        /// <summary>Raised after the pin shortcuts are applied, so an open Keyboard page can show
+        /// which keys Windows refused.</summary>
+        internal static event Action PinHotkeysApplied;
+
+        /// <summary>Re-read the keyboard settings and register or drop each shortcut. It runs after
+        /// every save, which includes a profile switch, so the active profile's pin keys follow.</summary>
         private void ApplyHotkeys()
         {
             if (_hotkeys == null || Settings == null) return;
             var s = Settings.Current;
             _hotkeys.Apply(s.KeyboardNav, s.KeyboardNavHotkey);
             if (_switcherHotkey != null) _switcherHotkey.Apply(s.QuickSwitcher, s.QuickSwitcherHotkey);
+            if (_pinHotkeys != null)
+            {
+                var profile = s.ActiveProfile;
+                var entries = profile == null ? null : profile.PinHotkeys;
+                var slots = entries == null ? new List<int>() : entries.Where(e => e != null).Select(e => e.Slot).Distinct().ToList();
+                PinHotkeysRefused = _pinHotkeys.Apply(s.PinHotkeys, s.PinHotkeyModifiers, slots);
+                var h = PinHotkeysApplied;
+                if (h != null) h();
+            }
+        }
+
+        /// <summary>Send the window in front to the folder that holds this pin shortcut (#299). The
+        /// window is read first, before anything of ours takes focus. A key whose folder is no longer
+        /// pinned does nothing.</summary>
+        private static void OpenPinFromHotkey(int slot)
+        {
+            try
+            {
+                IntPtr target;
+                var kind = UI.QuickSwitcher.TargetInFront(out target);
+                var s = Settings == null ? null : Settings.Current;
+                var profile = s == null ? null : s.ActiveProfile;
+                string path = PinHotkeyModel.Resolve(profile == null ? null : profile.PinHotkeys, slot,
+                    PinHotkeyModel.FolderPinTargets(Groups == null ? null : Groups.Groups));
+                if (path == null)
+                {
+                    Log.Event("shortcut", "pin shortcut " + slot + " has no pinned folder, so it did nothing.");
+                    return;
+                }
+                UI.QuickSwitcher.SendFolder(kind, target, path);
+            }
+            catch (Exception ex) { Log.Error("pin shortcut", ex); }
         }
 
         /// <summary>Put focus in the pane belonging to whatever dialog is in front.</summary>

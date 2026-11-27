@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using PowerPane.Services;
@@ -40,6 +42,12 @@ namespace PowerPane.UI.Settings.Pages
                     "Search pins, Recent, drives, and actions from the keyboard.", "quick switcher", "search", "jump", "go to", "palette", "hotkey");
                 yield return new SettingsSearchEntry(Id, SwitcherShortcutCardId, "Quick switcher shortcut",
                     "The key combination that opens the quick switcher.", "hotkey", "shortcut", "ctrl+alt");
+                yield return new SettingsSearchEntry(Id, PinToggleCardId, "Let keyboard shortcuts open pinned folders",
+                    "A prefix plus a number from 1 to 9 opens a pinned folder.", "pin shortcut", "hotkey", "number", "favourite", "ctrl+alt");
+                yield return new SettingsSearchEntry(Id, PinPrefixCardId, "Pin shortcut prefix",
+                    "The modifiers in front of a pin shortcut's number.", "hotkey", "shortcut", "ctrl+alt", "altgr");
+                yield return new SettingsSearchEntry(Id, PinListCardId, "Assigned pin shortcuts",
+                    "The pinned folders that have a shortcut in this profile.", "pin shortcut", "hotkey", "remove");
                 yield return new SettingsSearchEntry(Id, FolderClicksCardId, "Clicking a folder",
                     "Choose what each click on a folder row does.", "mouse", "click", "middle click", "new window", "copy path", "ctrl", "shift");
                 yield return new SettingsSearchEntry(Id, FileClicksCardId, "Clicking a file",
@@ -83,6 +91,7 @@ namespace PowerPane.UI.Settings.Pages
                 box, "Keyboard navigation shortcut"));
 
             BuildQuickSwitcher(ctx, panel);
+            BuildPinShortcuts(ctx, panel);
             BuildClicks(ctx, panel);
             return panel;
         }
@@ -158,6 +167,110 @@ namespace PowerPane.UI.Settings.Pages
             panel.Children.Add(ctx.Cards.Card(SwitcherShortcutCardId, SwitcherGlyph, "Quick switcher shortcut",
                 "Modifiers joined with +, ending in a key, e.g. ctrl+alt+Space. Pick a combination other programs do not use, because PowerPane takes it from all of them.",
                 box, "Quick switcher shortcut"));
+        }
+
+        private const string PinToggleCardId = "pin-shortcuts-enabled";
+        private const string PinPrefixCardId = "pin-shortcuts-prefix";
+        private const string PinListCardId = "pin-shortcuts-list";
+        private const string PinGlyph = "\uE718";   // Segoe MDL2 Pin
+
+        /// <summary>Pin shortcuts (#299): the switch, the prefix, and the active profile's assigned
+        /// numbers. Each number is given to a folder from its pin's right-click menu. A number whose
+        /// folder is no longer pinned stays listed, so it can be removed by hand, and a number Windows
+        /// refused says so.</summary>
+        private static void BuildPinShortcuts(SettingsPageContext ctx, StackPanel panel)
+        {
+            var settings = ctx.Settings;
+            var s = settings.Current;
+            panel.Children.Add(ctx.Cards.Subheader("Pin shortcuts"));
+
+            var toggle = ctx.Cards.Toggle(s.PinHotkeys, enabled =>
+            {
+                s.PinHotkeys = enabled;
+                settings.Save();
+            }, "Let keyboard shortcuts open pinned folders");
+            panel.Children.Add(ctx.Cards.Card(PinToggleCardId, PinGlyph, "Let keyboard shortcuts open pinned folders",
+                "Give a folder pin a number from 1 to 9 with Assign shortcut in its right-click menu. The prefix and the number then send the Explorer window or file dialog in front to that folder, or open a new window when neither is in front.",
+                toggle, "Let keyboard shortcuts open pinned folders"));
+
+            var box = new TextBox { Text = s.PinHotkeyModifiers, MinWidth = 160 };
+            box.LostFocus += (sender, e) =>
+            {
+                bool accepted;
+                string result = ValidatePinPrefixText(box.Text, s.PinHotkeyModifiers, out accepted);
+                box.Text = result;
+                if (accepted && result != s.PinHotkeyModifiers)
+                {
+                    s.PinHotkeyModifiers = result;
+                    settings.Save();
+                }
+            };
+            panel.Children.Add(ctx.Cards.Card(PinPrefixCardId, PinGlyph, "Pin shortcut prefix",
+                "Modifiers joined with +, such as ctrl+alt; the number is added after them. On a keyboard where the right Alt key types extra characters, Ctrl+Alt and a number can be one of those characters, and PowerPane takes each assigned combination from every program. Choose another prefix, such as ctrl+shift, if you type them.",
+                box, "Pin shortcut prefix"));
+
+            var profile = s.ActiveProfile;
+            string profileName = profile == null ? "this profile" : profile.Name;
+            var list = ctx.Cards.Expander(PinListCardId, PinGlyph, "Assigned pin shortcuts",
+                "The pinned folders with a shortcut in " + profileName + ". Each profile has its own.",
+                accessibleName: "Assigned pin shortcuts");
+            var entries = profile == null ? null : profile.PinHotkeys;
+            var targets = PinHotkeyModel.FolderPinTargets(App.Groups == null ? null : App.Groups.Groups);
+            var orphans = PinHotkeyModel.Orphans(entries, targets);
+            var refused = App.PinHotkeysRefused ?? new List<int>();
+            var shown = (entries ?? new List<Models.PinHotkeyEntry>()).Where(x => x != null).OrderBy(x => x.Slot).ToList();
+            if (shown.Count == 0)
+                list.AddChild(ctx.Cards.ChildRow("No pinned folder has a shortcut yet.", new TextBlock()));
+            foreach (var entry in shown)
+            {
+                int slot = entry.Slot;
+                string label = PinHotkeyModel.SlotLabel(s.PinHotkeyModifiers, slot) + ": " + GroupSection.PinHotkeyLabel(entry.Target);
+                string note = PinShortcutNote(orphans.Any(o => o.Slot == slot), s.PinHotkeys && refused.Contains(slot));
+                if (note != null) label += " (" + note + ")";
+                // ChildRow names its control, so the button's own name goes in again there; passing the
+                // row's label would make a screen reader announce the Remove button as the folder.
+                string removeName = "Remove pin shortcut " + PinHotkeyModel.SlotLabel(s.PinHotkeyModifiers, slot);
+                var remove = ctx.Cards.IconButton("\uE74D", removeName, () =>
+                {
+                    if (profile == null || !ReferenceEquals(settings.Current.ActiveProfile, profile)) return;
+                    profile.PinHotkeys = PinHotkeyModel.Unassign(profile.PinHotkeys, slot);
+                    settings.Save();
+                    ctx.Rebuild();
+                });
+                list.AddChild(ctx.Cards.ChildRow(label, remove, removeName));
+            }
+            panel.Children.Add(list.Root);
+
+            // The keys are registered after the save that changed them, so the refusals can arrive
+            // after this page is built. Rebuild once they differ from what the page shows.
+            string seen = string.Join(",", refused);
+            Action onApplied = null;
+            onApplied = () =>
+            {
+                if (!ctx.IsCurrent) { App.PinHotkeysApplied -= onApplied; return; }
+                if (string.Join(",", App.PinHotkeysRefused ?? new List<int>()) == seen) return;
+                App.PinHotkeysApplied -= onApplied;
+                ctx.Rebuild();
+            };
+            App.PinHotkeysApplied += onApplied;
+        }
+
+        /// <summary>The note beside an assigned pin shortcut, or null when it works: the folder is no
+        /// longer pinned, or Windows refused the key because another program holds it (#299).</summary>
+        internal static string PinShortcutNote(bool orphaned, bool refused)
+        {
+            if (orphaned) return "no longer pinned";
+            if (refused) return "Windows refused this key, because another program holds it";
+            return null;
+        }
+
+        /// <summary>A pin shortcut prefix is kept when it is modifiers alone, stored in the order
+        /// ctrl, alt, shift, win; anything else reverts to <paramref name="lastValid"/> (#299).</summary>
+        internal static string ValidatePinPrefixText(string input, string lastValid, out bool accepted)
+        {
+            var v = PinHotkeyModel.ValidateModifiers(input);
+            accepted = v != null;
+            return v ?? lastValid;
         }
 
         /// <summary>The same decision as the old text box's <c>LostFocus</c> handler
