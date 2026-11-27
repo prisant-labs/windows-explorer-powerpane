@@ -728,7 +728,10 @@ namespace PowerPane.UI
         {
             var hit = FindPin(linkPath);
             if (hit.Item2 == null || destTab == null) return;
-            if (!ReferenceEquals(hit.Item1, destTab))
+            // Compared by folder, not by object: a scan that lands before the pane redraws gives the
+            // same tab a new object, and a drag within the tab must not turn into a move to another
+            // tab, which would append the pin unpinned (#301 review).
+            if (!string.Equals(hit.Item1.FolderPath, destTab.FolderPath, StringComparison.OrdinalIgnoreCase))
             {
                 var folder = hit.Item2;
                 // A pin dropped at a line on a sorted tab goes in at that line, in the order shown,
@@ -744,9 +747,10 @@ namespace PowerPane.UI
             // nothing, so it never turns a sorted tab to Manual. The line also decides whether the
             // pin is pinned to top: dropped below the band it is unpinned, and dropped into the band
             // it is pinned, as pinned tabs behave in a browser (#301).
-            var ordered = PinSorter.PlaceAtLineInBands(destTab.Items, hit.Item2, index);
+            var ordered = PinSorter.PlaceAtLineInBands(hit.Item1.Items, hit.Item2, index);
             if (ordered == null) return;
-            App.Groups.PostEdit(store => store.ReorderPins(destTab, ordered));
+            var sameTab = hit.Item1;
+            App.Groups.PostEdit(store => store.ReorderPins(sameTab, ordered));
         }
 
         private void MovePinToTabEnd(string linkPath, PinnedTab destTab)
